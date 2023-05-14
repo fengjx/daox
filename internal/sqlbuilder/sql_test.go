@@ -118,19 +118,78 @@ func TestInsert(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sql, err := tc.inserter.Sql()
-			assert.Equal(t, tc.wantErr, err)
-			if err != nil {
-				return
+			if tc.wantSQL != "" {
+				sql, err := tc.inserter.Sql()
+				assert.Equal(t, tc.wantErr, err)
+				if err != nil {
+					return
+				}
+				assert.Equal(t, tc.wantSQL, sql)
 			}
-			assert.Equal(t, tc.wantSQL, sql)
 
-			sql, err = tc.inserter.NameSql()
-			assert.Equal(t, tc.wantErr, err)
-			if err != nil {
-				return
+			if tc.wantNameSQL != "" {
+				sql, err := tc.inserter.NameSql()
+				assert.Equal(t, tc.wantErr, err)
+				if err != nil {
+					return
+				}
+				assert.Equal(t, tc.wantNameSQL, sql)
 			}
-			assert.Equal(t, tc.wantNameSQL, sql)
+		})
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	testCases := []struct {
+		name        string
+		updater     *Updater
+		wantSQL     string
+		wantNameSQL string
+		wantErr     error
+	}{
+		{
+			name:        "update",
+			updater:     New("user").Update().Columns("username", "age"),
+			wantSQL:     "UPDATE `user` SET `username` = ?, `age` = ?",
+			wantNameSQL: "UPDATE `user` SET `username` = :username, `age` = :age",
+		},
+		{
+			name: "update where",
+			updater: New("user").
+				Update().
+				Columns("username", "age").
+				Where(C().Where(true, "id = ?")),
+			wantSQL: "UPDATE `user` SET `username` = ?, `age` = ? WHERE id = ?",
+		},
+		{
+			name: "update name where",
+			updater: New("user").
+				Update().
+				Columns("username", "age").
+				Where(C().Where(true, "id = :id")),
+			wantNameSQL: "UPDATE `user` SET `username` = :username, `age` = :age WHERE id = :id",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.wantSQL != "" {
+				sql, err := tc.updater.Sql()
+				assert.Equal(t, tc.wantErr, err)
+				if err != nil {
+					return
+				}
+				assert.Equal(t, tc.wantSQL, sql)
+			}
+
+			if tc.wantNameSQL != "" {
+				sql, err := tc.updater.NameSql()
+				assert.Equal(t, tc.wantErr, err)
+				if err != nil {
+					return
+				}
+				assert.Equal(t, tc.wantNameSQL, sql)
+			}
 		})
 	}
 }

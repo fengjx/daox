@@ -65,15 +65,7 @@ func (s *Selector) Sql() (string, error) {
 	}
 	sb.WriteString(" FROM ")
 	warpQuote(sb, strings.TrimSpace(s.tableName))
-	if s.where != nil && len(s.where.predicates) > 0 {
-		sb.WriteString(" WHERE ")
-		for _, predicate := range s.where.predicates {
-			if predicate.op != nil {
-				sb.WriteString(predicate.op.text)
-			}
-			sb.WriteString(predicate.express)
-		}
-	}
+	buildWhereSql(sb, s.where)
 	if len(s.orderExpress) > 0 {
 		sb.WriteString(" ORDER BY ")
 		sb.WriteString(s.orderExpress)
