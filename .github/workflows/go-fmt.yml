@@ -1,0 +1,28 @@
+name: Format Go code
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ">=1.18.0"
+
+      - name: Install goimports
+        run: go install golang.org/x/tools/cmd/goimports@latest
+
+      - name: Check
+        run: |
+          make check
+          if [ -n "$(git status --porcelain)" ]; then
+             echo >&2 "错误: 请在本地运行命令'make check'后再提交."
+             exit 1
+          fi

@@ -63,7 +63,7 @@ func (ins *Inserter) Sql() (string, error) {
 		}
 	}
 	sb.WriteString(") VALUES (")
-	for i, _ := range ins.columns {
+	for i := range ins.columns {
 		sb.WriteString("?")
 		if i != len(ins.columns)-1 {
 			sb.WriteString(", ")

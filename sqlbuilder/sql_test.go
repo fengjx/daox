@@ -1,8 +1,9 @@
 package sqlbuilder
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSelect(t *testing.T) {
