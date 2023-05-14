@@ -8,6 +8,7 @@ import (
 var (
 	SQLErrTableNameRequire = errors.New("[sqlbuilder] tableName requires")
 	SQLErrColumnsRequire   = errors.New("[sqlbuilder] columns requires")
+	SQLErrDeleteMissWhere  = errors.New("[sqlbuilder] delete sql miss where")
 )
 
 type Builder struct {
@@ -31,6 +32,10 @@ func (b *Builder) Insert() *Inserter {
 
 func (b *Builder) Update() *Updater {
 	return NewUpdater(b.tableName)
+}
+
+func (b *Builder) Delete() *Deleter {
+	return NewDeleter(b.tableName)
 }
 
 func warpQuote(sb *strings.Builder, s string) {

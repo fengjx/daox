@@ -194,3 +194,37 @@ func TestUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestDelete(t *testing.T) {
+	testCases := []struct {
+		name    string
+		deleter *Deleter
+		wantSQL string
+		wantErr error
+	}{
+		{
+			name:    "delete",
+			deleter: New("user").Delete(),
+			wantSQL: "DELETE FROM `user`",
+			wantErr: SQLErrDeleteMissWhere,
+		},
+		{
+			name: "delete",
+			deleter: New("user").Delete().Where(
+				C().Where(true, "id = ?"),
+			),
+			wantSQL: "DELETE FROM `user` WHERE id = ?",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sql, err := tc.deleter.Sql()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantSQL, sql)
+		})
+	}
+}

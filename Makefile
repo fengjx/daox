@@ -1,7 +1,7 @@
 # 单元测试
 .PHONY: test
 test:
-	@go test -race ./...
+	go test -race ./...
 
 .PHONY: lint
 lint:
@@ -13,7 +13,7 @@ fmt:
 
 .PHONY: tidy
 tidy:
-	@go mod tidy -v
+	go mod tidy -v
 
 .PHONY: check
 check:
