@@ -1,6 +1,13 @@
 package sqlbuilder
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
+
+var (
+	SQLErrTableNameRequire = errors.New("[sqlbuilder] tableName requires")
+)
 
 type Builder struct {
 	tableName string
@@ -15,6 +22,10 @@ func New(tableName string) *Builder {
 
 func (b *Builder) Select() *Selector {
 	return NewSelector(b.tableName)
+}
+
+func (b *Builder) Insert() *Inserter {
+	return NewInserter(b.tableName)
 }
 
 type condition struct {

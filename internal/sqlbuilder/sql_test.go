@@ -98,5 +98,39 @@ func TestSelect(t *testing.T) {
 			assert.Equal(t, tc.wantSQL, sql)
 		})
 	}
+}
 
+func TestInsert(t *testing.T) {
+	testCases := []struct {
+		name        string
+		inserter    *Inserter
+		wantSQL     string
+		wantNameSQL string
+		wantErr     error
+	}{
+		{
+			name:        "insert",
+			inserter:    New("user").Insert().Columns("username", "age", "sex"),
+			wantSQL:     "INSERT INTO `user`(`username`, `age`, `sex`) VALUES (?, ?, ?)",
+			wantNameSQL: "INSERT INTO `user`(`username`, `age`, `sex`) VALUES (:username, :age, :sex)",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sql, err := tc.inserter.Sql()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantSQL, sql)
+
+			sql, err = tc.inserter.NameSql()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantNameSQL, sql)
+		})
+	}
 }
