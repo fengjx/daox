@@ -7,6 +7,7 @@ import (
 
 var (
 	SQLErrTableNameRequire = errors.New("[sqlbuilder] tableName requires")
+	SQLErrColumnsRequire   = errors.New("[sqlbuilder] columns requires")
 )
 
 type Builder struct {
@@ -26,18 +27,6 @@ func (b *Builder) Select() *Selector {
 
 func (b *Builder) Insert() *Inserter {
 	return NewInserter(b.tableName)
-}
-
-type condition struct {
-	meet    bool
-	express string
-}
-
-func Condition(meet bool, express string) *condition {
-	return &condition{
-		meet:    meet,
-		express: express,
-	}
 }
 
 func warpQuote(sb *strings.Builder, s string) {

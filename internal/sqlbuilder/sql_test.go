@@ -27,7 +27,7 @@ func TestSelect(t *testing.T) {
 			name: "select by id",
 			selector: New("user").Select().
 				Columns("id", "username").
-				Where(Condition(true, "id = ?")),
+				Where(C().Where(true, "id = ?")),
 			wantSQL: "SELECT `id`, `username` FROM `user` WHERE id = ?",
 		},
 		{
@@ -35,8 +35,8 @@ func TestSelect(t *testing.T) {
 			selector: New("user").Select().
 				Columns("id", "username", "age", "sex").
 				Where(
-					Condition(true, "age > ?"),
-					Condition(true, "sex = ?"),
+					C().Where(true, "age > ?").
+						And(true, "sex = ?"),
 				),
 			wantSQL: "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE age > ? AND sex = ?",
 		},
@@ -44,9 +44,9 @@ func TestSelect(t *testing.T) {
 			name: "select where not meet",
 			selector: New("user").Select().Columns("id", "username", "age", "sex").
 				Where(
-					Condition(true, "age > ?"),
-					Condition(true, "sex = ?"),
-					Condition(false, "username like ?"),
+					C().Where(true, "age > ?").
+						And(true, "sex = ?").
+						And(false, "username like ?"),
 				),
 			wantSQL: "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE age > ? AND sex = ?",
 		},
@@ -55,8 +55,8 @@ func TestSelect(t *testing.T) {
 			selector: New("user").Select().
 				Columns("id", "username", "age", "sex", "ctime").
 				Where(
-					Condition(true, "age > ?"),
-					Condition(true, "sex = ?"),
+					C().Where(true, "age > ?").
+						And(true, "sex = ?"),
 				).
 				OrderBy("ctime desc"),
 			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE age > ? AND sex = ? ORDER BY ctime desc",
@@ -66,8 +66,8 @@ func TestSelect(t *testing.T) {
 			selector: New("user").Select().
 				Columns("id", "username", "age", "sex", "ctime").
 				Where(
-					Condition(true, "age > ?"),
-					Condition(true, "sex = ?"),
+					C().Where(true, "age > ?").
+						And(true, "sex = ?"),
 				).
 				OrderBy("ctime desc").
 				Limit(10),
@@ -78,8 +78,8 @@ func TestSelect(t *testing.T) {
 			selector: New("user").Select().
 				Columns("id", "username", "age", "sex", "ctime").
 				Where(
-					Condition(true, "age > ?"),
-					Condition(true, "sex = ?"),
+					C().Where(true, "age > ?").
+						And(true, "sex = ?"),
 				).
 				OrderBy("ctime desc").
 				Offset(10).

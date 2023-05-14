@@ -1,12 +1,7 @@
 package sqlbuilder
 
 import (
-	"errors"
 	"strings"
-)
-
-var (
-	InsertErrColumnsRequire = errors.New("[sqlbuilder] insert columns requires")
 )
 
 type Inserter struct {
@@ -28,7 +23,7 @@ func (ins *Inserter) Columns(columns ...string) *Inserter {
 
 func (ins *Inserter) NameSql() (string, error) {
 	if len(ins.columns) == 0 {
-		return "", InsertErrColumnsRequire
+		return "", SQLErrColumnsRequire
 	}
 	sb := &strings.Builder{}
 	sb.WriteString("INSERT INTO ")
@@ -55,7 +50,7 @@ func (ins *Inserter) NameSql() (string, error) {
 
 func (ins *Inserter) Sql() (string, error) {
 	if len(ins.columns) == 0 {
-		return "", InsertErrColumnsRequire
+		return "", SQLErrColumnsRequire
 	}
 	sb := &strings.Builder{}
 	sb.WriteString("INSERT INTO ")

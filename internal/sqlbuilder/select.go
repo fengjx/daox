@@ -9,7 +9,7 @@ type Selector struct {
 	tableName    string
 	distinct     bool
 	columns      []string
-	wheres       []*condition
+	where        *condition
 	orderExpress string
 	limit        *int
 	offset       *int
@@ -27,8 +27,8 @@ func (s *Selector) Columns(columns ...string) *Selector {
 	return s
 }
 
-func (s *Selector) Where(conditions ...*condition) *Selector {
-	s.wheres = conditions
+func (s *Selector) Where(condition *condition) *Selector {
+	s.where = condition
 	return s
 }
 
@@ -65,15 +65,13 @@ func (s *Selector) Sql() (string, error) {
 	}
 	sb.WriteString(" FROM ")
 	warpQuote(sb, strings.TrimSpace(s.tableName))
-	if len(s.wheres) > 0 {
+	if s.where != nil && len(s.where.predicates) > 0 {
 		sb.WriteString(" WHERE ")
-		for i, cond := range s.wheres {
-			if cond.meet {
-				if i != 0 {
-					sb.WriteString(" AND ")
-				}
-				sb.WriteString(cond.express)
+		for _, predicate := range s.where.predicates {
+			if predicate.op != nil {
+				sb.WriteString(predicate.op.text)
 			}
+			sb.WriteString(predicate.express)
 		}
 	}
 	if len(s.orderExpress) > 0 {
