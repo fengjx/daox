@@ -1,4 +1,4 @@
-package model
+package daox
 
 type Column struct {
 	ColumnName   string
