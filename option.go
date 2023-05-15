@@ -13,8 +13,8 @@ func WithDBRead(read *sqlx.DB) Option {
 	}
 }
 
-func WithRedis(redisClient *redis.Client) Option {
-	return func(p *Dao) {
-		p.Redis = redisClient
+func WithRedis(redisClient *redis.Client, cacheMeta *CacheMeta) Option {
+	return func(d *Dao) {
+		d.Redis = redisClient
 	}
 }
