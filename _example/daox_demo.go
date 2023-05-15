@@ -3,13 +3,14 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/jmoiron/sqlx"
-	"github.com/jmoiron/sqlx/reflectx"
-	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/reflectx"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type User struct {

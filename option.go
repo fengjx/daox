@@ -13,8 +13,15 @@ func WithDBRead(read *sqlx.DB) Option {
 	}
 }
 
-func WithRedis(redisClient *redis.Client, cacheMeta *CacheMeta) Option {
+func WithCache(redisClient *redis.Client, cacheMeta *CacheMeta) Option {
 	return func(d *Dao) {
 		d.Redis = redisClient
+		d.CacheMeta = cacheMeta
+	}
+}
+
+func IsAutoIncrement() Option {
+	return func(dao *Dao) {
+		dao.TableMeta.IsAutoIncrement = true
 	}
 }
