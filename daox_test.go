@@ -2,6 +2,7 @@ package daox
 
 import (
 	"database/sql"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -39,8 +40,9 @@ func newDb(t *testing.T) *sqlx.DB {
 	return db
 }
 
-func before(t *testing.T, db *sqlx.DB) {
+func before(t *testing.T) {
 	t.Log("before...")
+	db := newDb(t)
 	_, err := db.Exec(`
 		CREATE TABLE user (
 		  id integer primary key autoincrement,
@@ -55,6 +57,22 @@ func before(t *testing.T, db *sqlx.DB) {
 	if err != nil {
 		panic(err)
 	}
+	dao := Create(db, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
+	for i := 0; i < 10; i++ {
+		id, err := dao.Save(&user{
+			Uid:       int64(1000 + i),
+			Name:      fmt.Sprintf("u-%d", i),
+			Sex:       "male",
+			LoginTime: time.Now().Unix(),
+			Utime:     time.Now().Unix(),
+		}, "ctime")
+		if err != nil {
+			t.Log(err.Error())
+			continue
+		}
+		t.Logf("save id - %d", id)
+	}
+
 }
 
 type user struct {
@@ -86,10 +104,8 @@ func TestCreate(t *testing.T) {
 }
 
 func TestSave(t *testing.T) {
+	before(t)
 	DBMaster := newDb(t)
-
-	before(t, DBMaster)
-
 	dao := Create(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
 	id, err := dao.Save(&user{
 		Uid:       1000,
@@ -103,7 +119,7 @@ func TestSave(t *testing.T) {
 	t.Logf("id: %d", id)
 
 	u := &user{}
-	err = dao.GetByPrimaryKey(id, u)
+	err = dao.GetById(id, u)
 	if err != nil {
 		t.Fatal(err)
 	}
