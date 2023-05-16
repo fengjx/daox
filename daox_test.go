@@ -88,10 +88,10 @@ type user struct {
 func TestCreate(t *testing.T) {
 	DBMaster := newDb(t)
 	cacheMeta := &CacheMeta{
-		Version:    "v1",
-		CacheKey:   "uid",
-		CacheTime:  time.Minute * 3,
-		ExpireTime: time.Minute * 10,
+		Version:        "v1",
+		CacheKey:       "uid",
+		ExpireTime:     time.Minute * 3,
+		CacheCleanTime: time.Minute * 5,
 	}
 	redisClient := createRedisClient(t)
 	dao := Create(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement(), WithCache(redisClient, cacheMeta))

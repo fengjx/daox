@@ -1,6 +1,7 @@
 package daox
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"reflect"
@@ -9,6 +10,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 )
+
+var ctx = context.TODO()
 
 type Dao struct {
 	DBMaster  *sqlx.DB
