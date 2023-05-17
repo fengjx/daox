@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jmoiron/sqlx/reflectx"
-	"github.com/redis/go-redis/v9"
 	"reflect"
 	"time"
+
+	"github.com/jmoiron/sqlx/reflectx"
+	"github.com/redis/go-redis/v9"
 )
 
 type CreateDataFun func() (interface{}, error)
@@ -49,6 +50,19 @@ func (c *CacheTool) Set(key string, data interface{}) error {
 	return err
 }
 
+func (c *CacheTool) SetAll(dataList map[string]interface{}) error {
+	pipe := c.RedisClient.Pipeline()
+	for key, data := range dataList {
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		pipe.SetNX(ctx, key, jsonData, c.ExpireTime)
+	}
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
 func (c *CacheTool) Del(key string) error {
 	_, err := c.RedisClient.Del(ctx, key).Result()
 	return err
@@ -64,18 +78,20 @@ func (c *CacheTool) Fetch(key string, dest interface{}, fun CreateDataFun) error
 	if ok {
 		return nil
 	}
-	data, err := fun()
+	dest, err = fun()
 	if err != nil {
 		return err
 	}
-	err = c.Set(key, data)
+	err = c.Set(key, dest)
 	if err != nil {
 		return err
 	}
-	dest = data
 	return nil
 }
 
+// BatchFetch
+// dest: must a slice
+// fun: to create miss data
 func (c *CacheTool) BatchFetch(keyPrefix string, items []string, dest interface{}, fun BatchCreateDataFun) error {
 	var v, vp reflect.Value
 	value := reflect.ValueOf(dest)
@@ -114,9 +130,8 @@ func (c *CacheTool) BatchFetch(keyPrefix string, items []string, dest interface{
 		// create a new struct type (which returns PtrTo) and indirect it
 		vp = reflect.New(base)
 		v = reflect.Indirect(vp)
-		v = reflect.Indirect(v)
 
-		err = json.Unmarshal([]byte(jsonStr), vp)
+		err = json.Unmarshal([]byte(jsonStr), vp.Interface())
 		if err != nil {
 			return err
 		}
@@ -133,14 +148,13 @@ func (c *CacheTool) BatchFetch(keyPrefix string, items []string, dest interface{
 	if err != nil {
 		return err
 	}
+	dataList := make(map[string]interface{}, len(list))
 	for key, val := range list {
-		err = c.Set(c.genKey(keyPrefix, key), val)
-		if err != nil {
-			return err
-		}
+		redisKey := c.genKey(keyPrefix, key)
+		dataList[redisKey] = val
 		direct.Set(reflect.Append(direct, reflect.ValueOf(val)))
 	}
-	return nil
+	return c.SetAll(dataList)
 }
 
 func (c *CacheTool) genKey(prefix string, item string) string {

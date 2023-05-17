@@ -3,10 +3,11 @@ package daox
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/redis/go-redis/v9"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type testInfo struct {
@@ -15,30 +16,42 @@ type testInfo struct {
 }
 
 func TestBatchFetch(t *testing.T) {
-	redisCtl := redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:6379",
-		Password: "",
-		DB:       0,
-	})
+	redisCtl := createRedisClient(t)
 	cacheTool := NewCacheTool(redisCtl, time.Minute*10)
-	var infos []*testInfo
-	err := cacheTool.BatchFetch("test-batch", []string{"1", "2", "3"}, &infos, func(missItem []string) (map[string]interface{}, error) {
-		res := make(map[string]interface{}, 0)
-		for _, item := range missItem {
-			i, _ := strconv.Atoi(item)
-			res[item] = &testInfo{
-				Id:   int64(i),
-				Name: fmt.Sprintf("name-%s", item),
-			}
+	for i := 0; i < 10; i++ {
+		var testInfos []*testInfo
+		var items []string
+		for j := 0; j < 3; j++ {
+			testInfos = append(testInfos, &testInfo{
+				Id:   int64(j),
+				Name: fmt.Sprintf("name-%d", j),
+			})
+			items = append(items, fmt.Sprintf("%d", j))
 		}
-		return res, nil
-	})
-	if err != nil {
-		t.Fatal(err)
+		var infos []*testInfo
+		err := cacheTool.BatchFetch("test-batch-v2", items, &infos, func(missItem []string) (map[string]interface{}, error) {
+			res := make(map[string]interface{}, 0)
+			for _, item := range missItem {
+				i, _ := strconv.Atoi(item)
+				res[item] = &testInfo{
+					Id:   int64(i),
+					Name: fmt.Sprintf("name-%s", item),
+				}
+			}
+			return res, nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		infoMap := make(map[int64]*testInfo)
+		for _, info := range infos {
+			infoMap[info.Id] = info
+		}
+
+		for _, info := range testInfos {
+			testJsonStr, _ := json.Marshal(info)
+			jsonStr, _ := json.Marshal(infoMap[info.Id])
+			assert.Equal(t, string(testJsonStr), string(jsonStr))
+		}
 	}
-	jsonStr, err := json.Marshal(infos)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(string(jsonStr))
 }

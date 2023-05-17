@@ -2,8 +2,9 @@ package daox
 
 import (
 	"fmt"
-	"github.com/jmoiron/sqlx/reflectx"
 	"reflect"
+
+	"github.com/jmoiron/sqlx/reflectx"
 )
 
 func baseType(t reflect.Type, expected reflect.Kind) (reflect.Type, error) {
