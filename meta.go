@@ -15,10 +15,9 @@ type TableMeta struct {
 }
 
 type CacheMeta struct {
-	CacheKey       string
-	Version        string
-	ExpireTime     time.Duration
-	CacheCleanTime time.Duration
+	CacheKey   string
+	Version    string
+	ExpireTime time.Duration
 }
 
 func (meta *TableMeta) OmitColumns(omit ...string) []string {
