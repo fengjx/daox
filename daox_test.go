@@ -57,7 +57,7 @@ func before(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	dao := Create(db, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
+	dao := NewDAO(db, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
 	for i := 0; i < 10; i++ {
 		id, err := dao.Save(&user{
 			Uid:       int64(1000 + i),
@@ -88,7 +88,7 @@ type user struct {
 func TestCreate(t *testing.T) {
 	DBMaster := newDb(t)
 	redisClient := createRedisClient(t)
-	dao := Create(
+	dao := NewDAO(
 		DBMaster,
 		"user",
 		"id",
@@ -107,7 +107,7 @@ func TestCreate(t *testing.T) {
 func TestSave(t *testing.T) {
 	before(t)
 	DBMaster := newDb(t)
-	dao := Create(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
+	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
 	u1 := &user{
 		Uid:       1000,
 		Name:      "fengjx",

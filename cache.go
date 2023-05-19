@@ -14,19 +14,19 @@ import (
 type FillDataFun func(missItem string, dest interface{}) error
 type BatchCreateDataFun func(missItems []string) (map[string]interface{}, error)
 
-type CacheTool struct {
+type CacheProvider struct {
 	RedisClient *redis.Client
 	ExpireTime  time.Duration // 缓存时长
 }
 
-func NewCacheTool(redisCtl *redis.Client, expireTime time.Duration) *CacheTool {
-	return &CacheTool{
+func NewCacheProvider(redisCtl *redis.Client, expireTime time.Duration) *CacheProvider {
+	return &CacheProvider{
 		RedisClient: redisCtl,
 		ExpireTime:  expireTime,
 	}
 }
 
-func (c *CacheTool) Get(key string, dest interface{}) (bool, error) {
+func (c *CacheProvider) Get(key string, dest interface{}) (bool, error) {
 	result, err := c.RedisClient.Get(ctx, key).Result()
 	if err != nil {
 		return false, err
@@ -41,7 +41,7 @@ func (c *CacheTool) Get(key string, dest interface{}) (bool, error) {
 	return true, nil
 }
 
-func (c *CacheTool) Set(key string, data interface{}) error {
+func (c *CacheProvider) Set(key string, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -50,7 +50,7 @@ func (c *CacheTool) Set(key string, data interface{}) error {
 	return err
 }
 
-func (c *CacheTool) SetAll(dataList map[string]interface{}) error {
+func (c *CacheProvider) SetAll(dataList map[string]interface{}) error {
 	pipe := c.RedisClient.Pipeline()
 	for key, data := range dataList {
 		jsonData, err := json.Marshal(data)
@@ -63,14 +63,14 @@ func (c *CacheTool) SetAll(dataList map[string]interface{}) error {
 	return err
 }
 
-func (c *CacheTool) Del(key string) error {
+func (c *CacheProvider) Del(key string) error {
 	_, err := c.RedisClient.Del(ctx, key).Result()
 	return err
 }
 
 // Fetch
 // invalidStale 当缓存过期时，是否使用旧值
-func (c *CacheTool) Fetch(keyPrefix string, item string, dest interface{}, fun FillDataFun) error {
+func (c *CacheProvider) Fetch(keyPrefix string, item string, dest interface{}, fun FillDataFun) error {
 	value := reflect.ValueOf(dest)
 	err := c.CheckPointer(value)
 	if err != nil {
@@ -98,7 +98,7 @@ func (c *CacheTool) Fetch(keyPrefix string, item string, dest interface{}, fun F
 // BatchFetch
 // dest: must a slice
 // fun: to create miss data
-func (c *CacheTool) BatchFetch(keyPrefix string, items []string, dest interface{}, fun BatchCreateDataFun) error {
+func (c *CacheProvider) BatchFetch(keyPrefix string, items []string, dest interface{}, fun BatchCreateDataFun) error {
 	var v, vp reflect.Value
 	value := reflect.ValueOf(dest)
 	err := c.CheckPointer(value)
@@ -160,7 +160,7 @@ func (c *CacheTool) BatchFetch(keyPrefix string, items []string, dest interface{
 	return c.SetAll(dataList)
 }
 
-func (c *CacheTool) CheckPointer(value reflect.Value) error {
+func (c *CacheProvider) CheckPointer(value reflect.Value) error {
 	if value.Kind() != reflect.Ptr {
 		return errors.New("must pass a pointer, not a value")
 	}
@@ -170,6 +170,6 @@ func (c *CacheTool) CheckPointer(value reflect.Value) error {
 	return nil
 }
 
-func (c *CacheTool) genKey(prefix string, item string) string {
+func (c *CacheProvider) genKey(prefix string, item string) string {
 	return fmt.Sprintf("{%s}_%s", prefix, item)
 }

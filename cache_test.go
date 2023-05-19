@@ -20,13 +20,13 @@ func TestFetch(t *testing.T) {
 	//redisCtl = redis.NewClient(&redis.Options{
 	//	Addr: "127.0.0.1:6379",
 	//})
-	cacheTool := NewCacheTool(redisCtl, time.Minute*10)
+	cache := NewCacheProvider(redisCtl, time.Minute*10)
 	tinfo := &testInfo{
 		Id:   1,
 		Name: "name-v1-1",
 	}
 	info := &testInfo{}
-	err := cacheTool.Fetch("test-fetch-v1", "1", info, func(missItem string, dest interface{}) error {
+	err := cache.Fetch("test-fetch-v1", "1", info, func(missItem string, dest interface{}) error {
 		res := dest.(*testInfo)
 		id, _ := strconv.Atoi(missItem)
 		res.Id = int64(id)
@@ -44,7 +44,7 @@ func TestFetch(t *testing.T) {
 
 func TestBatchFetch(t *testing.T) {
 	redisCtl := createRedisClient(t)
-	cacheTool := NewCacheTool(redisCtl, time.Minute*10)
+	cache := NewCacheProvider(redisCtl, time.Minute*10)
 	for i := 0; i < 10; i++ {
 		var testInfos []*testInfo
 		var items []string
@@ -56,7 +56,7 @@ func TestBatchFetch(t *testing.T) {
 			items = append(items, fmt.Sprintf("%d", j))
 		}
 		var infos []*testInfo
-		err := cacheTool.BatchFetch("test-batch-v2", items, &infos, func(missItem []string) (map[string]interface{}, error) {
+		err := cache.BatchFetch("test-batch-v2", items, &infos, func(missItem []string) (map[string]interface{}, error) {
 			res := make(map[string]interface{}, 0)
 			for _, item := range missItem {
 				i, _ := strconv.Atoi(item)

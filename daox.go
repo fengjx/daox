@@ -21,7 +21,7 @@ type Dao struct {
 	TableMeta *TableMeta
 }
 
-func Create(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
+func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
 	structMap := master.Mapper.TypeMap(structType)
 	columns := make([]string, 0, len(structMap.Names))
 	for _, column := range structMap.Names {
@@ -96,6 +96,7 @@ func (dao *Dao) BatchSave(dest []interface{}) (int64, error) {
 }
 
 func (dao *Dao) GetByColumn(kv *KV, dest interface{}) error {
+
 	tableMeta := dao.TableMeta
 	querySql, err := dao.SQLBuilder().Select().
 		Columns(tableMeta.OmitColumns()...).
