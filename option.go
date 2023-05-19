@@ -3,6 +3,7 @@ package daox
 import (
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
+	"time"
 )
 
 type Option func(*Dao)
@@ -13,10 +14,21 @@ func WithDBRead(read *sqlx.DB) Option {
 	}
 }
 
-func WithCache(redisClient *redis.Client, cacheMeta *CacheMeta) Option {
+func WithCacheExpireTime(cacheExpireTime time.Duration) Option {
+	return func(d *Dao) {
+		d.TableMeta.CacheExpireTime = cacheExpireTime
+	}
+}
+
+func WithCacheVersion(cacheVersion string) Option {
+	return func(d *Dao) {
+		d.TableMeta.CacheVersion = cacheVersion
+	}
+}
+
+func WithCache(redisClient *redis.Client) Option {
 	return func(d *Dao) {
 		d.Redis = redisClient
-		d.CacheMeta = cacheMeta
 	}
 }
 

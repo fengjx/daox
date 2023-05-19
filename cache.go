@@ -11,8 +11,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type CreateDataFun func() (interface{}, error)
-type BatchCreateDataFun func(missItem []string) (map[string]interface{}, error)
+type FillDataFun func(missItem string, dest interface{}) error
+type BatchCreateDataFun func(missItems []string) (map[string]interface{}, error)
 
 type CacheTool struct {
 	RedisClient *redis.Client
@@ -70,15 +70,21 @@ func (c *CacheTool) Del(key string) error {
 
 // Fetch
 // invalidStale 当缓存过期时，是否使用旧值
-func (c *CacheTool) Fetch(key string, dest interface{}, fun CreateDataFun) error {
-	ok, err := c.Get(key, dest)
+func (c *CacheTool) Fetch(keyPrefix string, item string, dest interface{}, fun FillDataFun) error {
+	value := reflect.ValueOf(dest)
+	err := c.CheckPointer(value)
 	if err != nil {
+		return err
+	}
+	key := c.genKey(keyPrefix, item)
+	ok, err := c.Get(key, dest)
+	if err != nil && err != redis.Nil {
 		return err
 	}
 	if ok {
 		return nil
 	}
-	dest, err = fun()
+	err = fun(item, dest)
 	if err != nil {
 		return err
 	}
@@ -95,12 +101,9 @@ func (c *CacheTool) Fetch(key string, dest interface{}, fun CreateDataFun) error
 func (c *CacheTool) BatchFetch(keyPrefix string, items []string, dest interface{}, fun BatchCreateDataFun) error {
 	var v, vp reflect.Value
 	value := reflect.ValueOf(dest)
-	// json.Unmarshal returns errors for these
-	if value.Kind() != reflect.Ptr {
-		return errors.New("must pass a pointer, not a value")
-	}
-	if value.IsNil() {
-		return errors.New("must not a nil pointer")
+	err := c.CheckPointer(value)
+	if err != nil {
+		return err
 	}
 	direct := reflect.Indirect(value)
 	slice, err := baseType(value.Type(), reflect.Slice)
@@ -155,6 +158,16 @@ func (c *CacheTool) BatchFetch(keyPrefix string, items []string, dest interface{
 		direct.Set(reflect.Append(direct, reflect.ValueOf(val)))
 	}
 	return c.SetAll(dataList)
+}
+
+func (c *CacheTool) CheckPointer(value reflect.Value) error {
+	if value.Kind() != reflect.Ptr {
+		return errors.New("must pass a pointer, not a value")
+	}
+	if value.IsNil() {
+		return errors.New("must not a nil pointer")
+	}
+	return nil
 }
 
 func (c *CacheTool) genKey(prefix string, item string) string {

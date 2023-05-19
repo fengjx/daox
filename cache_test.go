@@ -15,6 +15,33 @@ type testInfo struct {
 	Name string `json:"name"`
 }
 
+func TestFetch(t *testing.T) {
+	redisCtl := createRedisClient(t)
+	//redisCtl = redis.NewClient(&redis.Options{
+	//	Addr: "127.0.0.1:6379",
+	//})
+	cacheTool := NewCacheTool(redisCtl, time.Minute*10)
+	tinfo := &testInfo{
+		Id:   1,
+		Name: "name-v1-1",
+	}
+	info := &testInfo{}
+	err := cacheTool.Fetch("test-fetch-v1", "1", info, func(missItem string, dest interface{}) error {
+		res := dest.(*testInfo)
+		id, _ := strconv.Atoi(missItem)
+		res.Id = int64(id)
+		res.Name = fmt.Sprintf("name-v1-%d", id)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testJsonStr, _ := json.Marshal(tinfo)
+	jsonStr, _ := json.Marshal(info)
+	t.Log(string(jsonStr))
+	assert.Equal(t, string(testJsonStr), string(jsonStr))
+}
+
 func TestBatchFetch(t *testing.T) {
 	redisCtl := createRedisClient(t)
 	cacheTool := NewCacheTool(redisCtl, time.Minute*10)

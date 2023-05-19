@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/fengjx/daox/sqlbuilder"
 	"github.com/jmoiron/sqlx"
@@ -18,7 +19,6 @@ type Dao struct {
 	DBRead    *sqlx.DB
 	Redis     *redis.Client
 	TableMeta *TableMeta
-	CacheMeta *CacheMeta
 }
 
 func Create(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
@@ -42,6 +42,14 @@ func Create(master *sqlx.DB, tableName string, primaryKey string, structType ref
 	if dao.DBRead == nil {
 		dao.DBRead = dao.DBMaster
 	}
+	if dao.TableMeta.CacheVersion == "" {
+		dao.TableMeta.CacheVersion = "v1"
+	}
+	if dao.TableMeta.CacheExpireTime == 0 {
+		dao.TableMeta.CacheExpireTime = time.Minute * 3
+	}
+	keyPrefix := fmt.Sprintf("{%v}-%s-", structType.Elem(), dao.TableMeta.CacheVersion)
+	dao.TableMeta.cachePrefix = keyPrefix
 	return dao
 }
 
@@ -179,4 +187,13 @@ func (dao *Dao) DeleteByIds(idValue interface{}) (bool, error) {
 		return false, err
 	}
 	return affected == 1, nil
+}
+
+func containsString(collection []string, element string) bool {
+	for _, item := range collection {
+		if item == element {
+			return true
+		}
+	}
+	return false
 }

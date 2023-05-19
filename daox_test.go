@@ -87,40 +87,43 @@ type user struct {
 
 func TestCreate(t *testing.T) {
 	DBMaster := newDb(t)
-	cacheMeta := &CacheMeta{
-		Version:    "v1",
-		CacheKey:   "uid",
-		ExpireTime: time.Minute * 3,
-	}
 	redisClient := createRedisClient(t)
-	dao := Create(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement(), WithCache(redisClient, cacheMeta))
+	dao := Create(
+		DBMaster,
+		"user",
+		"id",
+		reflect.TypeOf(&user{}),
+		IsAutoIncrement(),
+		WithCache(redisClient),
+		WithCacheVersion("v-1"),
+	)
 	assert.Equal(t, len(dao.TableMeta.Columns), 7)
 	assert.Equal(t, dao.TableMeta.PrimaryKey, "id")
 	for _, column := range dao.TableMeta.Columns {
 		t.Log(column)
 	}
-	assert.Equal(t, cacheMeta, dao.CacheMeta)
 }
 
 func TestSave(t *testing.T) {
 	before(t)
 	DBMaster := newDb(t)
 	dao := Create(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
-	id, err := dao.Save(&user{
+	u1 := &user{
 		Uid:       1000,
 		Name:      "fengjx",
 		Sex:       "1",
 		LoginTime: time.Now().Unix(),
-	})
+		Utime:     time.Now().Unix(),
+	}
+	id, err := dao.Save(u1)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	t.Logf("id: %d", id)
-
-	u := &user{}
-	err = dao.GetById(id, u)
+	u2 := &user{}
+	err = dao.GetById(id, u2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(u.Name)
+	assert.Equal(t, u1.Uid, u2.Uid)
 }
