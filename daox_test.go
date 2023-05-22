@@ -104,7 +104,7 @@ func TestCreate(t *testing.T) {
 	}
 }
 
-func TestSave(t *testing.T) {
+func TestCrud(t *testing.T) {
 	before(t)
 	DBMaster := newDb(t)
 	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
@@ -126,4 +126,44 @@ func TestSave(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, u1.Uid, u2.Uid)
+}
+
+func TestBatchSave(t *testing.T) {
+	before(t)
+	DBMaster := newDb(t)
+	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
+	nowUnix := time.Now().Unix()
+	users := []*user{
+		{
+			Uid:       1000,
+			Name:      "fengjx0",
+			Sex:       "1",
+			LoginTime: nowUnix,
+			Utime:     nowUnix,
+			Ctime:     nowUnix,
+		},
+		{
+			Uid:       1001,
+			Name:      "fengjx1",
+			Sex:       "2",
+			LoginTime: nowUnix,
+			Utime:     nowUnix,
+			Ctime:     nowUnix,
+		},
+	}
+	affected, err := dao.BatchSave(users)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	assert.Equal(t, int64(2), affected)
+	u := &user{}
+	err = dao.GetByColumn(Kv("uid", 1000), u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "fengjx0", u.Name)
+}
+
+func TestDaoFetch(t *testing.T) {
+
 }

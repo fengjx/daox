@@ -28,7 +28,7 @@ func WithCacheVersion(cacheVersion string) Option {
 
 func WithCache(redisClient *redis.Client) Option {
 	return func(d *Dao) {
-		d.Redis = redisClient
+		d.RedisClient = redisClient
 	}
 }
 

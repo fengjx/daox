@@ -26,8 +26,12 @@ func NewCacheProvider(redisCtl *redis.Client, expireTime time.Duration) *CachePr
 	}
 }
 
-func (c *CacheProvider) Get(key string, dest interface{}) (bool, error) {
+func (c *CacheProvider) get(keyPrefix string, item string, dest interface{}) (bool, error) {
+	key := c.genKey(keyPrefix, item)
 	result, err := c.RedisClient.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
@@ -41,7 +45,8 @@ func (c *CacheProvider) Get(key string, dest interface{}) (bool, error) {
 	return true, nil
 }
 
-func (c *CacheProvider) Set(key string, data interface{}) error {
+func (c *CacheProvider) set(keyPrefix string, item string, data interface{}) error {
+	key := c.genKey(keyPrefix, item)
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -50,9 +55,10 @@ func (c *CacheProvider) Set(key string, data interface{}) error {
 	return err
 }
 
-func (c *CacheProvider) SetAll(dataList map[string]interface{}) error {
+func (c *CacheProvider) setAll(keyPrefix string, dataList map[string]interface{}) error {
 	pipe := c.RedisClient.Pipeline()
-	for key, data := range dataList {
+	for item, data := range dataList {
+		key := c.genKey(keyPrefix, item)
 		jsonData, err := json.Marshal(data)
 		if err != nil {
 			return err
@@ -63,9 +69,23 @@ func (c *CacheProvider) SetAll(dataList map[string]interface{}) error {
 	return err
 }
 
-func (c *CacheProvider) Del(key string) error {
+func (c *CacheProvider) Del(keyPrefix string, item string) error {
+	key := c.genKey(keyPrefix, item)
 	_, err := c.RedisClient.Del(ctx, key).Result()
 	return err
+}
+
+func (c *CacheProvider) BatchDel(keyPrefix string, items []string) error {
+	pipe := c.RedisClient.Pipeline()
+	for _, item := range items {
+		key := c.genKey(keyPrefix, item)
+		pipe.Del(ctx, key)
+	}
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Fetch
@@ -76,19 +96,18 @@ func (c *CacheProvider) Fetch(keyPrefix string, item string, dest interface{}, f
 	if err != nil {
 		return err
 	}
-	key := c.genKey(keyPrefix, item)
-	ok, err := c.Get(key, dest)
-	if err != nil && err != redis.Nil {
+	exist, err := c.get(keyPrefix, item, dest)
+	if err != nil {
 		return err
 	}
-	if ok {
+	if exist {
 		return nil
 	}
 	err = fun(item, dest)
 	if err != nil {
 		return err
 	}
-	err = c.Set(key, dest)
+	err = c.set(keyPrefix, item, dest)
 	if err != nil {
 		return err
 	}
@@ -157,7 +176,7 @@ func (c *CacheProvider) BatchFetch(keyPrefix string, items []string, dest interf
 		dataList[redisKey] = val
 		direct.Set(reflect.Append(direct, reflect.ValueOf(val)))
 	}
-	return c.SetAll(dataList)
+	return c.setAll(keyPrefix, dataList)
 }
 
 func (c *CacheProvider) CheckPointer(value reflect.Value) error {
