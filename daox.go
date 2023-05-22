@@ -260,28 +260,21 @@ func containsString(collection []string, element string) bool {
 	return false
 }
 
-func toString(v interface{}) string {
-	if v == nil {
+func toString(src interface{}) string {
+	if src == nil {
 		return ""
 	}
-	if bs, ok := v.([]byte); ok {
-		return string(bs)
-	}
 
-	rt := reflect.TypeOf(v)
-	switch rt.Kind() {
-	case reflect.String:
-		if s, ok := v.(string); ok {
-			return s
-		}
-		return reflect.ValueOf(v).String()
-	case reflect.Int, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int8, reflect.Uint, reflect.Uint32, reflect.Uint64, reflect.Uint8:
-		return fmt.Sprintf("%d", v)
-	case reflect.Float32, reflect.Float64:
+	switch v := src.(type) {
+	case string:
+		return src.(string)
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", src)
+	case float32, float64:
 		bs, _ := json.Marshal(v)
 		return string(bs)
-	case reflect.Bool:
-		if b, ok := v.(bool); ok && b {
+	case bool:
+		if b, ok := src.(bool); ok && b {
 			return "true"
 		} else {
 			return "false"
