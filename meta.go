@@ -2,7 +2,6 @@ package daox
 
 import (
 	"reflect"
-	"time"
 )
 
 type TableMeta struct {
@@ -11,9 +10,6 @@ type TableMeta struct {
 	Columns         []string
 	PrimaryKey      string
 	IsAutoIncrement bool
-	CacheVersion    string
-	CacheExpireTime time.Duration
-	cachePrefix     string
 }
 
 func (meta *TableMeta) OmitColumns(omit ...string) []string {

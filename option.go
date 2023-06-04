@@ -16,13 +16,13 @@ func WithDBRead(read *sqlx.DB) Option {
 
 func WithCacheExpireTime(cacheExpireTime time.Duration) Option {
 	return func(d *Dao) {
-		d.TableMeta.CacheExpireTime = cacheExpireTime
+		d.CacheProvider.ExpireTime = cacheExpireTime
 	}
 }
 
 func WithCacheVersion(cacheVersion string) Option {
 	return func(d *Dao) {
-		d.TableMeta.CacheVersion = cacheVersion
+		d.CacheProvider.Version = cacheVersion
 	}
 }
 

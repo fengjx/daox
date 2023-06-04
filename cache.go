@@ -11,24 +11,27 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type FillDataFun func(missItem string, dest interface{}) error
 type BatchCreateDataFun func(missItems []string) (map[string]interface{}, error)
 
 type CacheProvider struct {
 	RedisClient *redis.Client
+	Version     string
+	KeyPrefix   string
 	ExpireTime  time.Duration // 缓存时长
 }
 
-func NewCacheProvider(redisCtl *redis.Client, expireTime time.Duration) *CacheProvider {
+func NewCacheProvider(redisCtl *redis.Client, keyPrefix string, version string, expireTime time.Duration) *CacheProvider {
 	return &CacheProvider{
 		RedisClient: redisCtl,
+		Version:     version,
+		KeyPrefix:   keyPrefix,
 		ExpireTime:  expireTime,
 	}
 }
 
-func (c *CacheProvider) get(keyPrefix string, item string, dest interface{}) (bool, error) {
-	key := c.genKey(keyPrefix, item)
-	result, err := c.RedisClient.Get(ctx, key).Result()
+func (c *CacheProvider) get(key string, item string, dest interface{}) (bool, error) {
+	cacheKey := c.genKey(key, item)
+	result, err := c.RedisClient.Get(ctx, cacheKey).Result()
 	if err == redis.Nil {
 		return false, nil
 	}
@@ -45,69 +48,43 @@ func (c *CacheProvider) get(keyPrefix string, item string, dest interface{}) (bo
 	return true, nil
 }
 
-func (c *CacheProvider) set(keyPrefix string, item string, data interface{}) error {
-	key := c.genKey(keyPrefix, item)
+func (c *CacheProvider) set(key string, item string, data interface{}) error {
+	cacheKey := c.genKey(key, item)
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-	_, err = c.RedisClient.Set(ctx, key, jsonData, c.ExpireTime).Result()
+	_, err = c.RedisClient.Set(ctx, cacheKey, jsonData, c.ExpireTime).Result()
 	return err
 }
 
-func (c *CacheProvider) setAll(keyPrefix string, dataList map[string]interface{}) error {
+func (c *CacheProvider) setAll(key string, dataList map[string]interface{}) error {
 	pipe := c.RedisClient.Pipeline()
 	for item, data := range dataList {
-		key := c.genKey(keyPrefix, item)
+		cacheKey := c.genKey(key, item)
 		jsonData, err := json.Marshal(data)
 		if err != nil {
 			return err
 		}
-		pipe.SetNX(ctx, key, jsonData, c.ExpireTime)
+		pipe.SetNX(ctx, cacheKey, jsonData, c.ExpireTime)
 	}
 	_, err := pipe.Exec(ctx)
 	return err
 }
 
-func (c *CacheProvider) Del(keyPrefix string, item string) error {
-	key := c.genKey(keyPrefix, item)
-	_, err := c.RedisClient.Del(ctx, key).Result()
+func (c *CacheProvider) Del(key string, item string) error {
+	cacheKey := c.genKey(key, item)
+	_, err := c.RedisClient.Del(ctx, cacheKey).Result()
 	return err
 }
 
-func (c *CacheProvider) BatchDel(keyPrefix string, items []string) error {
+func (c *CacheProvider) BatchDel(key string, items []string) error {
 	pipe := c.RedisClient.Pipeline()
 	for _, item := range items {
-		key := c.genKey(keyPrefix, item)
-		pipe.Del(ctx, key)
+		cacheKey := c.genKey(key, item)
+		pipe.Del(ctx, cacheKey)
 	}
 	_, err := pipe.Exec(ctx)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Fetch
-// invalidStale 当缓存过期时，是否使用旧值
-func (c *CacheProvider) Fetch(keyPrefix string, item string, dest interface{}, fun FillDataFun) error {
-	value := reflect.ValueOf(dest)
-	err := c.CheckPointer(value)
-	if err != nil {
-		return err
-	}
-	exist, err := c.get(keyPrefix, item, dest)
-	if err != nil {
-		return err
-	}
-	if exist {
-		return nil
-	}
-	err = fun(item, dest)
-	if err != nil {
-		return err
-	}
-	err = c.set(keyPrefix, item, dest)
 	if err != nil {
 		return err
 	}
@@ -117,7 +94,7 @@ func (c *CacheProvider) Fetch(keyPrefix string, item string, dest interface{}, f
 // BatchFetch
 // dest: must a slice
 // fun: to create miss data
-func (c *CacheProvider) BatchFetch(keyPrefix string, items []string, dest interface{}, fun BatchCreateDataFun) error {
+func (c *CacheProvider) BatchFetch(key string, items []string, dest interface{}, fun BatchCreateDataFun) error {
 	var v, vp reflect.Value
 	value := reflect.ValueOf(dest)
 	err := c.CheckPointer(value)
@@ -136,7 +113,7 @@ func (c *CacheProvider) BatchFetch(keyPrefix string, items []string, dest interf
 
 	keys := make([]string, len(items))
 	for i := 0; i < len(items); i++ {
-		keys[i] = c.genKey(keyPrefix, items[i])
+		keys[i] = c.genKey(key, items[i])
 	}
 	result, err := c.RedisClient.MGet(ctx, keys...).Result()
 	if err != nil {
@@ -171,12 +148,12 @@ func (c *CacheProvider) BatchFetch(keyPrefix string, items []string, dest interf
 		return err
 	}
 	dataList := make(map[string]interface{}, len(list))
-	for key, val := range list {
-		redisKey := c.genKey(keyPrefix, key)
-		dataList[redisKey] = val
+	for k, val := range list {
+		cacheKey := c.genKey(key, k)
+		dataList[cacheKey] = val
 		direct.Set(reflect.Append(direct, reflect.ValueOf(val)))
 	}
-	return c.setAll(keyPrefix, dataList)
+	return c.setAll(key, dataList)
 }
 
 func (c *CacheProvider) CheckPointer(value reflect.Value) error {
@@ -189,6 +166,6 @@ func (c *CacheProvider) CheckPointer(value reflect.Value) error {
 	return nil
 }
 
-func (c *CacheProvider) genKey(prefix string, item string) string {
-	return fmt.Sprintf("{%s}_%s", prefix, item)
+func (c *CacheProvider) genKey(key, item string) string {
+	return fmt.Sprintf("{%s}_%s_%s_%s", c.KeyPrefix, c.Version, key, item)
 }

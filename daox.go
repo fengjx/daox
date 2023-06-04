@@ -20,7 +20,7 @@ type Dao struct {
 	DBRead        *sqlx.DB
 	RedisClient   *redis.Client
 	TableMeta     *TableMeta
-	cacheProvider *CacheProvider
+	CacheProvider *CacheProvider
 }
 
 func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
@@ -38,21 +38,14 @@ func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType ref
 		},
 		DBMaster: master,
 	}
+	keyPrefix := fmt.Sprintf("data_%v", structType.Elem())
+	dao.CacheProvider = NewCacheProvider(dao.RedisClient, keyPrefix, "v1", time.Minute*3)
 	for _, opt := range opts {
 		opt(dao)
 	}
 	if dao.DBRead == nil {
 		dao.DBRead = dao.DBMaster
 	}
-	if dao.TableMeta.CacheVersion == "" {
-		dao.TableMeta.CacheVersion = "v1"
-	}
-	if dao.TableMeta.CacheExpireTime == 0 {
-		dao.TableMeta.CacheExpireTime = time.Minute * 3
-	}
-	keyPrefix := fmt.Sprintf("data_{%v}_%s", structType.Elem(), dao.TableMeta.CacheVersion)
-	dao.TableMeta.cachePrefix = keyPrefix
-	dao.cacheProvider = NewCacheProvider(dao.RedisClient, dao.TableMeta.CacheExpireTime)
 	return dao
 }
 
@@ -229,26 +222,18 @@ func (dao *Dao) DeleteById(id interface{}) (bool, error) {
 	return affected == 1, nil
 }
 
-func (dao *Dao) Fetch(kv *KV, dest interface{}, fun FillDataFun) error {
-	return dao.cacheProvider.Fetch(dao.KeyPrefix(kv.Key), toString(kv.Value), dest, fun)
-}
-
 // BatchFetch
 // 注意不会按 items 顺序返回
 func (dao *Dao) BatchFetch(field string, items []string, dest interface{}, fun BatchCreateDataFun) error {
-	return dao.cacheProvider.BatchFetch(field, items, dest, fun)
+	return dao.CacheProvider.BatchFetch(field, items, dest, fun)
 }
 
 func (dao *Dao) DeleteCache(kv *KV) error {
-	return dao.cacheProvider.Del(kv.Key, toString(kv.Value))
+	return dao.CacheProvider.Del(kv.Key, toString(kv.Value))
 }
 
 func (dao *Dao) BatchDeleteCache(field string, items []string) error {
-	return dao.cacheProvider.BatchDel(field, items)
-}
-
-func (dao *Dao) KeyPrefix(field string) string {
-	return fmt.Sprintf("%s_%s", dao.TableMeta.cachePrefix, field)
+	return dao.CacheProvider.BatchDel(field, items)
 }
 
 func containsString(collection []string, element string) bool {

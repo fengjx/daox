@@ -95,7 +95,7 @@ func TestCreate(t *testing.T) {
 		reflect.TypeOf(&user{}),
 		IsAutoIncrement(),
 		WithCache(redisClient),
-		WithCacheVersion("v-1"),
+		WithCacheVersion("v1"),
 	)
 	assert.Equal(t, len(dao.TableMeta.Columns), 7)
 	assert.Equal(t, dao.TableMeta.PrimaryKey, "id")
