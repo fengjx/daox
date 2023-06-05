@@ -26,8 +26,8 @@ type Dao struct {
 func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
 	structMap := master.Mapper.TypeMap(structType)
 	columns := make([]string, 0, len(structMap.Names))
-	for _, column := range structMap.Names {
-		columns = append(columns, column.Name)
+	for _, fieldInfo := range structMap.Tree.Children {
+		columns = append(columns, fieldInfo.Name)
 	}
 	dao := &Dao{
 		TableMeta: &TableMeta{

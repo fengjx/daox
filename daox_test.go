@@ -3,6 +3,7 @@ package daox
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"reflect"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/mattn/go-sqlite3"
@@ -17,12 +19,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func sqliteDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", "file:.cache/test.db?cache=shared&mode=memory")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return db
+func sqliteDB() (*sql.DB, error) {
+	return sql.Open("sqlite3", "file:.cache/test.db?cache=shared&mode=memory")
+}
+
+func mysqlDB() (*sql.DB, error) {
+	return sql.Open("mysql", "root:1234@tcp(192.168.1.200:3306)/fjx?charset=utf8mb4,utf8&tls=false&timeout=10s")
 }
 
 func createRedisClient(t *testing.T) *redis.Client {
@@ -34,16 +36,33 @@ func createRedisClient(t *testing.T) *redis.Client {
 	})
 }
 
-func newDb(t *testing.T) *sqlx.DB {
-	db := sqlx.NewDb(sqliteDB(t), "sqlite3")
-	db.Mapper = reflectx.NewMapperFunc("json", strings.ToLower)
-	return db
+func newDb() (*sqlx.DB, error) {
+	db, err := mysqlDB()
+	if err != nil {
+		return nil, err
+	}
+	dbx := sqlx.NewDb(db, "mysql")
+	dbx.Mapper = reflectx.NewMapperFunc("json", strings.ToLower)
+	return dbx, nil
 }
 
-func before(t *testing.T) {
-	t.Log("before...")
-	db := newDb(t)
-	_, err := db.Exec(`
+func newSqliteDb() (*sqlx.DB, error) {
+	db, err := sqliteDB()
+	if err != nil {
+		return nil, err
+	}
+	dbx := sqlx.NewDb(db, "sqlite3")
+	dbx.Mapper = reflectx.NewMapperFunc("json", strings.ToLower)
+	return dbx, nil
+}
+
+func init() {
+	log.Println("before...")
+	db, err := newSqliteDb()
+	if err != nil {
+		panic(err)
+	}
+	_, err = db.Exec(`
 		CREATE TABLE user (
 		  id integer primary key autoincrement,
 		  uid integer,
@@ -60,17 +79,17 @@ func before(t *testing.T) {
 	dao := NewDAO(db, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
 	for i := 0; i < 10; i++ {
 		id, err := dao.Save(&user{
-			Uid:       int64(1000 + i),
+			Uid:       int64(100 + i),
 			Name:      fmt.Sprintf("u-%d", i),
 			Sex:       "male",
 			LoginTime: time.Now().Unix(),
 			Utime:     time.Now().Unix(),
 		}, "ctime")
 		if err != nil {
-			t.Log(err.Error())
+			panic(err)
 			continue
 		}
-		t.Logf("save id - %d", id)
+		log.Printf("save id - %d \n", id)
 	}
 
 }
@@ -86,7 +105,10 @@ type user struct {
 }
 
 func TestCreate(t *testing.T) {
-	DBMaster := newDb(t)
+	DBMaster, err := newSqliteDb()
+	if err != nil {
+		log.Panic(err)
+	}
 	redisClient := createRedisClient(t)
 	dao := NewDAO(
 		DBMaster,
@@ -105,15 +127,18 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCrud(t *testing.T) {
-	before(t)
-	DBMaster := newDb(t)
+	DBMaster, err := newSqliteDb()
+	if err != nil {
+		log.Panic(err)
+	}
 	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
 	u1 := &user{
-		Uid:       1000,
+		Uid:       10000,
 		Name:      "fengjx",
 		Sex:       "1",
 		LoginTime: time.Now().Unix(),
 		Utime:     time.Now().Unix(),
+		Ctime:     time.Now().Unix(),
 	}
 	id, err := dao.Save(u1)
 	if err != nil {
@@ -129,8 +154,11 @@ func TestCrud(t *testing.T) {
 }
 
 func TestBatchSave(t *testing.T) {
-	before(t)
-	DBMaster := newDb(t)
+	// DBMaster := newDb(t)
+	DBMaster, err := newSqliteDb()
+	if err != nil {
+		log.Panic(err)
+	}
 	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
 	nowUnix := time.Now().Unix()
 	users := []*user{
