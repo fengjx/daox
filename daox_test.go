@@ -23,6 +23,7 @@ func sqliteDB() (*sql.DB, error) {
 	return sql.Open("sqlite3", "file:.cache/test.db?cache=shared&mode=memory")
 }
 
+// lint:ignore U1000 Ignore unused function temporarily
 func mysqlDB() (*sql.DB, error) {
 	return sql.Open("mysql", "root:1234@tcp(192.168.1.200:3306)/fjx?charset=utf8mb4,utf8&tls=false&timeout=10s")
 }

@@ -29,35 +29,6 @@ func NewCacheProvider(redisCtl *redis.Client, keyPrefix string, version string, 
 	}
 }
 
-func (c *CacheProvider) get(key string, item string, dest interface{}) (bool, error) {
-	cacheKey := c.genKey(key, item)
-	result, err := c.RedisClient.Get(ctx, cacheKey).Result()
-	if err == redis.Nil {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	if result == "" {
-		return false, nil
-	}
-	err = json.Unmarshal([]byte(result), dest)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-func (c *CacheProvider) set(key string, item string, data interface{}) error {
-	cacheKey := c.genKey(key, item)
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	_, err = c.RedisClient.Set(ctx, cacheKey, jsonData, c.ExpireTime).Result()
-	return err
-}
-
 func (c *CacheProvider) setAll(key string, dataList map[string]interface{}) error {
 	pipe := c.RedisClient.Pipeline()
 	for item, data := range dataList {

@@ -6,6 +6,10 @@ run:
 
 issues:
   new: true
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - unused
 
 linters:
   enable:

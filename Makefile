@@ -5,7 +5,7 @@ test:
 
 .PHONY: lint
 lint:
-	golangci-lint run
+	golangci-lint run --config .github/linters/.golangci.yml
 
 .PHONY: fmt
 fmt:
