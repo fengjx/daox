@@ -1,9 +1,10 @@
 package daox
 
 import (
+	"time"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
-	"time"
 )
 
 type Option func(*Dao)

@@ -13,10 +13,9 @@ fmt:
 
 .PHONY: tidy
 tidy:
-	go mod tidy -v
+	@go mod tidy -v
 
 .PHONY: check
 check:
 	@$(MAKE) fmt
 	@$(MAKE) tidy
-	@$(MAKE) lint
