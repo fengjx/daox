@@ -3,6 +3,7 @@ run:
   skip-files:
     - generated.*
     - gen.*
+  tests: false
 
 issues:
   new: true
