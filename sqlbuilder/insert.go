@@ -46,6 +46,7 @@ func (ins *Inserter) NameSql() (string, error) {
 		}
 	}
 	ins.writeString(")")
+	ins.end()
 	return ins.sb.String(), nil
 }
 
