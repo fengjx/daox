@@ -162,7 +162,7 @@ func TestCrud(t *testing.T) {
 	}
 	t.Logf("id: %d", id)
 	u2 := &user{}
-	err = dao.GetById(id, u2)
+	err = dao.GetByID(id, u2)
 	if err != nil {
 		t.Fatal(err)
 	}

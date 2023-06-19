@@ -24,6 +24,7 @@ func (d *Deleter) Sql() (string, error) {
 	d.reset()
 	d.writeString("DELETE FROM ")
 	d.quote(d.tableName)
-	d.whereSql(d.where)
+	d.whereSQL(d.where)
+	d.end()
 	return d.sb.String(), nil
 }

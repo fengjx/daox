@@ -72,7 +72,7 @@ func (b *sqlBuilder) comma() {
 	b.writeByte(',')
 }
 
-func (b *sqlBuilder) whereSql(condition *condition) {
+func (b *sqlBuilder) whereSQL(condition *condition) {
 	if condition != nil && len(condition.predicates) > 0 {
 		b.writeString(" WHERE ")
 		for _, predicate := range condition.predicates {

@@ -152,15 +152,15 @@ func (dao *Dao) List(kv *KV, dest interface{}) error {
 	return dao.DBRead.Select(dest, querySql, kv.Value)
 }
 
-func (dao *Dao) GetById(id interface{}, dest Model) error {
+func (dao *Dao) GetByID(id interface{}, dest Model) error {
 	tableMeta := dao.TableMeta
 	return dao.GetByColumn(OfKv(tableMeta.PrimaryKey, id), dest)
 }
 
-func (dao *Dao) GetByIdCache(id interface{}, dest Model) error {
+func (dao *Dao) GetByIDCache(id interface{}, dest Model) error {
 	primaryKey := dao.TableMeta.PrimaryKey
 	return dao.CacheProvider.Fetch(primaryKey, id, dest, func() (interface{}, error) {
-		return dest, dao.GetById(id, dest)
+		return dest, dao.GetByID(id, dest)
 	})
 }
 

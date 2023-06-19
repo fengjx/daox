@@ -65,7 +65,7 @@ func (s *Selector) Sql() (string, error) {
 	}
 	s.writeString(" FROM ")
 	s.quote(s.tableName)
-	s.whereSql(s.where)
+	s.whereSQL(s.where)
 
 	// order by
 	if len(s.orderBy) > 0 {
@@ -90,6 +90,7 @@ func (s *Selector) Sql() (string, error) {
 		s.writeString(" LIMIT ")
 		s.writeString(strconv.Itoa(*s.limit))
 	}
+	s.end()
 	return s.sb.String(), nil
 }
 

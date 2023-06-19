@@ -71,5 +71,6 @@ func (ins *Inserter) Sql() (string, error) {
 		}
 	}
 	ins.writeString(")")
+	ins.end()
 	return ins.sb.String(), nil
 }

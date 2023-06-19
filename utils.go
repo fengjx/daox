@@ -29,14 +29,6 @@ func toString(src interface{}) string {
 	}
 }
 
-func sliceToString(src []interface{}) []string {
-	res := make([]string, len(src))
-	for i, item := range src {
-		res[i] = toString(item)
-	}
-	return res
-}
-
 func ModelListToMap(src []Model) map[interface{}]Model {
 	if len(src) == 0 {
 		return make(map[interface{}]Model, 0)

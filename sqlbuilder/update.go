@@ -38,7 +38,8 @@ func (u *Updater) Sql() (string, error) {
 			u.writeString(", ")
 		}
 	}
-	u.whereSql(u.where)
+	u.whereSQL(u.where)
+	u.end()
 	return u.sb.String(), nil
 }
 
@@ -58,6 +59,7 @@ func (u *Updater) NameSql() (string, error) {
 			u.writeString(", ")
 		}
 	}
-	u.whereSql(u.where)
+	u.whereSQL(u.where)
+	u.end()
 	return u.sb.String(), nil
 }
