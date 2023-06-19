@@ -5,7 +5,7 @@ type KV struct {
 	Value interface{}
 }
 
-func Kv(key string, value interface{}) *KV {
+func OfKv(key string, value interface{}) *KV {
 	return &KV{
 		Key:   key,
 		Value: value,
@@ -17,9 +17,14 @@ type MultiKV struct {
 	Values []interface{}
 }
 
-func MultiKv(key string, values []interface{}) *MultiKV {
+func OfMultiKv(key string, values ...interface{}) *MultiKV {
 	return &MultiKV{
 		Key:    key,
 		Values: values,
 	}
+}
+
+func (kv *MultiKV) AddValue(val string) *MultiKV {
+	kv.AddValue(val)
+	return kv
 }

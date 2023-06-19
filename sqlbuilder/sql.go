@@ -38,20 +38,48 @@ func (b *Builder) Delete() *Deleter {
 	return NewDeleter(b.tableName)
 }
 
-func warpQuote(sb *strings.Builder, s string) {
-	sb.WriteString("`")
-	sb.WriteString(s)
-	sb.WriteString("`")
+type sqlBuilder struct {
+	sb strings.Builder
 }
 
-func buildWhereSql(sb *strings.Builder, condition *condition) {
+func (b *sqlBuilder) reset() {
+	b.sb.Reset()
+}
+
+func (b *sqlBuilder) writeString(val string) {
+	_, _ = b.sb.WriteString(val)
+}
+
+func (b *sqlBuilder) writeByte(c byte) {
+	_ = b.sb.WriteByte(c)
+}
+
+func (b *sqlBuilder) quote(val string) {
+	b.writeByte('`')
+	b.writeString(strings.TrimSpace(val))
+	b.writeByte('`')
+}
+
+func (b *sqlBuilder) space() {
+	b.writeByte(' ')
+}
+
+func (b *sqlBuilder) end() {
+	b.writeByte(';')
+}
+
+func (b *sqlBuilder) comma() {
+	b.writeByte(',')
+}
+
+func (b *sqlBuilder) whereSql(condition *condition) {
 	if condition != nil && len(condition.predicates) > 0 {
-		sb.WriteString(" WHERE ")
+		b.writeString(" WHERE ")
 		for _, predicate := range condition.predicates {
 			if predicate.op != nil {
-				sb.WriteString(predicate.op.text)
+				b.writeString(predicate.op.text)
 			}
-			sb.WriteString(predicate.express)
+			b.writeString(predicate.express)
 		}
 	}
 }

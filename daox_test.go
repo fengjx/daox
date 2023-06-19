@@ -6,6 +6,7 @@ import (
 	"log"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,12 +29,18 @@ func mysqlDB() (*sql.DB, error) {
 	return sql.Open("mysql", "root:1234@tcp(192.168.1.200:3306)/fjx?charset=utf8mb4,utf8&tls=false&timeout=10s")
 }
 
-func createRedisClient(t *testing.T) *redis.Client {
+func createMockRedisClient(t *testing.T) *redis.Client {
 	serv := miniredis.RunT(t)
 	return redis.NewClient(&redis.Options{
 		Addr:     serv.Addr(),
 		Password: "",
 		DB:       0,
+	})
+}
+
+func createRedisClient(t *testing.T) *redis.Client {
+	return redis.NewClient(&redis.Options{
+		Addr: "127.0.0.1:6379",
 	})
 }
 
@@ -57,13 +64,16 @@ func newSqliteDb() (*sqlx.DB, error) {
 	return dbx, nil
 }
 
-func init() {
-	log.Println("before...")
-	db, err := newSqliteDb()
-	if err != nil {
-		panic(err)
-	}
-	_, err = db.Exec(`
+var once sync.Once
+
+func Init() {
+	once.Do(func() {
+		log.Println("before...")
+		db, err := newSqliteDb()
+		if err != nil {
+			panic(err)
+		}
+		_, err = db.Exec(`
 		CREATE TABLE user (
 		  id integer primary key autoincrement,
 		  uid integer,
@@ -74,25 +84,25 @@ func init() {
 		  ctime integer
 		);	
 	`)
-	if err != nil {
-		panic(err)
-	}
-	dao := NewDAO(db, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
-	for i := 0; i < 10; i++ {
-		id, err := dao.Save(&user{
-			Uid:       int64(100 + i),
-			Name:      fmt.Sprintf("u-%d", i),
-			Sex:       "male",
-			LoginTime: time.Now().Unix(),
-			Utime:     time.Now().Unix(),
-		}, "ctime")
 		if err != nil {
 			panic(err)
-			continue
 		}
-		log.Printf("save id - %d \n", id)
-	}
-
+		dao := NewDAO(db, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
+		for i := 0; i < 10; i++ {
+			id, err := dao.Save(&user{
+				Uid:       int64(100 + i),
+				Name:      fmt.Sprintf("u-%d", i),
+				Sex:       "male",
+				LoginTime: time.Now().Unix(),
+				Utime:     time.Now().Unix(),
+			}, "ctime")
+			if err != nil {
+				panic(err)
+				continue
+			}
+			log.Printf("save id - %d \n", id)
+		}
+	})
 }
 
 type user struct {
@@ -103,6 +113,10 @@ type user struct {
 	LoginTime int64  `json:"login_time"`
 	Utime     int64  `json:"utime"`
 	Ctime     int64  `json:"ctime"`
+}
+
+func (u *user) GetId() interface{} {
+	return u.Id
 }
 
 func TestCreate(t *testing.T) {
@@ -128,6 +142,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCrud(t *testing.T) {
+	Init()
 	DBMaster, err := newSqliteDb()
 	if err != nil {
 		log.Panic(err)
@@ -155,6 +170,7 @@ func TestCrud(t *testing.T) {
 }
 
 func TestBatchSave(t *testing.T) {
+	Init()
 	// DBMaster := newDb(t)
 	DBMaster, err := newSqliteDb()
 	if err != nil {
@@ -186,13 +202,9 @@ func TestBatchSave(t *testing.T) {
 	}
 	assert.Equal(t, int64(2), affected)
 	u := &user{}
-	err = dao.GetByColumn(Kv("uid", 1000), u)
+	err = dao.GetByColumn(OfKv("uid", 1000), u)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, "fengjx0", u.Name)
-}
-
-func TestDaoFetch(t *testing.T) {
-
 }

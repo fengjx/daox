@@ -3,7 +3,6 @@ package daox
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -14,6 +13,8 @@ import (
 )
 
 var ctx = context.TODO()
+
+type SliceToMapFun = func([]*Model) map[interface{}]*Model
 
 type Dao struct {
 	DBMaster      *sqlx.DB
@@ -55,7 +56,7 @@ func (dao *Dao) SQLBuilder() *sqlbuilder.Builder {
 
 // Save
 // omitColumns 不需要 insert 的字段
-func (dao *Dao) Save(dest interface{}, omitColumns ...string) (int64, error) {
+func (dao *Dao) Save(dest Model, omitColumns ...string) (int64, error) {
 	tableMeta := dao.TableMeta
 	if tableMeta.IsAutoIncrement {
 		omitColumns = append(omitColumns, tableMeta.PrimaryKey)
@@ -72,7 +73,7 @@ func (dao *Dao) Save(dest interface{}, omitColumns ...string) (int64, error) {
 	return res.LastInsertId()
 }
 
-func (dao *Dao) BatchSave(dest interface{}) (int64, error) {
+func (dao *Dao) BatchSave(models interface{}) (int64, error) {
 	tableMeta := dao.TableMeta
 	var columns []string
 	if tableMeta.IsAutoIncrement {
@@ -84,14 +85,14 @@ func (dao *Dao) BatchSave(dest interface{}) (int64, error) {
 	if err != nil {
 		return 0, nil
 	}
-	res, err := dao.DBMaster.NamedExec(execSql, dest)
+	res, err := dao.DBMaster.NamedExec(execSql, models)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
 }
 
-func (dao *Dao) GetByColumn(kv *KV, dest interface{}) error {
+func (dao *Dao) GetByColumn(kv *KV, dest Model) error {
 	if kv == nil {
 		return nil
 	}
@@ -110,7 +111,17 @@ func (dao *Dao) GetByColumn(kv *KV, dest interface{}) error {
 	return err
 }
 
-func (dao *Dao) ListByColumns(kvs *MultiKV, dest interface{}) error {
+func (dao *Dao) GetByColumnCache(kv *KV, dest Model) error {
+	return dao.CacheProvider.Fetch(kv.Key, toString(kv.Value), dest, func() (interface{}, error) {
+		err := dao.GetByColumn(kv, dest)
+		if err != nil {
+			return nil, err
+		}
+		return dest, nil
+	})
+}
+
+func (dao *Dao) ListByColumns(kvs *MultiKV, dest []Model) error {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return nil
 	}
@@ -141,14 +152,21 @@ func (dao *Dao) List(kv *KV, dest interface{}) error {
 	return dao.DBRead.Select(dest, querySql, kv.Value)
 }
 
-func (dao *Dao) GetById(id interface{}, dest interface{}) error {
+func (dao *Dao) GetById(id interface{}, dest Model) error {
 	tableMeta := dao.TableMeta
-	return dao.GetByColumn(Kv(tableMeta.PrimaryKey, id), dest)
+	return dao.GetByColumn(OfKv(tableMeta.PrimaryKey, id), dest)
 }
 
-func (dao *Dao) GetByIds(ids []interface{}, dest interface{}) error {
+func (dao *Dao) GetByIdCache(id interface{}, dest Model) error {
+	primaryKey := dao.TableMeta.PrimaryKey
+	return dao.CacheProvider.Fetch(primaryKey, id, dest, func() (interface{}, error) {
+		return dest, dao.GetById(id, dest)
+	})
+}
+
+func (dao *Dao) ListByIds(ids []interface{}, dest []Model) error {
 	tableMeta := dao.TableMeta
-	return dao.ListByColumns(MultiKv(tableMeta.PrimaryKey, ids), dest)
+	return dao.ListByColumns(OfMultiKv(tableMeta.PrimaryKey, ids), dest)
 }
 
 func (dao *Dao) UpdateById(idValue interface{}, dict map[string]interface{}) (int64, error) {
@@ -215,16 +233,21 @@ func (dao *Dao) DeleteByColumns(kvs *MultiKV) (int64, error) {
 
 func (dao *Dao) DeleteById(id interface{}) (bool, error) {
 	tableMeta := dao.TableMeta
-	affected, err := dao.DeleteByColumn(Kv(tableMeta.PrimaryKey, id))
+	affected, err := dao.DeleteByColumn(OfKv(tableMeta.PrimaryKey, id))
 	if err != nil {
 		return false, err
 	}
 	return affected == 1, nil
 }
 
+// Fetch query one row
+func (dao *Dao) Fetch(field string, item string, dest interface{}, fun CreateDataFun) error {
+	return dao.CacheProvider.Fetch(field, item, dest, fun)
+}
+
 // BatchFetch
 // 注意不会按 items 顺序返回
-func (dao *Dao) BatchFetch(field string, items []string, dest interface{}, fun BatchCreateDataFun) error {
+func (dao *Dao) BatchFetch(field string, items []interface{}, dest interface{}, fun BatchCreateDataFun) error {
 	return dao.CacheProvider.BatchFetch(field, items, dest, fun)
 }
 
@@ -243,28 +266,4 @@ func containsString(collection []string, element string) bool {
 		}
 	}
 	return false
-}
-
-func toString(src interface{}) string {
-	if src == nil {
-		return ""
-	}
-
-	switch v := src.(type) {
-	case string:
-		return src.(string)
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprintf("%d", src)
-	case float32, float64:
-		bs, _ := json.Marshal(v)
-		return string(bs)
-	case bool:
-		if b, ok := src.(bool); ok && b {
-			return "true"
-		} else {
-			return "false"
-		}
-	default:
-		return fmt.Sprintf("%v", v)
-	}
 }

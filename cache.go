@@ -11,7 +11,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type BatchCreateDataFun func(missItems []string) (map[string]interface{}, error)
+type CreateDataFun func() (interface{}, error)
+type BatchCreateDataFun func(missItems []interface{}) (map[interface{}]interface{}, error)
 
 type CacheProvider struct {
 	RedisClient *redis.Client
@@ -29,9 +30,38 @@ func NewCacheProvider(redisCtl *redis.Client, keyPrefix string, version string, 
 	}
 }
 
-func (c *CacheProvider) setAll(key string, dataList map[string]interface{}) error {
+func (c *CacheProvider) get(key string, item interface{}, dest interface{}) (bool, error) {
+	cacheKey := c.genKey(key, item)
+	result, err := c.RedisClient.Get(ctx, cacheKey).Result()
+	if err == redis.Nil {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if result == "" {
+		return false, nil
+	}
+	err = json.Unmarshal([]byte(result), dest)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (c *CacheProvider) set(key string, item interface{}, data interface{}) error {
+	cacheKey := c.genKey(key, item)
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	_, err = c.RedisClient.Set(ctx, cacheKey, jsonData, c.ExpireTime).Result()
+	return err
+}
+
+func (c *CacheProvider) setAll(key string, dataMap map[interface{}]interface{}) error {
 	pipe := c.RedisClient.Pipeline()
-	for item, data := range dataList {
+	for item, data := range dataMap {
 		cacheKey := c.genKey(key, item)
 		jsonData, err := json.Marshal(data)
 		if err != nil {
@@ -62,10 +92,36 @@ func (c *CacheProvider) BatchDel(key string, items []string) error {
 	return nil
 }
 
+// Fetch
+// invalidStale 当缓存过期时，是否使用旧值
+func (c *CacheProvider) Fetch(key string, item interface{}, dest interface{}, fun CreateDataFun) error {
+	value := reflect.ValueOf(dest)
+	err := c.CheckPointer(value)
+	if err != nil {
+		return err
+	}
+	exist, err := c.get(key, item, dest)
+	if err != nil {
+		return err
+	}
+	if exist {
+		return nil
+	}
+	dest, err = fun()
+	if err != nil {
+		return err
+	}
+	err = c.set(key, item, dest)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // BatchFetch
 // dest: must a slice
 // fun: to create miss data
-func (c *CacheProvider) BatchFetch(key string, items []string, dest interface{}, fun BatchCreateDataFun) error {
+func (c *CacheProvider) BatchFetch(key string, items []interface{}, dest interface{}, fun BatchCreateDataFun) error {
 	var v, vp reflect.Value
 	value := reflect.ValueOf(dest)
 	err := c.CheckPointer(value)
@@ -90,7 +146,7 @@ func (c *CacheProvider) BatchFetch(key string, items []string, dest interface{},
 	if err != nil {
 		return err
 	}
-	missItems := make([]string, 0)
+	missItems := make([]interface{}, 0)
 	for i, item := range result {
 		jsonStr, ok := item.(string)
 		if !ok || jsonStr == "" {
@@ -114,17 +170,14 @@ func (c *CacheProvider) BatchFetch(key string, items []string, dest interface{},
 	if len(missItems) == 0 {
 		return nil
 	}
-	list, err := fun(missItems)
+	dataMap, err := fun(missItems)
 	if err != nil {
 		return err
 	}
-	dataList := make(map[string]interface{}, len(list))
-	for k, val := range list {
-		cacheKey := c.genKey(key, k)
-		dataList[cacheKey] = val
+	for _, val := range dataMap {
 		direct.Set(reflect.Append(direct, reflect.ValueOf(val)))
 	}
-	return c.setAll(key, dataList)
+	return c.setAll(key, dataMap)
 }
 
 func (c *CacheProvider) CheckPointer(value reflect.Value) error {
@@ -137,6 +190,6 @@ func (c *CacheProvider) CheckPointer(value reflect.Value) error {
 	return nil
 }
 
-func (c *CacheProvider) genKey(key, item string) string {
-	return fmt.Sprintf("{%s}_%s_%s_%s", c.KeyPrefix, c.Version, key, item)
+func (c *CacheProvider) genKey(key, item interface{}) string {
+	return fmt.Sprintf("{%s}_%s_%s_%s", c.KeyPrefix, c.Version, key, toString(item))
 }

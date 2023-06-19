@@ -1,8 +1,7 @@
 package sqlbuilder
 
-import "strings"
-
 type Updater struct {
+	sqlBuilder
 	tableName string
 	columns   []string
 	where     *condition
@@ -28,37 +27,37 @@ func (u *Updater) Sql() (string, error) {
 	if len(u.columns) == 0 {
 		return "", SQLErrColumnsRequire
 	}
-	sb := &strings.Builder{}
-	sb.WriteString("UPDATE ")
-	warpQuote(sb, strings.TrimSpace(u.tableName))
-	sb.WriteString(" SET ")
+	u.reset()
+	u.writeString("UPDATE ")
+	u.quote(u.tableName)
+	u.writeString(" SET ")
 	for i, column := range u.columns {
-		warpQuote(sb, strings.TrimSpace(column))
-		sb.WriteString(" = ?")
+		u.quote(column)
+		u.writeString(" = ?")
 		if i != len(u.columns)-1 {
-			sb.WriteString(", ")
+			u.writeString(", ")
 		}
 	}
-	buildWhereSql(sb, u.where)
-	return sb.String(), nil
+	u.whereSql(u.where)
+	return u.sb.String(), nil
 }
 
 func (u *Updater) NameSql() (string, error) {
 	if len(u.columns) == 0 {
 		return "", SQLErrColumnsRequire
 	}
-	sb := &strings.Builder{}
-	sb.WriteString("UPDATE ")
-	warpQuote(sb, strings.TrimSpace(u.tableName))
-	sb.WriteString(" SET ")
+	u.reset()
+	u.writeString("UPDATE ")
+	u.quote(u.tableName)
+	u.writeString(" SET ")
 	for i, column := range u.columns {
-		warpQuote(sb, strings.TrimSpace(column))
-		sb.WriteString(" = :")
-		sb.WriteString(column)
+		u.quote(column)
+		u.writeString(" = :")
+		u.writeString(column)
 		if i != len(u.columns)-1 {
-			sb.WriteString(", ")
+			u.writeString(", ")
 		}
 	}
-	buildWhereSql(sb, u.where)
-	return sb.String(), nil
+	u.whereSql(u.where)
+	return u.sb.String(), nil
 }

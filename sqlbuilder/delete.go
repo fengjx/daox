@@ -1,8 +1,7 @@
 package sqlbuilder
 
-import "strings"
-
 type Deleter struct {
+	sqlBuilder
 	tableName string
 	where     *condition
 }
@@ -22,9 +21,9 @@ func (d *Deleter) Sql() (string, error) {
 	if d.where == nil || len(d.where.predicates) == 0 {
 		return "", SQLErrDeleteMissWhere
 	}
-	sb := &strings.Builder{}
-	sb.WriteString("DELETE FROM ")
-	warpQuote(sb, strings.TrimSpace(d.tableName))
-	buildWhereSql(sb, d.where)
-	return sb.String(), nil
+	d.reset()
+	d.writeString("DELETE FROM ")
+	d.quote(d.tableName)
+	d.whereSql(d.where)
+	return d.sb.String(), nil
 }

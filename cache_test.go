@@ -15,27 +15,50 @@ type testInfo struct {
 	Name string `json:"name"`
 }
 
+func TestFetch(t *testing.T) {
+	redisCtl := createRedisClient(t)
+	cacheTool := NewCacheProvider(redisCtl, "fetch-test-user", "v1", time.Minute*10)
+	tinfo := &testInfo{
+		Id:   1,
+		Name: "name-v1-1",
+	}
+	info := &testInfo{}
+	err := cacheTool.Fetch("user-by-id", "1", info, func() (interface{}, error) {
+		info = &testInfo{}
+		id, _ := strconv.Atoi("1")
+		info.Id = int64(id)
+		info.Name = fmt.Sprintf("name-v1-%d", id)
+		return info, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testJsonStr, _ := json.Marshal(tinfo)
+	jsonStr, _ := json.Marshal(info)
+	t.Log(string(jsonStr))
+	assert.Equal(t, string(testJsonStr), string(jsonStr))
+}
+
 func TestBatchFetch(t *testing.T) {
 	redisCtl := createRedisClient(t)
 	cache := NewCacheProvider(redisCtl, "test-cache", "v1", time.Minute*10)
 	for i := 0; i < 10; i++ {
 		var testInfos []*testInfo
-		var items []string
+		var items []interface{}
 		for j := 0; j < 3; j++ {
 			testInfos = append(testInfos, &testInfo{
 				Id:   int64(j),
 				Name: fmt.Sprintf("name-%d", j),
 			})
-			items = append(items, fmt.Sprintf("%d", j))
+			items = append(items, int64(j))
 		}
 		var infos []*testInfo
-		err := cache.BatchFetch("test-batch-v2", items, &infos, func(missItem []string) (map[string]interface{}, error) {
-			res := make(map[string]interface{}, 0)
+		err := cache.BatchFetch("test-batch", items, &infos, func(missItem []interface{}) (map[interface{}]interface{}, error) {
+			res := make(map[interface{}]interface{}, 0)
 			for _, item := range missItem {
-				i, _ := strconv.Atoi(item)
 				res[item] = &testInfo{
-					Id:   int64(i),
-					Name: fmt.Sprintf("name-%s", item),
+					Id:   item.(int64),
+					Name: fmt.Sprintf("name-%v", item),
 				}
 			}
 			return res, nil
