@@ -167,6 +167,37 @@ func TestCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, u1.Uid, u2.Uid)
+
+	updateName := "fengjx_2023"
+	affected, err := dao.UpdateById(id, map[string]interface{}{
+		"name": updateName,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if affected == 0 {
+		t.Fatal("update affected is 0")
+	}
+	u2 = &user{}
+	err = dao.GetByID(id, u2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, updateName, u2.Name)
+	ok, err := dao.DeleteById(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("delete by id fail")
+	}
+	u2 = &user{}
+	err = dao.GetByID(id, u2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(0), u2.Id)
+	assert.Equal(t, "", u2.Name)
 }
 
 func TestBatchSave(t *testing.T) {

@@ -25,19 +25,15 @@ type Dao struct {
 }
 
 func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
-	structMap := master.Mapper.TypeMap(structType)
-	columns := make([]string, 0, len(structMap.Names))
-	for _, fieldInfo := range structMap.Tree.Children {
-		columns = append(columns, fieldInfo.Name)
-	}
 	dao := &Dao{
-		TableMeta: &TableMeta{
-			TableName:  tableName,
-			StructType: structType,
-			PrimaryKey: primaryKey,
-			Columns:    columns,
-		},
 		DBMaster: master,
+	}
+	columns := dao.GetColumnsByType(structType)
+	dao.TableMeta = &TableMeta{
+		TableName:  tableName,
+		StructType: structType,
+		PrimaryKey: primaryKey,
+		Columns:    columns,
 	}
 	keyPrefix := fmt.Sprintf("data_%v", structType.Elem())
 	dao.CacheProvider = NewCacheProvider(dao.RedisClient, keyPrefix, "v1", time.Minute*3)
@@ -52,6 +48,20 @@ func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType ref
 
 func (dao *Dao) SQLBuilder() *sqlbuilder.Builder {
 	return sqlbuilder.New(dao.TableMeta.TableName)
+}
+
+func (dao *Dao) GetColumnsByModel(model interface{}) []string {
+	return dao.GetColumnsByType(reflect.TypeOf(model))
+}
+
+// GetColumnsByType 通过字段 tag 解析数据库字段
+func (dao *Dao) GetColumnsByType(typ reflect.Type) []string {
+	structMap := dao.DBMaster.Mapper.TypeMap(typ)
+	columns := make([]string, 0, len(structMap.Names))
+	for _, fieldInfo := range structMap.Tree.Children {
+		columns = append(columns, fieldInfo.Name)
+	}
+	return columns
 }
 
 // Save
@@ -169,11 +179,11 @@ func (dao *Dao) ListByIds(ids []interface{}, dest []Model) error {
 	return dao.ListByColumns(OfMultiKv(tableMeta.PrimaryKey, ids), dest)
 }
 
-func (dao *Dao) UpdateById(idValue interface{}, dict map[string]interface{}) (int64, error) {
+func (dao *Dao) UpdateById(idValue interface{}, fieldMap map[string]interface{}) (int64, error) {
 	tableMeta := dao.TableMeta
-	columns := make([]string, 0, len(dict))
-	args := make([]interface{}, 0, len(dict))
-	for k, v := range dict {
+	columns := make([]string, 0, len(fieldMap))
+	args := make([]interface{}, 0, len(fieldMap))
+	for k, v := range fieldMap {
 		columns = append(columns, k)
 		args = append(args, v)
 	}

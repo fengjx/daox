@@ -11,6 +11,7 @@ type Selector struct {
 	columns   []string
 	where     *condition
 	orderBy   []OrderBy
+	groupBy   []string
 	limit     *int
 	offset    *int
 }
@@ -27,8 +28,18 @@ func (s *Selector) Columns(columns ...string) *Selector {
 	return s
 }
 
+func (s *Selector) Distinct() *Selector {
+	s.distinct = true
+	return s
+}
+
 func (s *Selector) Where(condition *condition) *Selector {
 	s.where = condition
+	return s
+}
+
+func (s *Selector) GroupBy(columns ...string) *Selector {
+	s.groupBy = columns
 	return s
 }
 
@@ -66,6 +77,15 @@ func (s *Selector) Sql() (string, error) {
 	s.writeString(" FROM ")
 	s.quote(s.tableName)
 	s.whereSQL(s.where)
+
+	if len(s.groupBy) > 0 {
+		for i, column := range s.groupBy {
+			if i > 0 {
+				s.comma()
+			}
+			s.quote(column)
+		}
+	}
 
 	// order by
 	if len(s.orderBy) > 0 {
