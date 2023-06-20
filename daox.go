@@ -179,7 +179,7 @@ func (dao *Dao) ListByIds(ids []interface{}, dest []Model) error {
 	return dao.ListByColumns(OfMultiKv(tableMeta.PrimaryKey, ids), dest)
 }
 
-func (dao *Dao) UpdateById(idValue interface{}, fieldMap map[string]interface{}) (int64, error) {
+func (dao *Dao) UpdateByID(idValue interface{}, fieldMap map[string]interface{}) (int64, error) {
 	tableMeta := dao.TableMeta
 	columns := make([]string, 0, len(fieldMap))
 	args := make([]interface{}, 0, len(fieldMap))
