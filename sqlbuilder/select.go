@@ -2,17 +2,18 @@ package sqlbuilder
 
 import (
 	"strconv"
-	"strings"
 )
 
 type Selector struct {
-	tableName    string
-	distinct     bool
-	columns      []string
-	where        *condition
-	orderExpress string
-	limit        *int
-	offset       *int
+	sqlBuilder
+	tableName string
+	distinct  bool
+	columns   []string
+	where     *condition
+	orderBy   []OrderBy
+	groupBy   []string
+	limit     *int
+	offset    *int
 }
 
 func NewSelector(tableName string) *Selector {
@@ -27,13 +28,23 @@ func (s *Selector) Columns(columns ...string) *Selector {
 	return s
 }
 
+func (s *Selector) Distinct() *Selector {
+	s.distinct = true
+	return s
+}
+
 func (s *Selector) Where(condition *condition) *Selector {
 	s.where = condition
 	return s
 }
 
-func (s *Selector) OrderBy(orderExpress string) *Selector {
-	s.orderExpress = orderExpress
+func (s *Selector) GroupBy(columns ...string) *Selector {
+	s.groupBy = columns
+	return s
+}
+
+func (s *Selector) OrderBy(orderBy ...OrderBy) *Selector {
+	s.orderBy = orderBy
 	return s
 }
 
@@ -48,37 +59,59 @@ func (s *Selector) Offset(offset int) *Selector {
 }
 
 func (s *Selector) Sql() (string, error) {
-	sb := &strings.Builder{}
-	sb.WriteString("SELECT ")
+	s.reset()
+	s.writeString("SELECT ")
 	if s.distinct {
-		sb.WriteString("DISTINCT ")
+		s.writeString("DISTINCT ")
 	}
 	if len(s.columns) == 0 {
-		sb.WriteString("*")
+		s.writeByte('*')
 	} else {
 		for i, column := range s.columns {
-			warpQuote(sb, strings.TrimSpace(column))
+			s.quote(column)
 			if i != len(s.columns)-1 {
-				sb.WriteString(", ")
+				s.writeString(", ")
 			}
 		}
 	}
-	sb.WriteString(" FROM ")
-	warpQuote(sb, strings.TrimSpace(s.tableName))
-	buildWhereSql(sb, s.where)
-	if len(s.orderExpress) > 0 {
-		sb.WriteString(" ORDER BY ")
-		sb.WriteString(s.orderExpress)
+	s.writeString(" FROM ")
+	s.quote(s.tableName)
+	s.whereSQL(s.where)
+
+	if len(s.groupBy) > 0 {
+		for i, column := range s.groupBy {
+			if i > 0 {
+				s.comma()
+			}
+			s.quote(column)
+		}
 	}
+
+	// order by
+	if len(s.orderBy) > 0 {
+		s.writeString(" ORDER BY ")
+		for i, ob := range s.orderBy {
+			if i > 0 {
+				s.comma()
+			}
+			for _, c := range ob.columns {
+				s.quote(c)
+			}
+			s.space()
+			s.writeString(ob.orderType)
+		}
+	}
+
 	if s.offset != nil {
-		sb.WriteString(" OFFSET ")
-		sb.WriteString(strconv.Itoa(*s.offset))
+		s.writeString(" OFFSET ")
+		s.writeString(strconv.Itoa(*s.offset))
 	}
 	if s.limit != nil {
-		sb.WriteString(" LIMIT ")
-		sb.WriteString(strconv.Itoa(*s.limit))
+		s.writeString(" LIMIT ")
+		s.writeString(strconv.Itoa(*s.limit))
 	}
-	return sb.String(), nil
+	s.end()
+	return s.sb.String(), nil
 }
 
 type OrderType string
@@ -88,21 +121,21 @@ const (
 	DESC OrderType = "DESC"
 )
 
-type Order struct {
-	column    string
+type OrderBy struct {
+	columns   []string
 	orderType string
 }
 
-func Asc(column string) *Order {
-	return &Order{
-		column:    column,
+func Asc(columns ...string) OrderBy {
+	return OrderBy{
+		columns:   columns,
 		orderType: string(ASC),
 	}
 }
 
-func Desc(column string) *Order {
-	return &Order{
-		column:    column,
+func Desc(columns ...string) OrderBy {
+	return OrderBy{
+		columns:   columns,
 		orderType: string(DESC),
 	}
 }

@@ -5,6 +5,7 @@ import (
 )
 
 type Inserter struct {
+	sqlBuilder
 	tableName string
 	columns   []string
 }
@@ -25,50 +26,52 @@ func (ins *Inserter) NameSql() (string, error) {
 	if len(ins.columns) == 0 {
 		return "", SQLErrColumnsRequire
 	}
-	sb := &strings.Builder{}
-	sb.WriteString("INSERT INTO ")
-	warpQuote(sb, strings.TrimSpace(ins.tableName))
-	sb.WriteString("(")
+	ins.reset()
+	ins.writeString("INSERT INTO ")
+	ins.quote(strings.TrimSpace(ins.tableName))
+	ins.writeByte('(')
 	for i, column := range ins.columns {
-		warpQuote(sb, strings.TrimSpace(column))
+		ins.quote(column)
 		if i != len(ins.columns)-1 {
-			sb.WriteString(", ")
+			ins.writeString(", ")
 		}
 	}
-	sb.WriteString(")")
-	sb.WriteString(" VALUES (")
+	ins.writeByte(')')
+	ins.writeString(" VALUES (")
 	for i, column := range ins.columns {
-		sb.WriteString(":")
-		sb.WriteString(column)
+		ins.writeByte(':')
+		ins.writeString(column)
 		if i != len(ins.columns)-1 {
-			sb.WriteString(", ")
+			ins.writeString(", ")
 		}
 	}
-	sb.WriteString(")")
-	return sb.String(), nil
+	ins.writeString(")")
+	ins.end()
+	return ins.sb.String(), nil
 }
 
 func (ins *Inserter) Sql() (string, error) {
 	if len(ins.columns) == 0 {
 		return "", SQLErrColumnsRequire
 	}
-	sb := &strings.Builder{}
-	sb.WriteString("INSERT INTO ")
-	warpQuote(sb, strings.TrimSpace(ins.tableName))
-	sb.WriteString("(")
+	ins.reset()
+	ins.writeString("INSERT INTO ")
+	ins.quote(ins.tableName)
+	ins.writeByte('(')
 	for i, column := range ins.columns {
-		warpQuote(sb, strings.TrimSpace(column))
+		ins.quote(column)
 		if i != len(ins.columns)-1 {
-			sb.WriteString(", ")
+			ins.writeString(", ")
 		}
 	}
-	sb.WriteString(") VALUES (")
+	ins.writeString(") VALUES (")
 	for i := range ins.columns {
-		sb.WriteString("?")
+		ins.writeByte('?')
 		if i != len(ins.columns)-1 {
-			sb.WriteString(", ")
+			ins.writeString(", ")
 		}
 	}
-	sb.WriteString(")")
-	return sb.String(), nil
+	ins.writeString(")")
+	ins.end()
+	return ins.sb.String(), nil
 }

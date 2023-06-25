@@ -3,15 +3,22 @@ run:
   skip-files:
     - generated.*
     - gen.*
+  tests: false
 
 issues:
   new: true
+  exclude-rules:
+    - path: (.+)_test\.go
+      linters:
+        - unused
+        - govet
+        - funlen
+        - goconst
 
 linters:
   enable:
     - asciicheck
     - bodyclose
-    - deadcode
     - depguard
     - gci
     - gocritic
@@ -26,13 +33,11 @@ linters:
     - nilerr
     - rowserrcheck
     - staticcheck
-    - structcheck
+    - unused
     - stylecheck
     - typecheck
     - unconvert
-    - unused
     - unparam
-    - varcheck
     - whitespace
     - errcheck
     - errname
