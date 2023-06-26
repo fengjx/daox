@@ -169,13 +169,13 @@ func TestCrud(t *testing.T) {
 	assert.Equal(t, u1.Uid, u2.Uid)
 
 	updateName := "fengjx_2023"
-	affected, err := dao.UpdateByID(id, map[string]interface{}{
+	ok, err := dao.UpdateByID(id, map[string]interface{}{
 		"name": updateName,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if affected == 0 {
+	if !ok {
 		t.Fatal("update affected is 0")
 	}
 	u2 = &user{}
@@ -184,7 +184,7 @@ func TestCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, updateName, u2.Name)
-	ok, err := dao.DeleteById(id)
+	ok, err = dao.DeleteById(id)
 	if err != nil {
 		t.Fatal(err)
 	}

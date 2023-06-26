@@ -3,6 +3,7 @@ package daox
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -10,6 +11,10 @@ import (
 	"github.com/fengjx/daox/sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
+)
+
+var (
+	SQLErrUpdatePrimaryKeyRequire = errors.New("[daox] Primary key require for update")
 )
 
 var ctx = context.TODO()
@@ -179,7 +184,10 @@ func (dao *Dao) ListByIds(ids []interface{}, dest []Model) error {
 	return dao.ListByColumns(OfMultiKv(tableMeta.PrimaryKey, ids), dest)
 }
 
-func (dao *Dao) UpdateByID(idValue interface{}, fieldMap map[string]interface{}) (int64, error) {
+func (dao *Dao) UpdateByID(idValue interface{}, fieldMap map[string]interface{}) (bool, error) {
+	if toString(idValue) == "" {
+		return false, SQLErrUpdatePrimaryKeyRequire
+	}
 	tableMeta := dao.TableMeta
 	columns := make([]string, 0, len(fieldMap))
 	args := make([]interface{}, 0, len(fieldMap))
@@ -193,13 +201,40 @@ func (dao *Dao) UpdateByID(idValue interface{}, fieldMap map[string]interface{})
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", tableMeta.PrimaryKey))).
 		Sql()
 	if err != nil {
-		return 0, err
+		return false, err
 	}
 	res, err := dao.DBMaster.Exec(execSql, args...)
 	if err != nil {
-		return 0, err
+		return false, err
 	}
-	return res.RowsAffected()
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return affected > 0, nil
+}
+
+func (dao *Dao) Update(m Model) (bool, error) {
+	if toString(m.GetId()) == "" {
+		return false, SQLErrUpdatePrimaryKeyRequire
+	}
+	tableMeta := dao.TableMeta
+	execSql, err := dao.SQLBuilder().Update().
+		Columns(tableMeta.OmitColumns(tableMeta.PrimaryKey)...).
+		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", tableMeta.PrimaryKey))).
+		NameSql()
+	if err != nil {
+		return false, err
+	}
+	res, err := dao.DBMaster.Exec(execSql, m)
+	if err != nil {
+		return false, err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return affected > 0, nil
 }
 
 func (dao *Dao) DeleteByColumn(kv *KV) (int64, error) {
