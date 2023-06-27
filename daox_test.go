@@ -115,7 +115,7 @@ type user struct {
 	Ctime     int64  `json:"ctime"`
 }
 
-func (u *user) GetId() interface{} {
+func (u *user) GetID() interface{} {
 	return u.Id
 }
 
@@ -169,13 +169,13 @@ func TestCrud(t *testing.T) {
 	assert.Equal(t, u1.Uid, u2.Uid)
 
 	updateName := "fengjx_2023"
-	affected, err := dao.UpdateByID(id, map[string]interface{}{
+	ok, err := dao.UpdateField(id, map[string]interface{}{
 		"name": updateName,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if affected == 0 {
+	if !ok {
 		t.Fatal("update affected is 0")
 	}
 	u2 = &user{}
@@ -184,7 +184,7 @@ func TestCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, updateName, u2.Name)
-	ok, err := dao.DeleteById(id)
+	ok, err = dao.DeleteById(id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,4 +238,27 @@ func TestBatchSave(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, "fengjx0", u.Name)
+}
+
+func TestUpdate(t *testing.T) {
+	Init()
+	DBMaster, err := newSqliteDb()
+	if err != nil {
+		log.Panic(err)
+	}
+	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
+	u1 := &user{
+		Uid:       20000,
+		Name:      "fengjx",
+		Sex:       "1",
+		LoginTime: time.Now().Unix(),
+		Utime:     time.Now().Unix(),
+		Ctime:     time.Now().Unix(),
+	}
+	id, err := dao.Save(u1)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	t.Logf("save id: %d", id)
+
 }
