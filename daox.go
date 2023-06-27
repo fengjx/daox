@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	SQLErrUpdatePrimaryKeyRequire = errors.New("[daox] Primary key require for update")
+	ErrUpdatePrimaryKeyRequire = errors.New("[daox] Primary key require for update")
 )
 
 var ctx = context.TODO()
@@ -184,9 +184,9 @@ func (dao *Dao) ListByIds(ids []interface{}, dest []Model) error {
 	return dao.ListByColumns(OfMultiKv(tableMeta.PrimaryKey, ids), dest)
 }
 
-func (dao *Dao) UpdateByID(idValue interface{}, fieldMap map[string]interface{}) (bool, error) {
+func (dao *Dao) UpdateField(idValue interface{}, fieldMap map[string]interface{}) (bool, error) {
 	if toString(idValue) == "" {
-		return false, SQLErrUpdatePrimaryKeyRequire
+		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := dao.TableMeta
 	columns := make([]string, 0, len(fieldMap))
@@ -196,14 +196,14 @@ func (dao *Dao) UpdateByID(idValue interface{}, fieldMap map[string]interface{})
 		args = append(args, v)
 	}
 	args = append(args, idValue)
-	execSql, err := dao.SQLBuilder().Update().
+	updateSQL, err := dao.SQLBuilder().Update().
 		Columns(columns...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", tableMeta.PrimaryKey))).
 		Sql()
 	if err != nil {
 		return false, err
 	}
-	res, err := dao.DBMaster.Exec(execSql, args...)
+	res, err := dao.DBMaster.Exec(updateSQL, args...)
 	if err != nil {
 		return false, err
 	}
@@ -215,18 +215,18 @@ func (dao *Dao) UpdateByID(idValue interface{}, fieldMap map[string]interface{})
 }
 
 func (dao *Dao) Update(m Model) (bool, error) {
-	if toString(m.GetId()) == "" {
-		return false, SQLErrUpdatePrimaryKeyRequire
+	if toString(m.GetID()) == "" {
+		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := dao.TableMeta
-	execSql, err := dao.SQLBuilder().Update().
+	updateSQL, err := dao.SQLBuilder().Update().
 		Columns(tableMeta.OmitColumns(tableMeta.PrimaryKey)...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", tableMeta.PrimaryKey))).
 		NameSql()
 	if err != nil {
 		return false, err
 	}
-	res, err := dao.DBMaster.Exec(execSql, m)
+	res, err := dao.DBMaster.Exec(updateSQL, m)
 	if err != nil {
 		return false, err
 	}

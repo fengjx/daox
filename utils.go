@@ -35,7 +35,7 @@ func ModelListToMap(src []Model) map[interface{}]Model {
 	}
 	resMap := make(map[interface{}]Model, 0)
 	for _, m := range src {
-		resMap[m.GetId()] = m
+		resMap[m.GetID()] = m
 	}
 	return resMap
 }
