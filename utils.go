@@ -5,6 +5,11 @@ import (
 	"fmt"
 )
 
+func isIDEmpty(id interface{}) bool {
+	idStr := toString(id)
+	return idStr == "" || idStr == "0"
+}
+
 func toString(src interface{}) string {
 	if src == nil {
 		return ""

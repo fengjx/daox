@@ -260,5 +260,20 @@ func TestUpdate(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	t.Logf("save id: %d", id)
-
+	u1.Id = id
+	u1.Name = "fjx"
+	u1.Utime = time.Now().Unix()
+	ok, err := dao.Update(u1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("dao update not success")
+	}
+	u2 := &user{}
+	err = dao.GetByID(id, u2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, u1.Name, u2.Name)
 }

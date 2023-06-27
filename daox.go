@@ -185,7 +185,7 @@ func (dao *Dao) ListByIds(ids []interface{}, dest []Model) error {
 }
 
 func (dao *Dao) UpdateField(idValue interface{}, fieldMap map[string]interface{}) (bool, error) {
-	if toString(idValue) == "" {
+	if isIDEmpty(idValue) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := dao.TableMeta
@@ -215,18 +215,18 @@ func (dao *Dao) UpdateField(idValue interface{}, fieldMap map[string]interface{}
 }
 
 func (dao *Dao) Update(m Model) (bool, error) {
-	if toString(m.GetID()) == "" {
+	if isIDEmpty(m.GetID()) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := dao.TableMeta
 	updateSQL, err := dao.SQLBuilder().Update().
 		Columns(tableMeta.OmitColumns(tableMeta.PrimaryKey)...).
-		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", tableMeta.PrimaryKey))).
+		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey))).
 		NameSql()
 	if err != nil {
 		return false, err
 	}
-	res, err := dao.DBMaster.Exec(updateSQL, m)
+	res, err := dao.DBMaster.NamedExec(updateSQL, m)
 	if err != nil {
 		return false, err
 	}
