@@ -64,7 +64,7 @@ func (dao *Dao) GetColumnsByType(typ reflect.Type) []string {
 	structMap := dao.DBMaster.Mapper.TypeMap(typ)
 	columns := make([]string, 0)
 	for _, fieldInfo := range structMap.Tree.Children {
-		if fieldInfo.Name == "" {
+		if fieldInfo == nil || fieldInfo.Name == "" {
 			continue
 		}
 		columns = append(columns, fieldInfo.Name)

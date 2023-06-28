@@ -277,3 +277,23 @@ func TestUpdate(t *testing.T) {
 	}
 	assert.Equal(t, u1.Name, u2.Name)
 }
+
+type blog struct {
+	Id         int64      `json:"id,string"`
+	Uid        int64      `json:"uid,string"`
+	Title      string     `json:"title"`
+	Content    string     `json:"content"`
+	CreateTime int64      `json:"create_time"`
+	Ctime      *time.Time `json:"-"`
+	Utime      *time.Time `json:"-"`
+}
+
+func TestIgnoreField(t *testing.T) {
+	DBMaster, err := newSqliteDb()
+	if err != nil {
+		log.Panic(err)
+	}
+	dao := NewDAO(DBMaster, "blog", "id", reflect.TypeOf(&blog{}), IsAutoIncrement())
+	t.Log(strings.Join(dao.TableMeta.Columns, ","))
+	assert.Equal(t, "id,uid,title,content,create_time", strings.Join(dao.TableMeta.Columns, ","))
+}
