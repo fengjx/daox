@@ -75,7 +75,7 @@ func TestSelect(t *testing.T) {
 			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE age > ? AND sex = ? ORDER BY `ctime` DESC LIMIT 10;",
 		},
 		{
-			name: "select offset limit",
+			name: "select limit offset",
 			selector: New("user").Select().
 				Columns("id", "username", "age", "sex", "ctime").
 				Where(
@@ -85,7 +85,7 @@ func TestSelect(t *testing.T) {
 				OrderBy(Desc("ctime")).
 				Offset(10).
 				Limit(10),
-			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE age > ? AND sex = ? ORDER BY `ctime` DESC OFFSET 10 LIMIT 10;",
+			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE age > ? AND sex = ? ORDER BY `ctime` DESC LIMIT 10 OFFSET 10;",
 		},
 	}
 
