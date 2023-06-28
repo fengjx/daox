@@ -5,4 +5,5 @@
 - [完成基础crud和缓存实现](https://github.com/fengjx/daox/pull/1)
 - [dao - 支持根据Model更新](https://github.com/fengjx/daox/pull/4)
 - [fix: Model 中包含忽略字段时创建 Dao 失败](https://github.com/fengjx/daox/pull/6)
+- [fix: [sqlbuilder] 分页sql offset 错误](https://github.com/fengjx/daox/pull/9)
 
