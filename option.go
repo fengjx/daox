@@ -11,7 +11,7 @@ type Option func(*Dao)
 
 func WithDBRead(read *sqlx.DB) Option {
 	return func(p *Dao) {
-		p.DBRead = read
+		p.DBRead = NewDB(read)
 	}
 }
 

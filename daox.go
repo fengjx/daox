@@ -22,8 +22,8 @@ var ctx = context.TODO()
 type SliceToMapFun = func([]*Model) map[interface{}]*Model
 
 type Dao struct {
-	DBMaster      *sqlx.DB
-	DBRead        *sqlx.DB
+	DBMaster      *DB
+	DBRead        *DB
 	RedisClient   *redis.Client
 	TableMeta     *TableMeta
 	CacheProvider *CacheProvider
@@ -31,7 +31,7 @@ type Dao struct {
 
 func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
 	dao := &Dao{
-		DBMaster: master,
+		DBMaster: NewDB(master),
 	}
 	columns := dao.GetColumnsByType(structType)
 	dao.TableMeta = &TableMeta{
