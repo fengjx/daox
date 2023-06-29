@@ -89,13 +89,15 @@ func Init() {
 		}
 		dao := NewDAO(db, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
 		for i := 0; i < 10; i++ {
+			nowSec := time.Now().Unix()
 			id, err := dao.Save(&user{
 				Uid:       int64(100 + i),
 				Name:      fmt.Sprintf("u-%d", i),
 				Sex:       "male",
-				LoginTime: time.Now().Unix(),
-				Utime:     time.Now().Unix(),
-			}, "ctime")
+				LoginTime: nowSec,
+				Utime:     nowSec,
+				Ctime:     nowSec,
+			})
 			if err != nil {
 				panic(err)
 				continue
@@ -296,4 +298,25 @@ func TestIgnoreField(t *testing.T) {
 	dao := NewDAO(DBMaster, "blog", "id", reflect.TypeOf(&blog{}), IsAutoIncrement())
 	t.Log(strings.Join(dao.TableMeta.Columns, ","))
 	assert.Equal(t, "id,uid,title,content,create_time", strings.Join(dao.TableMeta.Columns, ","))
+}
+
+func TestPage(t *testing.T) {
+	Init()
+	DBMaster, err := newSqliteDb()
+	if err != nil {
+		log.Panic(err)
+	}
+	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
+	querySQL, err := dao.SQLBuilder().Select().Limit(10).Offset(5).Sql()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var list []user
+	err = dao.DBRead.Select(&list, querySQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range list {
+		t.Log(item)
+	}
 }
