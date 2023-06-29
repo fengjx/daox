@@ -102,13 +102,13 @@ func (s *Selector) Sql() (string, error) {
 		}
 	}
 
-	if s.offset != nil {
-		s.writeString(" OFFSET ")
-		s.writeString(strconv.Itoa(*s.offset))
-	}
 	if s.limit != nil {
 		s.writeString(" LIMIT ")
 		s.writeString(strconv.Itoa(*s.limit))
+	}
+	if s.offset != nil {
+		s.writeString(" OFFSET ")
+		s.writeString(strconv.Itoa(*s.offset))
 	}
 	s.end()
 	return s.sb.String(), nil
