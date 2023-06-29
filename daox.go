@@ -22,8 +22,8 @@ var ctx = context.TODO()
 type SliceToMapFun = func([]*Model) map[interface{}]*Model
 
 type Dao struct {
-	DBMaster      *sqlx.DB
-	DBRead        *sqlx.DB
+	DBMaster      *DB
+	DBRead        *DB
 	RedisClient   *redis.Client
 	TableMeta     *TableMeta
 	CacheProvider *CacheProvider
@@ -31,7 +31,7 @@ type Dao struct {
 
 func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
 	dao := &Dao{
-		DBMaster: master,
+		DBMaster: NewDB(master),
 	}
 	columns := dao.GetColumnsByType(structType)
 	dao.TableMeta = &TableMeta{
@@ -55,21 +55,36 @@ func (dao *Dao) SQLBuilder() *sqlbuilder.Builder {
 	return sqlbuilder.New(dao.TableMeta.TableName)
 }
 
-func (dao *Dao) GetColumnsByModel(model interface{}) []string {
-	return dao.GetColumnsByType(reflect.TypeOf(model))
+func (dao *Dao) GetColumnsByModel(model interface{}, omitColumns ...string) []string {
+	return dao.GetColumnsByType(reflect.TypeOf(model), omitColumns...)
 }
 
 // GetColumnsByType 通过字段 tag 解析数据库字段
-func (dao *Dao) GetColumnsByType(typ reflect.Type) []string {
+func (dao *Dao) GetColumnsByType(typ reflect.Type, omitColumns ...string) []string {
 	structMap := dao.DBMaster.Mapper.TypeMap(typ)
 	columns := make([]string, 0)
 	for _, fieldInfo := range structMap.Tree.Children {
-		if fieldInfo == nil || fieldInfo.Name == "" {
+		if fieldInfo == nil || fieldInfo.Name == "" || containsString(omitColumns, fieldInfo.Name) {
 			continue
 		}
 		columns = append(columns, fieldInfo.Name)
 	}
 	return columns
+}
+
+func (dao *Dao) DBColumns(omitColumns ...string) []string {
+	columns := make([]string, 0)
+	for _, column := range dao.TableMeta.Columns {
+		if containsString(omitColumns, column) {
+			continue
+		}
+		columns = append(columns, column)
+	}
+	return columns
+}
+
+func (dao *Dao) TableName() string {
+	return dao.TableMeta.TableName
 }
 
 // Save
@@ -114,9 +129,8 @@ func (dao *Dao) GetByColumn(kv *KV, dest Model) error {
 	if kv == nil {
 		return nil
 	}
-	tableMeta := dao.TableMeta
 	querySql, err := dao.SQLBuilder().Select().
-		Columns(tableMeta.OmitColumns()...).
+		Columns(dao.DBColumns()...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", kv.Key))).
 		Sql()
 	if err != nil {
@@ -143,9 +157,8 @@ func (dao *Dao) ListByColumns(kvs *MultiKV, dest []Model) error {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return nil
 	}
-	tableMeta := dao.TableMeta
 	querySql, err := dao.SQLBuilder().Select().
-		Columns(tableMeta.OmitColumns()...).
+		Columns(dao.DBColumns()...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s in ?", kvs.Key))).
 		Sql()
 	if err != nil {
@@ -159,9 +172,8 @@ func (dao *Dao) List(kv *KV, dest interface{}) error {
 	if kv == nil {
 		return nil
 	}
-	tableMeta := dao.TableMeta
 	querySql, err := dao.SQLBuilder().Select().
-		Columns(tableMeta.OmitColumns()...).
+		Columns(dao.DBColumns()...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", kv.Key))).
 		Sql()
 	if err != nil {
@@ -223,7 +235,7 @@ func (dao *Dao) Update(m Model) (bool, error) {
 	}
 	tableMeta := dao.TableMeta
 	updateSQL, err := dao.SQLBuilder().Update().
-		Columns(tableMeta.OmitColumns(tableMeta.PrimaryKey)...).
+		Columns(dao.DBColumns(tableMeta.PrimaryKey)...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey))).
 		NameSql()
 	if err != nil {
@@ -305,13 +317,4 @@ func (dao *Dao) DeleteCache(kv *KV) error {
 
 func (dao *Dao) BatchDeleteCache(field string, items []string) error {
 	return dao.CacheProvider.BatchDel(field, items)
-}
-
-func containsString(collection []string, element string) bool {
-	for _, item := range collection {
-		if item == element {
-			return true
-		}
-	}
-	return false
 }

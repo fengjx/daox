@@ -34,6 +34,15 @@ func toString(src interface{}) string {
 	}
 }
 
+func containsString(collection []string, element string) bool {
+	for _, item := range collection {
+		if item == element {
+			return true
+		}
+	}
+	return false
+}
+
 func ModelListToMap(src []Model) map[interface{}]Model {
 	if len(src) == 0 {
 		return make(map[interface{}]Model, 0)
