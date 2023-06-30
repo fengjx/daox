@@ -3,6 +3,8 @@ package daox
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/fengjx/daox/sqlbuilder"
 )
 
 func isIDEmpty(id interface{}) bool {
@@ -35,12 +37,7 @@ func toString(src interface{}) string {
 }
 
 func containsString(collection []string, element string) bool {
-	for _, item := range collection {
-		if item == element {
-			return true
-		}
-	}
-	return false
+	return sqlbuilder.ContainsString(collection, element)
 }
 
 func ModelListToMap(src []Model) map[interface{}]Model {

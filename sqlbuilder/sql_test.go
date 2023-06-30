@@ -6,6 +6,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type tm struct {
+	Id    int64  `json:"id"`
+	Name  string `json:"name"`
+	Age   string `json:"age"`
+	Ctime int64  `json:"ctime"`
+}
+
 func TestSelect(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -87,6 +94,18 @@ func TestSelect(t *testing.T) {
 				Limit(10),
 			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE age > ? AND sex = ? ORDER BY `ctime` DESC LIMIT 10 OFFSET 10;",
 		},
+		{
+			name: "select model",
+			selector: New("user").Select().
+				StructColumns(&tm{}, "json"),
+			wantSQL: "SELECT `id`, `name`, `age`, `ctime` FROM `user`;",
+		},
+		{
+			name: "select model omit",
+			selector: New("user").Select().
+				StructColumns(&tm{}, "json", "ctime"),
+			wantSQL: "SELECT `id`, `name`, `age` FROM `user`;",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -114,6 +133,12 @@ func TestInsert(t *testing.T) {
 			inserter:    New("user").Insert().Columns("username", "age", "sex"),
 			wantSQL:     "INSERT INTO `user`(`username`, `age`, `sex`) VALUES (?, ?, ?);",
 			wantNameSQL: "INSERT INTO `user`(`username`, `age`, `sex`) VALUES (:username, :age, :sex);",
+		},
+		{
+			name:        "insert model",
+			inserter:    New("user").Insert().StructColumns(&tm{}, "json", "id"),
+			wantSQL:     "INSERT INTO `user`(`name`, `age`, `ctime`) VALUES (?, ?, ?);",
+			wantNameSQL: "INSERT INTO `user`(`name`, `age`, `ctime`) VALUES (:name, :age, :ctime);",
 		},
 	}
 
@@ -169,6 +194,14 @@ func TestUpdate(t *testing.T) {
 				Columns("username", "age").
 				Where(C().Where(true, "id = :id")),
 			wantNameSQL: "UPDATE `user` SET `username` = :username, `age` = :age WHERE id = :id;",
+		},
+		{
+			name: "update model",
+			updater: New("user").
+				Update().
+				StructColumns(&tm{}, "json", "id", "ctime").
+				Where(C().Where(true, "id = :id")),
+			wantNameSQL: "UPDATE `user` SET `name` = :name, `age` = :age WHERE id = :id;",
 		},
 	}
 

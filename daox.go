@@ -61,15 +61,7 @@ func (dao *Dao) GetColumnsByModel(model interface{}, omitColumns ...string) []st
 
 // GetColumnsByType 通过字段 tag 解析数据库字段
 func (dao *Dao) GetColumnsByType(typ reflect.Type, omitColumns ...string) []string {
-	structMap := dao.DBMaster.Mapper.TypeMap(typ)
-	columns := make([]string, 0)
-	for _, fieldInfo := range structMap.Tree.Children {
-		if fieldInfo == nil || fieldInfo.Name == "" || containsString(omitColumns, fieldInfo.Name) {
-			continue
-		}
-		columns = append(columns, fieldInfo.Name)
-	}
-	return columns
+	return sqlbuilder.GetColumnsByType(dao.DBMaster.Mapper, typ, omitColumns...)
 }
 
 func (dao *Dao) DBColumns(omitColumns ...string) []string {

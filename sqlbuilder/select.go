@@ -23,6 +23,11 @@ func NewSelector(tableName string) *Selector {
 	return selector
 }
 
+func (s *Selector) StructColumns(m interface{}, tagName string, omitColumns ...string) *Selector {
+	columns := GetColumnsByModel(GetMapperByTagName(tagName), m, omitColumns...)
+	return s.Columns(columns...)
+}
+
 func (s *Selector) Columns(columns ...string) *Selector {
 	s.columns = columns
 	return s
