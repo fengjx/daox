@@ -15,22 +15,22 @@ var (
 	SQLErrDeleteMissWhere  = errors.New("[sqlbuilder] delete sql miss where")
 )
 
-var MapperMap = map[string]*reflectx.Mapper{}
+var mapperMap = map[string]*reflectx.Mapper{}
 
 func init() {
-	MapperMap["json"] = reflectx.NewMapperFunc("json", strings.ToTitle)
-	MapperMap["db"] = reflectx.NewMapperFunc("db", strings.ToTitle)
+	mapperMap["json"] = reflectx.NewMapperFunc("json", strings.ToTitle)
+	mapperMap["db"] = reflectx.NewMapperFunc("db", strings.ToTitle)
 }
 
 var createMapperLock sync.Mutex
 
 func GetMapperByTagName(tagName string) *reflectx.Mapper {
-	if mapper, ok := MapperMap[tagName]; ok {
+	if mapper, ok := mapperMap[tagName]; ok {
 		return mapper
 	}
 	createMapperLock.Lock()
 	mapper := reflectx.NewMapperFunc(tagName, strings.ToTitle)
-	MapperMap[tagName] = mapper
+	mapperMap[tagName] = mapper
 	createMapperLock.Unlock()
 	return mapper
 }

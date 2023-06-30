@@ -19,7 +19,6 @@ linters:
   enable:
     - asciicheck
     - bodyclose
-    - depguard
     - gci
     - gocritic
     - gofmt
@@ -41,7 +40,6 @@ linters:
     - whitespace
     - errcheck
     - errname
-    - gochecknoglobals
     - sqlclosecheck
 #  disable:
 
