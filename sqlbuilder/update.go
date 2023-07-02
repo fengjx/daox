@@ -13,6 +13,11 @@ func NewUpdater(tableName string) *Updater {
 	}
 }
 
+func (u *Updater) StructColumns(m interface{}, tagName string, omitColumns ...string) *Updater {
+	columns := GetColumnsByModel(GetMapperByTagName(tagName), m, omitColumns...)
+	return u.Columns(columns...)
+}
+
 func (u *Updater) Columns(columns ...string) *Updater {
 	u.columns = columns
 	return u

@@ -2,7 +2,11 @@ package sqlbuilder
 
 import (
 	"errors"
+	"reflect"
 	"strings"
+	"sync"
+
+	"github.com/jmoiron/sqlx/reflectx"
 )
 
 var (
@@ -10,6 +14,43 @@ var (
 	SQLErrColumnsRequire   = errors.New("[sqlbuilder] columns requires")
 	SQLErrDeleteMissWhere  = errors.New("[sqlbuilder] delete sql miss where")
 )
+
+var mapperMap = map[string]*reflectx.Mapper{}
+
+func init() {
+	mapperMap["json"] = reflectx.NewMapperFunc("json", strings.ToTitle)
+	mapperMap["db"] = reflectx.NewMapperFunc("db", strings.ToTitle)
+}
+
+var createMapperLock sync.Mutex
+
+func GetMapperByTagName(tagName string) *reflectx.Mapper {
+	if mapper, ok := mapperMap[tagName]; ok {
+		return mapper
+	}
+	createMapperLock.Lock()
+	mapper := reflectx.NewMapperFunc(tagName, strings.ToTitle)
+	mapperMap[tagName] = mapper
+	createMapperLock.Unlock()
+	return mapper
+}
+
+func GetColumnsByModel(mapper *reflectx.Mapper, model interface{}, omitColumns ...string) []string {
+	return GetColumnsByType(mapper, reflect.TypeOf(model), omitColumns...)
+}
+
+// GetColumnsByType 通过字段 tag 解析数据库字段
+func GetColumnsByType(mapper *reflectx.Mapper, typ reflect.Type, omitColumns ...string) []string {
+	structMap := mapper.TypeMap(typ)
+	columns := make([]string, 0)
+	for _, fieldInfo := range structMap.Tree.Children {
+		if fieldInfo == nil || fieldInfo.Name == "" || ContainsString(omitColumns, fieldInfo.Name) {
+			continue
+		}
+		columns = append(columns, fieldInfo.Name)
+	}
+	return columns
+}
 
 type Builder struct {
 	tableName string
@@ -22,16 +63,16 @@ func New(tableName string) *Builder {
 	return builder
 }
 
-func (b *Builder) Select() *Selector {
-	return NewSelector(b.tableName)
+func (b *Builder) Select(columns ...string) *Selector {
+	return NewSelector(b.tableName).Columns(columns...)
 }
 
-func (b *Builder) Insert() *Inserter {
-	return NewInserter(b.tableName)
+func (b *Builder) Insert(columns ...string) *Inserter {
+	return NewInserter(b.tableName).Columns(columns...)
 }
 
-func (b *Builder) Update() *Updater {
-	return NewUpdater(b.tableName)
+func (b *Builder) Update(columns ...string) *Updater {
+	return NewUpdater(b.tableName).Columns(columns...)
 }
 
 func (b *Builder) Delete() *Deleter {
@@ -82,4 +123,13 @@ func (b *sqlBuilder) whereSQL(condition *condition) {
 			b.writeString(predicate.express)
 		}
 	}
+}
+
+func ContainsString(collection []string, element string) bool {
+	for _, item := range collection {
+		if item == element {
+			return true
+		}
+	}
+	return false
 }
