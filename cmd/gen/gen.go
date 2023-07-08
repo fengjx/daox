@@ -78,11 +78,7 @@ func run(ctx *cli.Context) error {
 		for _, col := range table.Columns {
 			col.TagName = config.Target.Custom.TagName
 		}
-		fmt.Println(table.Name, table.Comment, table.AutoIncrement)
-		columns := table.Columns
-		for _, column := range columns {
-			fmt.Println(column)
-		}
+		fmt.Println(table.Name, table.Comment)
 		gen(config, table)
 	}
 	return nil
