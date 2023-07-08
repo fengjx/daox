@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"database/sql"
+	"embed"
 	"fmt"
 	"log"
 	"math/big"
@@ -13,14 +14,17 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/fengjx/daox/utils"
 	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
+
+	"github.com/fengjx/daox/utils"
 )
+
+var embedFS embed.FS
 
 func main() {
 	app := &cli.App{
@@ -160,7 +164,7 @@ func gen(config *Config, table *Table) {
 	if config.Target.Custom.TemplateDir != "" {
 		dir = config.Target.Custom.TemplateDir
 	}
-	entries, err := os.ReadDir(dir)
+	entries, err := embedFS.ReadDir(dir)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -182,7 +186,7 @@ func render(basePath string, parent string, entries []os.DirEntry, outDir string
 	for _, entry := range entries {
 		path := filepath.Join(parent, entry.Name())
 		if entry.IsDir() {
-			children, err := os.ReadDir(filepath.Join(parent, entry.Name()))
+			children, err := embedFS.ReadDir(filepath.Join(parent, entry.Name()))
 			if err != nil {
 				fmt.Println(err.Error())
 				return
