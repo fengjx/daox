@@ -25,3 +25,5 @@ go.work
 *.iml
 .cache
 test.db
+.dev
+out

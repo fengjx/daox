@@ -8,4 +8,5 @@
 - [fix: [sqlbuilder] 分页sql offset 错误](https://github.com/fengjx/daox/pull/9)
 - [dao 采用组合模式引入 sqlx](https://github.com/fengjx/daox/pull/11)
 - [sqlbuilder 支持从 struct 解析字段](https://github.com/fengjx/daox/pull/13) 
+- [代码生成工具](https://github.com/fengjx/daox/pull/14)
 
