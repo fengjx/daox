@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"io/fs"
 	"log"
 	"math/big"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"github.com/fengjx/daox/utils"
 )
 
+//go:embed template/*
 var embedFS embed.FS
 
 func main() {
@@ -156,11 +158,13 @@ func loadColumnMeta(db *sqlx.DB, dbName, tableName string) []*Column {
 }
 
 func gen(config *Config, table *Table) {
-	dir := "./cmd/gen/template/default"
+	dir := "template/default"
+	isEmbed := true
 	if config.Target.Custom.TemplateDir != "" {
 		dir = config.Target.Custom.TemplateDir
+		isEmbed = false
 	}
-	entries, err := embedFS.ReadDir(dir)
+	entries, err := ReadDir(dir, isEmbed)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -171,23 +175,23 @@ func gen(config *Config, table *Table) {
 		"Table":   table,
 	}
 	out := filepath.Join(config.Target.Custom.OutDir, table.Name)
-	render(filepath.Join(dir), "", entries, out, attr)
+	render(isEmbed, filepath.Join(dir), "", entries, out, attr)
 }
 
 // 生成文件
-func render(basePath string, parent string, entries []os.DirEntry, outDir string, attr map[string]interface{}) {
+func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry, outDir string, attr map[string]interface{}) {
 	if parent == "" {
 		parent = basePath
 	}
 	for _, entry := range entries {
 		path := filepath.Join(parent, entry.Name())
 		if entry.IsDir() {
-			children, err := embedFS.ReadDir(filepath.Join(parent, entry.Name()))
+			children, err := ReadDir(filepath.Join(parent, entry.Name()), isEmbed)
 			if err != nil {
 				fmt.Println(err.Error())
 				return
 			}
-			render(basePath, path, children, outDir, attr)
+			render(isEmbed, basePath, path, children, outDir, attr)
 			continue
 		}
 		targetDir := filepath.Join(outDir, strings.ReplaceAll(parent, basePath, ""))
@@ -208,7 +212,7 @@ func render(basePath string, parent string, entries []os.DirEntry, outDir string
 		}
 		targetFile := filepath.Join(targetDir, strings.ReplaceAll(entry.Name(), ".tmpl", ""))
 		fmt.Println(targetFile)
-		bs, err := os.ReadFile(path)
+		bs, err := ReadFile(path, isEmbed)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -441,4 +445,18 @@ func GenGoImports(cols []*Column) []string {
 		}
 	}
 	return results
+}
+
+func ReadDir(name string, isEmbed bool) ([]fs.DirEntry, error) {
+	if isEmbed {
+		return embedFS.ReadDir(name)
+	}
+	return os.ReadDir(name)
+}
+
+func ReadFile(name string, isEmbed bool) ([]byte, error) {
+	if isEmbed {
+		return embedFS.ReadFile(name)
+	}
+	return os.ReadFile(name)
 }
