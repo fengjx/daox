@@ -2,6 +2,8 @@ package daox
 
 import (
 	"reflect"
+
+	"github.com/fengjx/daox/utils"
 )
 
 type TableMeta struct {
@@ -15,7 +17,7 @@ type TableMeta struct {
 func (meta *TableMeta) OmitColumns(omit ...string) []string {
 	columnArr := make([]string, 0, len(meta.Columns))
 	for _, column := range meta.Columns {
-		if !containsString(omit, column) {
+		if !utils.ContainsString(omit, column) {
 			columnArr = append(columnArr, column)
 		}
 	}

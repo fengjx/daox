@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/fengjx/daox/utils"
+
 	"github.com/jmoiron/sqlx/reflectx"
 )
 
@@ -44,7 +46,7 @@ func GetColumnsByType(mapper *reflectx.Mapper, typ reflect.Type, omitColumns ...
 	structMap := mapper.TypeMap(typ)
 	columns := make([]string, 0)
 	for _, fieldInfo := range structMap.Tree.Children {
-		if fieldInfo == nil || fieldInfo.Name == "" || ContainsString(omitColumns, fieldInfo.Name) {
+		if fieldInfo == nil || fieldInfo.Name == "" || utils.ContainsString(omitColumns, fieldInfo.Name) {
 			continue
 		}
 		columns = append(columns, fieldInfo.Name)
@@ -123,13 +125,4 @@ func (b *sqlBuilder) whereSQL(condition *condition) {
 			b.writeString(predicate.express)
 		}
 	}
-}
-
-func ContainsString(collection []string, element string) bool {
-	for _, item := range collection {
-		if item == element {
-			return true
-		}
-	}
-	return false
 }

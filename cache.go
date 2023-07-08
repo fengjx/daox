@@ -9,6 +9,8 @@ import (
 
 	"github.com/jmoiron/sqlx/reflectx"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/fengjx/daox/utils"
 )
 
 type CreateDataFun func() (interface{}, error)
@@ -191,5 +193,5 @@ func (c *CacheProvider) CheckPointer(value reflect.Value) error {
 }
 
 func (c *CacheProvider) genKey(key, item interface{}) string {
-	return fmt.Sprintf("{%s}_%s_%s_%s", c.KeyPrefix, c.Version, key, toString(item))
+	return fmt.Sprintf("{%s}_%s_%s_%s", c.KeyPrefix, c.Version, key, utils.ToString(item))
 }

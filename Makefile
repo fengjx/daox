@@ -7,6 +7,10 @@ test:
 lint:
 	golangci-lint run --config .github/linters/.golangci.yml
 
+.PHONY: lint-fix
+lint-fix:
+	golangci-lint run --config .github/linters/.golangci.yml --fix
+
 .PHONY: fmt
 fmt:
 	@goimports -l -w .

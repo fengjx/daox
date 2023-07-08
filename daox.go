@@ -8,9 +8,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/fengjx/daox/sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/fengjx/daox/sqlbuilder"
+	"github.com/fengjx/daox/utils"
 )
 
 var (
@@ -67,7 +69,7 @@ func (dao *Dao) GetColumnsByType(typ reflect.Type, omitColumns ...string) []stri
 func (dao *Dao) DBColumns(omitColumns ...string) []string {
 	columns := make([]string, 0)
 	for _, column := range dao.TableMeta.Columns {
-		if containsString(omitColumns, column) {
+		if utils.ContainsString(omitColumns, column) {
 			continue
 		}
 		columns = append(columns, column)
@@ -136,7 +138,7 @@ func (dao *Dao) GetByColumn(kv *KV, dest Model) error {
 }
 
 func (dao *Dao) GetByColumnCache(kv *KV, dest Model) error {
-	return dao.CacheProvider.Fetch(kv.Key, toString(kv.Value), dest, func() (interface{}, error) {
+	return dao.CacheProvider.Fetch(kv.Key, utils.ToString(kv.Value), dest, func() (interface{}, error) {
 		err := dao.GetByColumn(kv, dest)
 		if err != nil {
 			return nil, err
@@ -192,7 +194,7 @@ func (dao *Dao) ListByIds(ids []interface{}, dest []Model) error {
 }
 
 func (dao *Dao) UpdateField(idValue interface{}, fieldMap map[string]interface{}) (bool, error) {
-	if isIDEmpty(idValue) {
+	if utils.IsIDEmpty(idValue) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := dao.TableMeta
@@ -222,7 +224,7 @@ func (dao *Dao) UpdateField(idValue interface{}, fieldMap map[string]interface{}
 }
 
 func (dao *Dao) Update(m Model) (bool, error) {
-	if isIDEmpty(m.GetID()) {
+	if utils.IsIDEmpty(m.GetID()) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := dao.TableMeta
@@ -304,9 +306,20 @@ func (dao *Dao) BatchFetch(field string, items []interface{}, dest interface{}, 
 }
 
 func (dao *Dao) DeleteCache(kv *KV) error {
-	return dao.CacheProvider.Del(kv.Key, toString(kv.Value))
+	return dao.CacheProvider.Del(kv.Key, utils.ToString(kv.Value))
 }
 
 func (dao *Dao) BatchDeleteCache(field string, items []string) error {
 	return dao.CacheProvider.BatchDel(field, items)
+}
+
+func ModelListToMap(src []Model) map[interface{}]Model {
+	if len(src) == 0 {
+		return make(map[interface{}]Model, 0)
+	}
+	resMap := make(map[interface{}]Model, 0)
+	for _, m := range src {
+		resMap[m.GetID()] = m
+	}
+	return resMap
 }
