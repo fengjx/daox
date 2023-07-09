@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"reflect"
 	"strings"
@@ -11,6 +12,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/fengjx/daox"
 )
 
 type User struct {
@@ -72,17 +75,10 @@ func selectUser(db *sqlx.DB) {
 
 func main() {
 	var db *sqlx.DB
-	db = sqlx.NewDb(memoryDB(), "sqlite3")
+	db = sqlx.MustOpen("sqlite3", "file:.cache/example.db?cache=shared&mode=memory")
 	db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
-
-	err := db.Ping()
-	if err != nil {
-		panic(err)
+	dao := daox.NewDAO(db, "user", "id", reflect.TypeOf(&User{}), daox.IsAutoIncrement())
+	for _, col := range dao.TableMeta.Columns {
+		fmt.Println(col)
 	}
-	t := reflect.TypeOf(User{})
-	structMap := db.Mapper.TypeMap(t)
-	log.Print(structMap.Names)
-	insertUser(db)
-	selectUser(db)
-
 }
