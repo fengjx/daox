@@ -6,10 +6,6 @@
 
 实现了代码生成器，有内置生成模板，也可以自定义模板。
 
-为什么有 orm 框架了还要开发 daox？
-
-> `orm` 框架使用简单，但往往底层实现比较复杂，对大多数人来说很难二次开发扩展，并且在大多数情况下我们只使用了`orm`框架可能不到 20% 的功能。
-> `daox` 只包含基础 crud api，提供`sqlbuilder`，代码简单，容易做二次扩展。
 
 ## 安装
 
@@ -19,8 +15,8 @@ go get github.com/fengjx/daox
 
 ## CRUD
 
+在MySQL创建测试表
 ```sql
--- 在MySQL创建测试表
 create table user_info
 (
     id       bigint comment '主键',
@@ -43,24 +39,34 @@ dao := daox.NewDAO(db, "user_info", "id", reflect.TypeOf(&User{}), daox.IsAutoIn
 
 新增
 ```go
-sec := time.Now().Unix()
-user := &User{
-    Uid:      100 + int64(i),
-    Nickname: randString(6),
-    Sex:      int32(i) % 2,
-    Utime:    sec,
-    Ctime:    sec,
+for i := 0; i < 20; i++ {
+    sec := time.Now().Unix()
+    user := &User{
+        Uid:      100 + int64(i),
+        Nickname: randString(6),
+        Sex:      int32(i) % 2,
+        Utime:    sec,
+        Ctime:    sec,
+    }
+    id, err := dao.Save(user)
+    if err != nil {
+        log.Panic(err)
+    }
+    log.Println(id)
 }
-id, err := dao.Save(user)
-if err != nil {
-    log.Panic(err)
-}
-log.Println(id)
+
+
 ```
 
 查询
 ```go
+// id 查询
+user := new(User)
+err := dao.GetByID(1, user)
 
+// 指定字段查询单条记录
+user := new(User)
+err := dao.GetByColumn(daox.OfKv("uid", 10000), user)
 ```
 
 修改

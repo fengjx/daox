@@ -60,7 +60,40 @@ func insertUser(dao *daox.Dao) {
 	}
 }
 
-func selectUser(dao daox.Dao) {
+func batchInsertUser(dao *daox.Dao) {
+	var users []*User
+	for i := 0; i < 20; i++ {
+		sec := time.Now().Unix()
+		user := &User{
+			Uid:      10000 + int64(i),
+			Nickname: randString(6),
+			Sex:      int32(i) % 2,
+			Utime:    sec,
+			Ctime:    sec,
+		}
+		users = append(users, user)
+	}
+	count, err := dao.BatchSave(users)
+	if err != nil {
+		log.Panic(err)
+	}
+	log.Printf("save count: %d", count)
+}
+
+func selectUser(dao *daox.Dao) {
+	user := new(User)
+	err := dao.GetByID(1, user)
+	if err != nil {
+		log.Panic(err)
+	}
+	log.Println(user)
+
+	user2 := new(User)
+	err2 := dao.GetByColumn(daox.OfKv("uid", 10000), user2)
+	if err2 != nil {
+		log.Panic(err2)
+	}
+	log.Println(user2)
 }
 
 func main() {
@@ -70,5 +103,7 @@ func main() {
 	for _, col := range dao.TableMeta.Columns {
 		fmt.Println(col)
 	}
-	insertUser(dao)
+	// insertUser(dao)
+	// batchInsertUser(dao)
+	selectUser(dao)
 }
