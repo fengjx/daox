@@ -1,84 +1,74 @@
 package main
 
 import (
-	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"reflect"
 	"strings"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/fengjx/daox"
 )
 
+func init() {
+	rand.NewSource(time.Now().UnixNano())
+}
+
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randString(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
+
 type User struct {
-	Id    int64  `json:"id"`
-	Uid   int64  `json:"uid"`
-	Name  string `json:"name"`
-	Sex   string `json:"sex"`
-	Utime int64  `json:"utime"`
-	Ctime int64  `json:"ctime"`
+	Id       int64  `json:"id"`
+	Uid      int64  `json:"uid"`
+	Nickname string `json:"nickname"`
+	Sex      int32  `json:"sex"`
+	Utime    int64  `json:"utime"`
+	Ctime    int64  `json:"ctime"`
 }
 
-func memoryDB() *sql.DB {
-	db, err := sql.Open("sqlite3", "file:.cache/test.db?cache=shared&mode=memory")
-	if err != nil {
-		panic(err)
-	}
-	_, err = db.Exec(`
-		CREATE TABLE user (
-		  id integer primary key autoincrement,
-		  name text,
-		  sex text,
-		  utime integer,
-		  ctime integer
-		);	
-	`)
-	if err != nil {
-		panic(err)
-	}
-	return db
+func (receiver User) GetID() interface{} {
+	return receiver.Id
 }
 
-func insertUser(db *sqlx.DB) {
-	sql := "insert into user(name, sex, utime, ctime) values ('fenjgx', '1', 0, 0)"
-	now := time.Now().Unix()
-	user := &User{
-		Name:  "fengjx",
-		Sex:   "1",
-		Utime: now,
-		Ctime: now,
+func insertUser(dao *daox.Dao) {
+	for i := 0; i < 20; i++ {
+		sec := time.Now().Unix()
+		user := &User{
+			Uid:      100 + int64(i),
+			Nickname: randString(6),
+			Sex:      int32(i) % 2,
+			Utime:    sec,
+			Ctime:    sec,
+		}
+		id, err := dao.Save(user)
+		if err != nil {
+			log.Panic(err)
+		}
+		log.Println(id)
 	}
-	res, err := db.NamedExec(sql, user)
-	if err != nil {
-		panic(err)
-	}
-	id, _ := res.LastInsertId()
-	log.Printf("id: %d", id)
 }
 
-func selectUser(db *sqlx.DB) {
-	sql := "select * from user where id = ?"
-	u1 := &User{}
-	err := db.Get(u1, sql, 1)
-	if err != nil {
-		panic(err)
-	}
-	json, _ := json.Marshal(u1)
-	log.Println(string(json))
+func selectUser(dao daox.Dao) {
 }
 
 func main() {
-	var db *sqlx.DB
-	db = sqlx.MustOpen("sqlite3", "file:.cache/example.db?cache=shared&mode=memory")
+	db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
 	db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
-	dao := daox.NewDAO(db, "user", "id", reflect.TypeOf(&User{}), daox.IsAutoIncrement())
+	dao := daox.NewDAO(db, "user_info", "id", reflect.TypeOf(&User{}), daox.IsAutoIncrement())
 	for _, col := range dao.TableMeta.Columns {
 		fmt.Println(col)
 	}
+	insertUser(dao)
 }

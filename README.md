@@ -6,6 +6,11 @@
 
 实现了代码生成器，有内置生成模板，也可以自定义模板。
 
+为什么有 orm 框架了还要开发 daox？
+
+> `orm` 框架使用简单，但往往底层实现比较复杂，对大多数人来说很难二次开发扩展，并且在大多数情况下我们只使用了`orm`框架可能不到 20% 的功能。
+> `daox` 只包含基础 crud api，提供`sqlbuilder`，代码简单，容易做二次扩展。
+
 ## 安装
 
 ```
@@ -14,36 +19,69 @@ go get github.com/fengjx/daox
 
 ## CRUD
 
+```sql
+-- 在MySQL创建测试表
+create table user_info
+(
+    id       bigint comment '主键',
+    uid      bigint                not null,
+    nickname varchar(32) default '' null comment '昵称',
+    sex      tinyint     default 0 not null comment '性别',
+    utime    bigint      default 0 not null comment '更新时间',
+    ctime    bigint      default 0 not null comment '创建时间',
+    primary key pk(id),
+    unique uni_uid (uid)
+) comment '用户信息表';
+```
+
 创建 dao 对象
 ```go
-db, err := mysqlDB()
-if err != nil {
-    return nil, err
+db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
+db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
+dao := daox.NewDAO(db, "user_info", "id", reflect.TypeOf(&User{}), daox.IsAutoIncrement())
+```
+
+新增
+```go
+sec := time.Now().Unix()
+user := &User{
+    Uid:      100 + int64(i),
+    Nickname: randString(6),
+    Sex:      int32(i) % 2,
+    Utime:    sec,
+    Ctime:    sec,
 }
-// 初始化 sqlx
-dbx := sqlx.NewDb(db, "mysql")
-dbx.Mapper = reflectx.NewMapperFunc("json", strings.ToLower)
-// 初始化 daox，绑定表`user`，主键字段名`id`，主键为自增 id
-dao := daox.NewDAO(db, "user", "id", reflect.TypeOf(&User{}), daox.IsAutoIncrement())
+id, err := dao.Save(user)
+if err != nil {
+    log.Panic(err)
+}
+log.Println(id)
+```
+
+查询
+```go
+
+```
+
+修改
+```go
+
+```
+
+删除
+```go
+
 ```
 
 
+缓存
+```go
 
-### 新增
+```
 
-
-### 修改
-
-
-### 删除
+## sqlbuilder
 
 
-### 查询
-
-
-
-
-## 缓存
 
 
 
