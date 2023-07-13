@@ -64,9 +64,21 @@ for i := 0; i < 20; i++ {
 user := new(User)
 err := dao.GetByID(1, user)
 
+// 批量id查询
+var list []User
+err = dao.ListByIds(&list3, 10, 11)
+
 // 指定字段查询单条记录
 user := new(User)
 err := dao.GetByColumn(daox.OfKv("uid", 10000), user)
+
+// 指定字段查询多条记录
+var list []*User
+err := dao.List(daox.OfKv("sex", 0), &list)
+
+// 指定字段查询多个值
+var list []*User
+err = dao.ListByColumns(daox.OfMultiKv("uid", 10000, 10001), &list)
 ```
 
 修改

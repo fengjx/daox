@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"math/rand"
 	"reflect"
@@ -80,6 +79,7 @@ func batchInsertUser(dao *daox.Dao) {
 	log.Printf("save count: %d", count)
 }
 
+// 查询单条记录
 func selectUser(dao *daox.Dao) {
 	user := new(User)
 	err := dao.GetByID(1, user)
@@ -96,14 +96,46 @@ func selectUser(dao *daox.Dao) {
 	log.Println(user2)
 }
 
+// 查询多条记录
+func queryList(dao *daox.Dao) {
+	var list []*User
+	err := dao.List(daox.OfKv("sex", 0), &list)
+	if err != nil {
+		log.Panic(err)
+	}
+	log.Println("query by sex")
+	for _, user := range list {
+		log.Println(user)
+	}
+
+	log.Println("ListByColumns")
+	var list2 []User
+	err = dao.ListByColumns(daox.OfMultiKv("uid", 10000, 10001), &list2)
+	if err != nil {
+		log.Panic(err)
+	}
+	for _, user := range list2 {
+		log.Println(user)
+	}
+
+	log.Println("ListByIds")
+	var list3 []User
+	err = dao.ListByIds(&list3, 10, 11)
+	if err != nil {
+		log.Panic(err)
+	}
+	for _, user := range list3 {
+		log.Println(user)
+	}
+}
+
 func main() {
 	db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
 	db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
 	dao := daox.NewDAO(db, "user_info", "id", reflect.TypeOf(&User{}), daox.IsAutoIncrement())
-	for _, col := range dao.TableMeta.Columns {
-		fmt.Println(col)
-	}
+	log.Printf("columns: %v\n", dao.TableMeta.Columns)
 	// insertUser(dao)
 	// batchInsertUser(dao)
 	selectUser(dao)
+	queryList(dao)
 }

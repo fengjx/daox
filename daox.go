@@ -147,13 +147,13 @@ func (dao *Dao) GetByColumnCache(kv *KV, dest Model) error {
 	})
 }
 
-func (dao *Dao) ListByColumns(kvs *MultiKV, dest []Model) error {
+func (dao *Dao) ListByColumns(kvs *MultiKV, dest interface{}) error {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return nil
 	}
 	querySql, err := dao.SQLBuilder().Select().
 		Columns(dao.DBColumns()...).
-		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s in ?", kvs.Key))).
+		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s in (?)", kvs.Key))).
 		Sql()
 	if err != nil {
 		return err
@@ -188,9 +188,9 @@ func (dao *Dao) GetByIDCache(id interface{}, dest Model) error {
 	})
 }
 
-func (dao *Dao) ListByIds(ids []interface{}, dest []Model) error {
+func (dao *Dao) ListByIds(dest interface{}, ids ...interface{}) error {
 	tableMeta := dao.TableMeta
-	return dao.ListByColumns(OfMultiKv(tableMeta.PrimaryKey, ids), dest)
+	return dao.ListByColumns(OfMultiKv(tableMeta.PrimaryKey, ids...), dest)
 }
 
 func (dao *Dao) UpdateField(idValue interface{}, fieldMap map[string]interface{}) (bool, error) {
