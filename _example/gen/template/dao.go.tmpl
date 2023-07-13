@@ -1,0 +1,28 @@
+package {{FirstLower .Table.Name}}
+// auto generate by gen cmd tool
+import (
+	"github.com/fengjx/daox"
+	"reflect"
+	"sync"
+)
+
+type Dao struct {
+	*daox.Dao
+}
+
+var once sync.Once
+var dao *Dao
+
+func GetDao() *Dao {
+	once.Do(func() {
+		dao = &Dao{
+			Dao: daox.NewDAO(
+				db.GetDefaultDB(),
+				"{{.Table.Name}}",
+				"id",
+				reflect.TypeOf(&{{GonicCase .Table.Name}}{}),
+			),
+		}
+	})
+	return dao
+}

@@ -1,0 +1,13 @@
+ds:
+  type: mysql
+  dsn: root:1234@tcp(localhost:3306)/demo
+target:
+  custom:
+    tag-name: json
+    out-dir: ./out
+    template-dir: ./template
+    var:
+      a: aa
+      b: bb
+  tables:
+    - user_info
