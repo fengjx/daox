@@ -159,8 +159,8 @@ log.Println(deleteSQL)
 ### 安装代码生成工具
 
 ```bash
-go install github.com/fengjx/daox/cmd/gen@latest
-gen -h
+$ go install github.com/fengjx/daox/cmd/gen@latest
+$ gen -h
 
 GLOBAL OPTIONS:
    -f value    config file path
@@ -170,7 +170,7 @@ GLOBAL OPTIONS:
 生成代码
 
 ```
-gen -f gen.yml
+$ gen -f gen.yml
 ```
 
 配置示例说明
@@ -178,20 +178,63 @@ gen -f gen.yml
 ```yaml
 ds:
   type: mysql
-  dsn: root:1234@tcp(192.168.1.200:3306)/gogo
+  dsn: root:1234@tcp(localhost:3306)/demo
 target:
   custom:
-    tag-name: db
+    tag-name: json
     out-dir: ./out
     template-dir:
     var:
       a: aa
       b: bb
   tables:
-    - user
-    - blog
+    - user_info
 ```
+
+| 参数                         | 必须 | 说明                     |
+|----------------------------|----|------------------------|
+| ds.type                    | 是  | 数据库类型，暂时值支持 mysql      |
+| ds.dsn                     | 是  | 数据库连接                  |
+| target.custom.tag-name     | 是  | model 字段的 tagName      | 
+| target.custom.out-dir      | 是  | 文件生成路径                 | 
+| target.custom.template-dir | 否  | 自定义模板文件路径              | 
+| target.custom.var          | 否  | 自定义参数，map结构，可以在模板文件中使用 | 
+| target.custom.tables       | 是  | 需要生成文件的表名，list 结构      | 
+
 
 自定义模板说明
 
+通过`text/template`来渲染文件内容，模板语法不在此赘述，可自行查看参考文档。
 
+模板中可以使用的变量，详细可以查看源码[cmd/gen/gen.go](/cmd/gen/gen.go#L172)
+```go
+attr := map[string]interface{}{
+    "Var":     config.Target.Custom.Var,
+    "TagName": config.Target.Custom.TagName,
+    "Table":   table,
+}
+```
+
+模板中可以使用的函数
+
+- utils.FirstUpper: 首字母大写
+- utils.FirstLower: 首字母小写
+- utils.SnakeCase:  转下划线风格字符串
+- utils.TitleCase:  转驼峰风格字符串
+- utils.GonicCase:  转go风格驼峰字符串，user_id -> userID
+- utils.LineString: 空字符串使用横线"-"代替
+- SQLType2GoTypeString: sql类型转go类型字符串
+
+```go
+funcMap := template.FuncMap{
+    "FirstUpper":           utils.FirstUpper,
+    "FirstLower":           utils.FirstLower,
+    "SnakeCase":            utils.SnakeCase,
+    "TitleCase":            utils.TitleCase,
+    "GonicCase":            utils.GonicCase,
+    "LineString":           utils.LineString,
+    "SQLType2GoTypeString": SQLType2GoTypeString,
+}
+```
+
+参考`_example/gen`
