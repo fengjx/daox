@@ -99,12 +99,60 @@ err = dao.ListByColumns(daox.OfMultiKv("uid", 10000, 10001), &list)
 
 ## sqlbuilder
 
+创建Builder对象
+```go
+// 通过dao对象实例方法创建
+dao.SQLBuilder()
+
+// 独立使用
+sqlbuilder.New("user_info")
+```
+
+构造sql
+```go
+querySQL, err := sqlbuilder.New("user_info").Select().
+    Columns("id", "username", "age", "sex", "ctime").
+    Where(
+        sqlbuilder.C().
+            Where(true, "age > ?").
+            And(true, "sex = ?"),
+    ).
+    OrderBy(sqlbuilder.Desc("ctime")).
+    Offset(10).
+    Limit(10).Sql()
+// SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user_info` WHERE age > ? AND sex = ? ORDER BY `ctime` DESC LIMIT 10 OFFSET 10;
+log.Println(querySQL)
 
 
+inserter := sqlbuilder.New("user_info").Insert().
+    Columns("username", "age", "sex")
+
+sql, err := inserter.Sql()
+//  INSERT INTO `user_info`(`username`, `age`, `sex`) VALUES (?, ?, ?);
+log.Println(sql)
+
+nameSql, err := inserter.NameSql()
+// INSERT INTO `user_info`(`username`, `age`, `sex`) VALUES (:username, :age, :sex);
+log.Println(nameSql)
 
 
+updateSQL, err := sqlbuilder.New("user_info").
+    Update().
+    Columns("username", "age").
+        Where(sqlbuilder.C().Where(true, "id = ?")).
+    Sql()
+// UPDATE `user_info` SET `username` = ?, `age` = ? WHERE id = ?;
+log.Println(updateSQL)
 
 
+deleteSQL, err := sqlbuilder.New("user_info").Delete().
+    Where(sqlbuilder.C().Where(true, "id = ?")).
+    Sql()
+// DELETE FROM `user_info` WHERE id = ?;
+log.Println(deleteSQL)
+```
+
+更多示例请查看[sqlbuilder/sql_test.go](https://github.com/fengjx/daox/blob/master/sqlbuilder/sql_test.go)
 
 ## 代码生成
 

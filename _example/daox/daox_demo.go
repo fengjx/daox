@@ -129,6 +129,9 @@ func queryList(dao *daox.Dao) {
 	}
 }
 
+func sqlBuilder(dao *daox.Dao) {
+}
+
 func main() {
 	db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
 	db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
