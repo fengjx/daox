@@ -81,7 +81,7 @@ func (c *CacheProvider) Del(key string, item string) error {
 	return err
 }
 
-func (c *CacheProvider) BatchDel(key string, items []string) error {
+func (c *CacheProvider) BatchDel(key string, items ...string) error {
 	pipe := c.RedisClient.Pipeline()
 	for _, item := range items {
 		cacheKey := c.genKey(key, item)

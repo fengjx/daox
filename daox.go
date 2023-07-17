@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/redis/go-redis/v9"
 
 	"github.com/fengjx/daox/sqlbuilder"
 	"github.com/fengjx/daox/utils"
@@ -26,7 +25,6 @@ type SliceToMapFun = func([]*Model) map[interface{}]*Model
 type Dao struct {
 	DBMaster      *DB
 	DBRead        *DB
-	RedisClient   *redis.Client
 	TableMeta     *TableMeta
 	CacheProvider *CacheProvider
 }
@@ -43,7 +41,7 @@ func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType ref
 		Columns:    columns,
 	}
 	keyPrefix := fmt.Sprintf("data_%v", structType.Elem())
-	dao.CacheProvider = NewCacheProvider(dao.RedisClient, keyPrefix, "v1", time.Minute*3)
+	dao.CacheProvider = NewCacheProvider(nil, keyPrefix, "v1", time.Minute*3)
 	for _, opt := range opts {
 		opt(dao)
 	}
@@ -305,12 +303,12 @@ func (dao *Dao) BatchFetch(field string, items []interface{}, dest interface{}, 
 	return dao.CacheProvider.BatchFetch(field, items, dest, fun)
 }
 
-func (dao *Dao) DeleteCache(kv *KV) error {
-	return dao.CacheProvider.Del(kv.Key, utils.ToString(kv.Value))
-}
-
-func (dao *Dao) BatchDeleteCache(field string, items []string) error {
-	return dao.CacheProvider.BatchDel(field, items)
+func (dao *Dao) DeleteCache(field string, values ...interface{}) error {
+	items := make([]string, len(values))
+	for i, item := range values {
+		items[i] = utils.ToString(item)
+	}
+	return dao.CacheProvider.BatchDel(field, items...)
 }
 
 func ModelListToMap(src []Model) map[interface{}]Model {

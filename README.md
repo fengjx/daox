@@ -148,7 +148,27 @@ log.Printf("multiple delete by column res - %v", affected)
 
 缓存
 ```go
+user := new(User)
+// 按id查询并缓存
+err := dao.GetByIDCache(10, user)
+if err != nil {
+    log.Fatal(err)
+}
+log.Printf("get by id with cache - %v", user)
 
+// 删除缓存
+err = dao.DeleteCache("id", 10)
+if err != nil {
+    log.Fatal(err)
+}
+
+// 按指定字段查询并缓存
+cacheUser := new(User)
+err = dao.GetByColumnCache(daox.OfKv("uid", 10001), cacheUser)
+if err != nil {
+    log.Fatal(err)
+}
+log.Printf("get by uid with cache - %v", cacheUser)
 ```
 
 ## sqlbuilder

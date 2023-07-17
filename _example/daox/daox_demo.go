@@ -10,6 +10,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/fengjx/daox"
 )
@@ -192,15 +193,53 @@ func deleteUSer(dao *daox.Dao) {
 	log.Printf("multiple delete by column res - %v", affected)
 }
 
+func cache(dao *daox.Dao) {
+	user := new(User)
+	// 按id查询并缓存
+	err := dao.GetByIDCache(10, user)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("get by id with cache - %v", user)
+
+	// 删除缓存
+	err = dao.DeleteCache("id", 10)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 按指定字段查询并缓存
+	cacheUser := new(User)
+	err = dao.GetByColumnCache(daox.OfKv("uid", 10001), cacheUser)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("get by uid with cache - %v", cacheUser)
+}
+
 func main() {
+	redisCli := redis.NewClient(&redis.Options{
+		Addr: "127.0.0.1:6379",
+	})
+
 	db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
 	db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
-	dao := daox.NewDAO(db, "user_info", "id", reflect.TypeOf(&User{}), daox.IsAutoIncrement())
+
+	dao := daox.NewDAO(
+		db,
+		"user_info",
+		"id",
+		reflect.TypeOf(&User{}),
+		daox.IsAutoIncrement(),
+		daox.WithCache(redisCli),
+		daox.WithCacheVersion("v1"),
+	)
 	log.Printf("columns: %v\n", dao.TableMeta.Columns)
 	// insertUser(dao)
 	// batchInsertUser(dao)
 	selectUser(dao)
 	queryList(dao)
-	updateUser(dao)
-	deleteUSer(dao)
+	// updateUser(dao)
+	// deleteUSer(dao)
+	cache(dao)
 }
