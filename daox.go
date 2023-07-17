@@ -269,7 +269,7 @@ func (dao *Dao) DeleteByColumns(kvs *MultiKV) (int64, error) {
 	}
 
 	execSql, err := dao.SQLBuilder().Delete().
-		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s in ?", kvs.Key))).
+		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s in (?)", kvs.Key))).
 		Sql()
 	if err != nil {
 		return 0, err

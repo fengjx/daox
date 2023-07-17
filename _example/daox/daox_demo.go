@@ -129,7 +129,67 @@ func queryList(dao *daox.Dao) {
 	}
 }
 
-func sqlBuilder(dao *daox.Dao) {
+func updateUser(dao *daox.Dao) {
+	log.Println("=========== update ============")
+	user := new(User)
+	err := dao.GetByID(10, user)
+	if err != nil {
+		log.Fatal(err)
+	}
+	user.Nickname = "update-name-10"
+	// 全字段更新
+	ok, err := dao.Update(user)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("update res - %v", ok)
+
+	// 部分字段更新
+	ok, err = dao.UpdateField(11, map[string]interface{}{
+		"nickname": "update-name-11",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("update res - %v", ok)
+	var list []*User
+	err = dao.ListByIds(&list, 10, 11)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, u := range list {
+		log.Println(u)
+	}
+}
+
+func deleteUSer(dao *daox.Dao) {
+	log.Println("=========== delete ============")
+	// 按 id 删除
+	ok, err := dao.DeleteById(21)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("delete res - %v", ok)
+	user := new(User)
+	err = dao.GetByID(21, user)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("delete by id res - %v", user.Id)
+
+	// 按指定字段删除
+	affected, err := dao.DeleteByColumn(daox.OfKv("uid", 101))
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("delete by column res - %v", affected)
+
+	// 按字段删除多条记录
+	affected, err = dao.DeleteByColumns(daox.OfMultiKv("uid", 102, 103))
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("multiple delete by column res - %v", affected)
 }
 
 func main() {
@@ -141,4 +201,6 @@ func main() {
 	// batchInsertUser(dao)
 	selectUser(dao)
 	queryList(dao)
+	updateUser(dao)
+	deleteUSer(dao)
 }
