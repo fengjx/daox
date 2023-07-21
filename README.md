@@ -2,7 +2,7 @@
 
 基于 sqlx + go-redis 的轻量级数据库访问辅助工具，daox 的定位是 sqlx 的功能增强，不是一个 orm。
 
-封装了基础 crud api，实现了`sqlbuilder`，能够帮助构造 sql，无需手动拼接。
+封装了基础 crud api，实现了`sqlbuilder`，通过 api 生成 sql，无需手动拼接。
 
 实现了代码生成器，有内置生成文件模板，也可以自定义模板。
 
@@ -85,63 +85,34 @@ err = dao.ListByColumns(daox.OfMultiKv("uid", 10000, 10001), &list)
 ```go
 user := new(User)
 err := dao.GetByID(10, user)
-if err != nil {
-    log.Fatal(err)
-}
 user.Nickname = "update-name-10"
 // 全字段更新
 ok, err := dao.Update(user)
-if err != nil {
-    log.Fatal(err)
-}
 log.Printf("update res - %v", ok)
 
 // 部分字段更新
 ok, err = dao.UpdateField(11, map[string]interface{}{
     "nickname": "update-name-11",
 })
-if err != nil {
-    log.Fatal(err)
-}
 log.Printf("update res - %v", ok)
-// 查询更新后的数据
-var list []*User
-err = dao.ListByIds(&list, 10, 11)
-if err != nil {
-    log.Fatal(err)
-}
-for _, u := range list {
-    log.Println(u)
-}
 ```
 
 删除
 ```go
 // 按 id 删除
 ok, err := dao.DeleteById(21)
-if err != nil {
-    log.Fatal(err)
-}
 log.Printf("delete res - %v", ok)
+
 user := new(User)
 err = dao.GetByID(21, user)
-if err != nil {
-    log.Fatal(err)
-}
 log.Printf("delete by id res - %v", user.Id)
 
 // 按指定字段删除
 affected, err := dao.DeleteByColumn(daox.OfKv("uid", 101))
-if err != nil {
-    log.Fatal(err)
-}
 log.Printf("delete by column res - %v", affected)
 
 // 按字段删除多条记录
 affected, err = dao.DeleteByColumns(daox.OfMultiKv("uid", 102, 103))
-if err != nil {
-    log.Fatal(err)
-}
 log.Printf("multiple delete by column res - %v", affected)
 ```
 
@@ -151,23 +122,14 @@ log.Printf("multiple delete by column res - %v", affected)
 user := new(User)
 // 按id查询并缓存
 err := dao.GetByIDCache(10, user)
-if err != nil {
-    log.Fatal(err)
-}
 log.Printf("get by id with cache - %v", user)
 
 // 删除缓存
 err = dao.DeleteCache("id", 10)
-if err != nil {
-    log.Fatal(err)
-}
 
 // 按指定字段查询并缓存
 cacheUser := new(User)
 err = dao.GetByColumnCache(daox.OfKv("uid", 10001), cacheUser)
-if err != nil {
-    log.Fatal(err)
-}
 log.Printf("get by uid with cache - %v", cacheUser)
 ```
 
