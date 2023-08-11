@@ -100,7 +100,6 @@ func Init() {
 			})
 			if err != nil {
 				panic(err)
-				continue
 			}
 			log.Printf("save id - %d \n", id)
 		}
@@ -164,9 +163,12 @@ func TestCrud(t *testing.T) {
 	}
 	t.Logf("id: %d", id)
 	u2 := &user{}
-	err = dao.GetByID(id, u2)
+	exist, err := dao.GetByID(id, u2)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !exist {
+		t.Fatal("GetByID not exist")
 	}
 	assert.Equal(t, u1.Uid, u2.Uid)
 
@@ -181,7 +183,7 @@ func TestCrud(t *testing.T) {
 		t.Fatal("update affected is 0")
 	}
 	u2 = &user{}
-	err = dao.GetByID(id, u2)
+	_, err = dao.GetByID(id, u2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,9 +196,12 @@ func TestCrud(t *testing.T) {
 		t.Fatal("delete by id fail")
 	}
 	u2 = &user{}
-	err = dao.GetByID(id, u2)
+	exist, err = dao.GetByID(id, u2)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if exist {
+		t.Fatal("DeleteById error")
 	}
 	assert.Equal(t, int64(0), u2.Id)
 	assert.Equal(t, "", u2.Name)
@@ -235,9 +240,12 @@ func TestBatchSave(t *testing.T) {
 	}
 	assert.Equal(t, int64(2), affected)
 	u := &user{}
-	err = dao.GetByColumn(OfKv("uid", 1000), u)
+	exist, err := dao.GetByColumn(OfKv("uid", 1000), u)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !exist {
+		t.Fatal("GetByColumn not exist")
 	}
 	assert.Equal(t, "fengjx0", u.Name)
 }
@@ -273,7 +281,7 @@ func TestUpdate(t *testing.T) {
 		t.Fatal("dao update not success")
 	}
 	u2 := &user{}
-	err = dao.GetByID(id, u2)
+	_, err = dao.GetByID(id, u2)
 	if err != nil {
 		t.Fatal(err)
 	}
