@@ -117,32 +117,37 @@ func (dao *Dao) BatchSave(models interface{}) (int64, error) {
 	return res.RowsAffected()
 }
 
-func (dao *Dao) GetByColumn(kv *KV, dest Model) error {
+// GetByColumn get one row
+// bool: exist or not
+func (dao *Dao) GetByColumn(kv *KV, dest Model) (bool, error) {
 	if kv == nil {
-		return nil
+		return false, nil
 	}
 	querySql, err := dao.SQLBuilder().Select().
 		Columns(dao.DBColumns()...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", kv.Key))).
 		Sql()
 	if err != nil {
-		return err
+		return false, err
 	}
 	err = dao.DBRead.Get(dest, querySql, kv.Value)
-	if err == sql.ErrNoRows {
-		return nil
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
 	}
-	return err
+	return true, nil
 }
 
-func (dao *Dao) GetByColumnCache(kv *KV, dest Model) error {
-	return dao.CacheProvider.Fetch(kv.Key, utils.ToString(kv.Value), dest, func() (interface{}, error) {
-		err := dao.GetByColumn(kv, dest)
+func (dao *Dao) GetByColumnCache(kv *KV, dest Model) (bool, error) {
+	exist := true
+	err := dao.CacheProvider.Fetch(kv.Key, utils.ToString(kv.Value), dest, func() (interface{}, error) {
+		var err error
+		exist, err = dao.GetByColumn(kv, dest)
 		if err != nil {
 			return nil, err
 		}
 		return dest, nil
 	})
+	return exist, err
 }
 
 func (dao *Dao) ListByColumns(kvs *MultiKV, dest interface{}) error {
@@ -174,16 +179,23 @@ func (dao *Dao) List(kv *KV, dest interface{}) error {
 	return dao.DBRead.Select(dest, querySql, kv.Value)
 }
 
-func (dao *Dao) GetByID(id interface{}, dest Model) error {
+func (dao *Dao) GetByID(id interface{}, dest Model) (bool, error) {
 	tableMeta := dao.TableMeta
 	return dao.GetByColumn(OfKv(tableMeta.PrimaryKey, id), dest)
 }
 
-func (dao *Dao) GetByIDCache(id interface{}, dest Model) error {
+func (dao *Dao) GetByIDCache(id interface{}, dest Model) (bool, error) {
 	primaryKey := dao.TableMeta.PrimaryKey
-	return dao.CacheProvider.Fetch(primaryKey, id, dest, func() (interface{}, error) {
-		return dest, dao.GetByID(id, dest)
+	exist := true
+	err := dao.CacheProvider.Fetch(primaryKey, id, dest, func() (interface{}, error) {
+		var err error
+		exist, err = dao.GetByID(id, dest)
+		if err != nil {
+			return nil, err
+		}
+		return dest, nil
 	})
+	return exist, err
 }
 
 func (dao *Dao) ListByIds(dest interface{}, ids ...interface{}) error {
@@ -309,15 +321,4 @@ func (dao *Dao) DeleteCache(field string, values ...interface{}) error {
 		items[i] = utils.ToString(item)
 	}
 	return dao.CacheProvider.BatchDel(field, items...)
-}
-
-func ModelListToMap(src []Model) map[interface{}]Model {
-	if len(src) == 0 {
-		return make(map[interface{}]Model, 0)
-	}
-	resMap := make(map[interface{}]Model, 0)
-	for _, m := range src {
-		resMap[m.GetID()] = m
-	}
-	return resMap
 }
