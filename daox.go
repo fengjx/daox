@@ -322,14 +322,3 @@ func (dao *Dao) DeleteCache(field string, values ...interface{}) error {
 	}
 	return dao.CacheProvider.BatchDel(field, items...)
 }
-
-func ModelListToMap(src []Model) map[interface{}]Model {
-	if len(src) == 0 {
-		return make(map[interface{}]Model)
-	}
-	resMap := make(map[interface{}]Model)
-	for _, m := range src {
-		resMap[m.GetID()] = m
-	}
-	return resMap
-}

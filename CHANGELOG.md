@@ -10,4 +10,5 @@
 - [sqlbuilder 支持从 struct 解析字段](https://github.com/fengjx/daox/pull/13) 
 - [代码生成工具](https://github.com/fengjx/daox/pull/14)
 - [文档完善](https://github.com/fengjx/daox/pull/15)
+- [单条数据查询返回是否存在数据](https://github.com/fengjx/daox/pull/20)
 
