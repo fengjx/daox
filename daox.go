@@ -106,11 +106,11 @@ func (dao *Dao) BatchSave(models interface{}) (int64, error) {
 	} else {
 		columns = tableMeta.OmitColumns()
 	}
-	execSql, err := dao.SQLBuilder().Insert().Columns(columns...).NameSQL()
+	execSQL, err := dao.SQLBuilder().Insert().Columns(columns...).NameSQL()
 	if err != nil {
 		return 0, nil
 	}
-	res, err := dao.DBMaster.NamedExec(execSql, models)
+	res, err := dao.DBMaster.NamedExec(execSQL, models)
 	if err != nil {
 		return 0, err
 	}
