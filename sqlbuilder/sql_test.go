@@ -106,11 +106,32 @@ func TestSelect(t *testing.T) {
 				StructColumns(&tm{}, "json", "ctime"),
 			wantSQL: "SELECT `id`, `name`, `age` FROM `user`;",
 		},
+		{
+			name: "select count",
+			selector: New("user").Select().
+				QueryString("count(*)"),
+			wantSQL: "SELECT count(*) FROM `user`;",
+		},
+		{
+			name: "select group by",
+			selector: New("user").Select().
+				QueryString("sum(coin) as total, uid, type").
+				GroupBy("uid", "type"),
+			wantSQL: "SELECT sum(coin) as total, uid, type FROM `user` GROUP BY `uid`, `type`;",
+		},
+		{
+			name: "select for update",
+			selector: New("user").Select().
+				Columns("uid", "nickname").
+				Where(C().Where(true, "id = 1")).
+				ForUpdate(true),
+			wantSQL: "SELECT `uid`, `nickname` FROM `user` WHERE id = 1 FOR UPDATE ;",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sql, err := tc.selector.Sql()
+			sql, err := tc.selector.SQL()
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return
@@ -140,12 +161,18 @@ func TestInsert(t *testing.T) {
 			wantSQL:     "INSERT INTO `user`(`name`, `age`, `ctime`) VALUES (?, ?, ?);",
 			wantNameSQL: "INSERT INTO `user`(`name`, `age`, `ctime`) VALUES (:name, :age, :ctime);",
 		},
+		{
+			name:        "insert on duplicate key update",
+			inserter:    New("user").Insert().Columns("username", "age", "sex", "version").OnDuplicateKeyUpdateString("version = version + 1"),
+			wantSQL:     "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE version = version + 1;",
+			wantNameSQL: "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (:username, :age, :sex, :version) ON DUPLICATE KEY UPDATE version = version + 1;",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.wantSQL != "" {
-				sql, err := tc.inserter.Sql()
+				sql, err := tc.inserter.SQL()
 				assert.Equal(t, tc.wantErr, err)
 				if err != nil {
 					return
@@ -154,7 +181,7 @@ func TestInsert(t *testing.T) {
 			}
 
 			if tc.wantNameSQL != "" {
-				sql, err := tc.inserter.NameSql()
+				sql, err := tc.inserter.NameSQL()
 				assert.Equal(t, tc.wantErr, err)
 				if err != nil {
 					return
@@ -208,7 +235,7 @@ func TestUpdate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.wantSQL != "" {
-				sql, err := tc.updater.Sql()
+				sql, err := tc.updater.SQL()
 				assert.Equal(t, tc.wantErr, err)
 				if err != nil {
 					return
@@ -217,7 +244,7 @@ func TestUpdate(t *testing.T) {
 			}
 
 			if tc.wantNameSQL != "" {
-				sql, err := tc.updater.NameSql()
+				sql, err := tc.updater.NameSQL()
 				assert.Equal(t, tc.wantErr, err)
 				if err != nil {
 					return
@@ -252,7 +279,7 @@ func TestDelete(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sql, err := tc.deleter.Sql()
+			sql, err := tc.deleter.SQL()
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return

@@ -17,7 +17,7 @@ func (d *Deleter) Where(condition *condition) *Deleter {
 	return d
 }
 
-func (d *Deleter) Sql() (string, error) {
+func (d *Deleter) SQL() (string, error) {
 	if d.where == nil || len(d.where.predicates) == 0 {
 		return "", SQLErrDeleteMissWhere
 	}

@@ -6,8 +6,9 @@ import (
 
 type Inserter struct {
 	sqlBuilder
-	tableName string
-	columns   []string
+	tableName                  string
+	columns                    []string
+	onDuplicateKeyUpdateString string
 }
 
 func NewInserter(tableName string) *Inserter {
@@ -27,7 +28,12 @@ func (ins *Inserter) Columns(columns ...string) *Inserter {
 	return ins
 }
 
-func (ins *Inserter) NameSql() (string, error) {
+func (ins *Inserter) OnDuplicateKeyUpdateString(updateString string) *Inserter {
+	ins.onDuplicateKeyUpdateString = updateString
+	return ins
+}
+
+func (ins *Inserter) NameSQL() (string, error) {
 	if len(ins.columns) == 0 {
 		return "", SQLErrColumnsRequire
 	}
@@ -51,11 +57,15 @@ func (ins *Inserter) NameSql() (string, error) {
 		}
 	}
 	ins.writeString(")")
+	if ins.onDuplicateKeyUpdateString != "" {
+		ins.writeString(" ON DUPLICATE KEY UPDATE ")
+		ins.writeString(ins.onDuplicateKeyUpdateString)
+	}
 	ins.end()
 	return ins.sb.String(), nil
 }
 
-func (ins *Inserter) Sql() (string, error) {
+func (ins *Inserter) SQL() (string, error) {
 	if len(ins.columns) == 0 {
 		return "", SQLErrColumnsRequire
 	}
@@ -77,6 +87,10 @@ func (ins *Inserter) Sql() (string, error) {
 		}
 	}
 	ins.writeString(")")
+	if ins.onDuplicateKeyUpdateString != "" {
+		ins.writeString(" ON DUPLICATE KEY UPDATE ")
+		ins.writeString(ins.onDuplicateKeyUpdateString)
+	}
 	ins.end()
 	return ins.sb.String(), nil
 }
