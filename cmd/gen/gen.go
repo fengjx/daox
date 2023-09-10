@@ -32,6 +32,7 @@ func main() {
 	app := &cli.App{
 		Name:        "code-gen",
 		Description: "create template file from database",
+		Version:     "1.0.0",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "f",
@@ -77,9 +78,6 @@ func run(ctx *cli.Context) error {
 	}
 	for _, tableName := range config.Target.Tables {
 		table := loadTableMeta(db, dsnCfg.DBName, tableName)
-		for _, col := range table.Columns {
-			col.TagName = config.Target.Custom.TagName
-		}
 		fmt.Println(table.Name, table.Comment)
 		gen(config, table)
 	}
@@ -118,30 +116,37 @@ func loadTableMeta(db *sqlx.DB, dbName, tableName string) *Table {
 	if rows.Err() != nil {
 		log.Fatal(err)
 	}
-	table.Columns = loadColumnMeta(db, dbName, tableName)
+	columns, primaryKey := loadColumnMeta(db, dbName, tableName)
+	table.Columns = columns
+	table.PrimaryKey = primaryKey
 	table.GoImports = GenGoImports(table.Columns)
 	return table
 }
 
-func loadColumnMeta(db *sqlx.DB, dbName, tableName string) []*Column {
+// loadColumnMeta
+// []*Column table column meta
+// *Column PrimaryKey column
+func loadColumnMeta(db *sqlx.DB, dbName, tableName string) ([]Column, Column) {
 	args := []interface{}{dbName, tableName}
-	querySQL := "SELECT column_name, column_type, column_comment FROM information_schema.columns " +
+	querySQL := "SELECT column_name, column_type, column_comment, column_key FROM information_schema.columns " +
 		"WHERE table_schema = ? AND table_name = ?"
 	rows, err := db.Query(querySQL, args...)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer rows.Close()
-	var columns []*Column
+	var columns []Column
+	var primaryKey Column
 	for rows.Next() {
 		var columnName string
 		var columnType string
 		var columnComment string
-		err = rows.Scan(&columnName, &columnType, &columnComment)
+		var columnKey string
+		err = rows.Scan(&columnName, &columnType, &columnComment, &columnKey)
 		if err != nil {
 			log.Fatal(err)
 		}
-		col := new(Column)
+		col := Column{}
 		col.Name = strings.Trim(columnName, "` ")
 		col.Comment = columnComment
 
@@ -152,9 +157,14 @@ func loadColumnMeta(db *sqlx.DB, dbName, tableName string) []*Column {
 		// Remove the /* mariadb-5.3 */ suffix from coltypes
 		colName = strings.TrimSuffix(colName, "/* mariadb-5.3 */")
 		col.SQLType = strings.ToUpper(colName)
+
+		if columnKey == "PRI" {
+			col.IsPrimaryKey = true
+			primaryKey = col
+		}
 		columns = append(columns, col)
 	}
-	return columns
+	return columns, primaryKey
 }
 
 func gen(config *Config, table *Table) {
@@ -277,7 +287,8 @@ type Custom struct {
 // Table represents a database table
 type Table struct {
 	Name          string
-	Columns       []*Column
+	Columns       []Column
+	PrimaryKey    Column
 	AutoIncrement bool
 	Comment       string
 	StoreEngine   string
@@ -285,11 +296,11 @@ type Table struct {
 }
 
 type Column struct {
-	TableName string
-	Name      string
-	SQLType   string
-	Comment   string
-	TagName   string
+	TableName    string
+	Name         string
+	SQLType      string
+	Comment      string
+	IsPrimaryKey bool
 }
 
 // enumerates all the database column types
@@ -407,7 +418,7 @@ func SQLType2GoTypeString(sqlType string) string {
 func SQLType2GolangType(sqlType string) reflect.Type {
 	switch sqlType {
 	case Bit, TinyInt, SmallInt, MediumInt, Int, Integer, Serial:
-		return IntType
+		return Int32Type
 	case BigInt, BigSerial:
 		return Int64Type
 	case UnsignedBit, UnsignedTinyInt, UnsignedSmallInt, UnsignedMediumInt, UnsignedInt:
@@ -433,7 +444,7 @@ func SQLType2GolangType(sqlType string) reflect.Type {
 	}
 }
 
-func GenGoImports(cols []*Column) []string {
+func GenGoImports(cols []Column) []string {
 	imports := make(map[string]string)
 	results := make([]string, 0)
 	for _, col := range cols {
