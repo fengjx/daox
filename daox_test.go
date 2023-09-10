@@ -187,7 +187,7 @@ func TestCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, updateName, u2.Name)
-	ok, err = dao.DeleteById(id)
+	ok, err = dao.DeleteByID(id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +314,7 @@ func TestPage(t *testing.T) {
 		log.Panic(err)
 	}
 	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
-	querySQL, err := dao.SQLBuilder().Select().Limit(10).Offset(5).Sql()
+	querySQL, err := dao.SQLBuilder().Select().Limit(10).Offset(5).SQL()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -87,7 +87,7 @@ func (dao *Dao) Save(dest Model, omitColumns ...string) (int64, error) {
 		omitColumns = append(omitColumns, tableMeta.PrimaryKey)
 	}
 	columns := tableMeta.OmitColumns(omitColumns...)
-	execSql, err := dao.SQLBuilder().Insert().Columns(columns...).NameSql()
+	execSql, err := dao.SQLBuilder().Insert().Columns(columns...).NameSQL()
 	if err != nil {
 		return 0, nil
 	}
@@ -106,11 +106,11 @@ func (dao *Dao) BatchSave(models interface{}) (int64, error) {
 	} else {
 		columns = tableMeta.OmitColumns()
 	}
-	execSql, err := dao.SQLBuilder().Insert().Columns(columns...).NameSql()
+	execSQL, err := dao.SQLBuilder().Insert().Columns(columns...).NameSQL()
 	if err != nil {
 		return 0, nil
 	}
-	res, err := dao.DBMaster.NamedExec(execSql, models)
+	res, err := dao.DBMaster.NamedExec(execSQL, models)
 	if err != nil {
 		return 0, err
 	}
@@ -126,7 +126,7 @@ func (dao *Dao) GetByColumn(kv *KV, dest Model) (bool, error) {
 	querySql, err := dao.SQLBuilder().Select().
 		Columns(dao.DBColumns()...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", kv.Key))).
-		Sql()
+		SQL()
 	if err != nil {
 		return false, err
 	}
@@ -157,7 +157,7 @@ func (dao *Dao) ListByColumns(kvs *MultiKV, dest interface{}) error {
 	querySql, err := dao.SQLBuilder().Select().
 		Columns(dao.DBColumns()...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s in (?)", kvs.Key))).
-		Sql()
+		SQL()
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func (dao *Dao) List(kv *KV, dest interface{}) error {
 	querySql, err := dao.SQLBuilder().Select().
 		Columns(dao.DBColumns()...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", kv.Key))).
-		Sql()
+		SQL()
 	if err != nil {
 		return err
 	}
@@ -198,7 +198,7 @@ func (dao *Dao) GetByIDCache(id interface{}, dest Model) (bool, error) {
 	return exist, err
 }
 
-func (dao *Dao) ListByIds(dest interface{}, ids ...interface{}) error {
+func (dao *Dao) ListByIDs(dest interface{}, ids ...interface{}) error {
 	tableMeta := dao.TableMeta
 	return dao.ListByColumns(OfMultiKv(tableMeta.PrimaryKey, ids...), dest)
 }
@@ -218,7 +218,7 @@ func (dao *Dao) UpdateField(idValue interface{}, fieldMap map[string]interface{}
 	updateSQL, err := dao.SQLBuilder().Update().
 		Columns(columns...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", tableMeta.PrimaryKey))).
-		Sql()
+		SQL()
 	if err != nil {
 		return false, err
 	}
@@ -241,7 +241,7 @@ func (dao *Dao) Update(m Model) (bool, error) {
 	updateSQL, err := dao.SQLBuilder().Update().
 		Columns(dao.DBColumns(tableMeta.PrimaryKey)...).
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey))).
-		NameSql()
+		NameSQL()
 	if err != nil {
 		return false, err
 	}
@@ -262,7 +262,7 @@ func (dao *Dao) DeleteByColumn(kv *KV) (int64, error) {
 	}
 	execSql, err := dao.SQLBuilder().Delete().
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", kv.Key))).
-		Sql()
+		SQL()
 	if err != nil {
 		return 0, err
 	}
@@ -280,7 +280,7 @@ func (dao *Dao) DeleteByColumns(kvs *MultiKV) (int64, error) {
 
 	execSql, err := dao.SQLBuilder().Delete().
 		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s in (?)", kvs.Key))).
-		Sql()
+		SQL()
 	if err != nil {
 		return 0, err
 	}
@@ -295,7 +295,7 @@ func (dao *Dao) DeleteByColumns(kvs *MultiKV) (int64, error) {
 	return res.RowsAffected()
 }
 
-func (dao *Dao) DeleteById(id interface{}) (bool, error) {
+func (dao *Dao) DeleteByID(id interface{}) (bool, error) {
 	tableMeta := dao.TableMeta
 	affected, err := dao.DeleteByColumn(OfKv(tableMeta.PrimaryKey, id))
 	if err != nil {

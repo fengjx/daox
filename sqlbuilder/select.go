@@ -6,14 +6,16 @@ import (
 
 type Selector struct {
 	sqlBuilder
-	tableName string
-	distinct  bool
-	columns   []string
-	where     *condition
-	orderBy   []OrderBy
-	groupBy   []string
-	limit     *int
-	offset    *int
+	tableName   string
+	distinct    bool
+	columns     []string
+	queryString string
+	where       *condition
+	orderBy     []OrderBy
+	groupBy     []string
+	limit       *int
+	offset      *int
+	IsForUpdate bool
 }
 
 func NewSelector(tableName string) *Selector {
@@ -28,6 +30,11 @@ func (s *Selector) StructColumns(m interface{}, tagName string, omitColumns ...s
 	return s.Columns(columns...)
 }
 
+func (s *Selector) QueryString(queryString string) *Selector {
+	s.queryString = queryString
+	return s
+}
+
 func (s *Selector) Columns(columns ...string) *Selector {
 	s.columns = columns
 	return s
@@ -40,6 +47,11 @@ func (s *Selector) Distinct() *Selector {
 
 func (s *Selector) Where(condition *condition) *Selector {
 	s.where = condition
+	return s
+}
+
+func (s *Selector) ForUpdate(isForUpdate bool) *Selector {
+	s.IsForUpdate = isForUpdate
 	return s
 }
 
@@ -63,19 +75,24 @@ func (s *Selector) Offset(offset int) *Selector {
 	return s
 }
 
-func (s *Selector) Sql() (string, error) {
+func (s *Selector) SQL() (string, error) {
 	s.reset()
 	s.writeString("SELECT ")
-	if s.distinct {
-		s.writeString("DISTINCT ")
-	}
-	if len(s.columns) == 0 {
-		s.writeByte('*')
+	if s.queryString != "" {
+		// 使用原始语句，例如 count, max 之类的函数
+		s.writeString(s.queryString)
 	} else {
-		for i, column := range s.columns {
-			s.quote(column)
-			if i != len(s.columns)-1 {
-				s.writeString(", ")
+		if s.distinct {
+			s.writeString("DISTINCT ")
+		}
+		if len(s.columns) == 0 {
+			s.writeByte('*')
+		} else {
+			for i, column := range s.columns {
+				s.quote(column)
+				if i != len(s.columns)-1 {
+					s.writeString(", ")
+				}
 			}
 		}
 	}
@@ -84,9 +101,11 @@ func (s *Selector) Sql() (string, error) {
 	s.whereSQL(s.where)
 
 	if len(s.groupBy) > 0 {
+		s.writeString(" GROUP BY ")
 		for i, column := range s.groupBy {
 			if i > 0 {
 				s.comma()
+				s.space()
 			}
 			s.quote(column)
 		}
@@ -114,6 +133,9 @@ func (s *Selector) Sql() (string, error) {
 	if s.offset != nil {
 		s.writeString(" OFFSET ")
 		s.writeString(strconv.Itoa(*s.offset))
+	}
+	if s.IsForUpdate {
+		s.writeString(" FOR UPDATE ")
 	}
 	s.end()
 	return s.sb.String(), nil

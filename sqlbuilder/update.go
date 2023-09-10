@@ -28,7 +28,7 @@ func (u *Updater) Where(condition *condition) *Updater {
 	return u
 }
 
-func (u *Updater) Sql() (string, error) {
+func (u *Updater) SQL() (string, error) {
 	if len(u.columns) == 0 {
 		return "", SQLErrColumnsRequire
 	}
@@ -48,7 +48,7 @@ func (u *Updater) Sql() (string, error) {
 	return u.sb.String(), nil
 }
 
-func (u *Updater) NameSql() (string, error) {
+func (u *Updater) NameSQL() (string, error) {
 	if len(u.columns) == 0 {
 		return "", SQLErrColumnsRequire
 	}
