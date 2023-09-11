@@ -167,6 +167,14 @@ func TestInsert(t *testing.T) {
 			wantSQL:     "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE version = version + 1;",
 			wantNameSQL: "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (:username, :age, :sex, :version) ON DUPLICATE KEY UPDATE version = version + 1;",
 		},
+		{
+			name: "replace into",
+			inserter: New("user").Insert().
+				Columns("username", "age", "sex").
+				IsReplaceInto(true),
+			wantSQL:     "REPLACE INTO `user`(`username`, `age`, `sex`) VALUES (?, ?, ?);",
+			wantNameSQL: "REPLACE INTO `user`(`username`, `age`, `sex`) VALUES (:username, :age, :sex);",
+		},
 	}
 
 	for _, tc := range testCases {
