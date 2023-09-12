@@ -129,7 +129,7 @@ func loadTableMeta(db *sqlx.DB, dbName, tableName string) *Table {
 func loadColumnMeta(db *sqlx.DB, dbName, tableName string) ([]Column, Column) {
 	args := []interface{}{dbName, tableName}
 	querySQL := "SELECT column_name, column_type, column_comment, column_key FROM information_schema.columns " +
-		"WHERE table_schema = ? AND table_name = ?"
+		"WHERE table_schema = ? AND table_name = ? ORDER BY ORDINAL_POSITION"
 	rows, err := db.Query(querySQL, args...)
 	if err != nil {
 		log.Fatal(err)
