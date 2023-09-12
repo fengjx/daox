@@ -327,3 +327,25 @@ func TestPage(t *testing.T) {
 		t.Log(item)
 	}
 }
+
+func TestReplaceInto(t *testing.T) {
+	Init()
+	DBMaster, err := newSqliteDb()
+	if err != nil {
+		log.Panic(err)
+	}
+	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
+	u1 := &user{
+		Uid:       10000,
+		Name:      "fengjx",
+		Sex:       "1",
+		LoginTime: time.Now().Unix(),
+		Utime:     time.Now().Unix(),
+		Ctime:     time.Now().Unix(),
+	}
+	id, err := dao.ReplaceInto(u1)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	t.Logf("id: %d", id)
+}
