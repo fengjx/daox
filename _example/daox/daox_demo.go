@@ -83,17 +83,19 @@ func batchInsertUser(dao *daox.Dao) {
 // 查询单条记录
 func selectUser(dao *daox.Dao) {
 	user := new(User)
-	err := dao.GetByID(1, user)
+	id, err := dao.GetByID(1, user)
 	if err != nil {
 		log.Panic(err)
 	}
+	log.Println("id", id)
 	log.Println(user)
 
 	user2 := new(User)
-	err2 := dao.GetByColumn(daox.OfKv("uid", 10000), user2)
-	if err2 != nil {
-		log.Panic(err2)
+	exist, err := dao.GetByColumn(daox.OfKv("uid", 10000), user2)
+	if err != nil {
+		log.Panic(err)
 	}
+	log.Println("exist", exist)
 	log.Println(user2)
 }
 
@@ -121,7 +123,7 @@ func queryList(dao *daox.Dao) {
 
 	log.Println("ListByIds")
 	var list3 []User
-	err = dao.ListByIds(&list3, 10, 11)
+	err = dao.ListByIDs(&list3, 10, 11)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -133,7 +135,7 @@ func queryList(dao *daox.Dao) {
 func updateUser(dao *daox.Dao) {
 	log.Println("=========== update ============")
 	user := new(User)
-	err := dao.GetByID(10, user)
+	_, err := dao.GetByID(10, user)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -154,7 +156,7 @@ func updateUser(dao *daox.Dao) {
 	}
 	log.Printf("update res - %v", ok)
 	var list []*User
-	err = dao.ListByIds(&list, 10, 11)
+	err = dao.ListByIDs(&list, 10, 11)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -166,16 +168,17 @@ func updateUser(dao *daox.Dao) {
 func deleteUSer(dao *daox.Dao) {
 	log.Println("=========== delete ============")
 	// 按 id 删除
-	ok, err := dao.DeleteById(21)
+	ok, err := dao.DeleteByID(21)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("delete res - %v", ok)
 	user := new(User)
-	err = dao.GetByID(21, user)
+	exist, err := dao.GetByID(21, user)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println("exist", exist)
 	log.Printf("delete by id res - %v", user.Id)
 
 	// 按指定字段删除
@@ -196,10 +199,11 @@ func deleteUSer(dao *daox.Dao) {
 func cache(dao *daox.Dao) {
 	user := new(User)
 	// 按id查询并缓存
-	err := dao.GetByIDCache(10, user)
+	exist, err := dao.GetByIDCache(10, user)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println("exist", exist)
 	log.Printf("get by id with cache - %v", user)
 
 	// 删除缓存
@@ -210,10 +214,11 @@ func cache(dao *daox.Dao) {
 
 	// 按指定字段查询并缓存
 	cacheUser := new(User)
-	err = dao.GetByColumnCache(daox.OfKv("uid", 10001), cacheUser)
+	exist, err = dao.GetByColumnCache(daox.OfKv("uid", 10001), cacheUser)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println("exist", exist)
 	log.Printf("get by uid with cache - %v", cacheUser)
 }
 

@@ -8,6 +8,7 @@ type Inserter struct {
 	sqlBuilder
 	tableName                  string
 	columns                    []string
+	replaceInto                bool
 	onDuplicateKeyUpdateString string
 }
 
@@ -28,6 +29,11 @@ func (ins *Inserter) Columns(columns ...string) *Inserter {
 	return ins
 }
 
+func (ins *Inserter) IsReplaceInto(replaceInto bool) *Inserter {
+	ins.replaceInto = replaceInto
+	return ins
+}
+
 func (ins *Inserter) OnDuplicateKeyUpdateString(updateString string) *Inserter {
 	ins.onDuplicateKeyUpdateString = updateString
 	return ins
@@ -38,7 +44,11 @@ func (ins *Inserter) NameSQL() (string, error) {
 		return "", SQLErrColumnsRequire
 	}
 	ins.reset()
-	ins.writeString("INSERT INTO ")
+	if ins.replaceInto {
+		ins.writeString("REPLACE INTO ")
+	} else {
+		ins.writeString("INSERT INTO ")
+	}
 	ins.quote(strings.TrimSpace(ins.tableName))
 	ins.writeByte('(')
 	for i, column := range ins.columns {
@@ -70,7 +80,11 @@ func (ins *Inserter) SQL() (string, error) {
 		return "", SQLErrColumnsRequire
 	}
 	ins.reset()
-	ins.writeString("INSERT INTO ")
+	if ins.replaceInto {
+		ins.writeString("REPLACE INTO ")
+	} else {
+		ins.writeString("INSERT INTO ")
+	}
 	ins.quote(ins.tableName)
 	ins.writeByte('(')
 	for i, column := range ins.columns {
