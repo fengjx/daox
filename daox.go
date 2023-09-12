@@ -98,15 +98,61 @@ func (dao *Dao) Save(dest Model, omitColumns ...string) (int64, error) {
 	return res.LastInsertId()
 }
 
-func (dao *Dao) BatchSave(models interface{}) (int64, error) {
+// ReplaceInto
+// omitColumns 不需要 insert 的字段
+func (dao *Dao) ReplaceInto(dest Model, omitColumns ...string) (int64, error) {
+	tableMeta := dao.TableMeta
+	if tableMeta.IsAutoIncrement {
+		omitColumns = append(omitColumns, tableMeta.PrimaryKey)
+	}
+	columns := tableMeta.OmitColumns(omitColumns...)
+	execSql, err := dao.SQLBuilder().Insert().
+		Columns(columns...).
+		IsReplaceInto(true).
+		NameSQL()
+	if err != nil {
+		return 0, nil
+	}
+	res, err := dao.DBMaster.NamedExec(execSql, dest)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// BatchSave 批量新增
+// omitColumns 不需要 insert 的字段
+func (dao *Dao) BatchSave(models interface{}, omitColumns ...string) (int64, error) {
 	tableMeta := dao.TableMeta
 	var columns []string
 	if tableMeta.IsAutoIncrement {
-		columns = tableMeta.OmitColumns(tableMeta.PrimaryKey)
-	} else {
-		columns = tableMeta.OmitColumns()
+		omitColumns = append(omitColumns, tableMeta.PrimaryKey)
 	}
+	columns = tableMeta.OmitColumns(omitColumns...)
 	execSQL, err := dao.SQLBuilder().Insert().Columns(columns...).NameSQL()
+	if err != nil {
+		return 0, nil
+	}
+	res, err := dao.DBMaster.NamedExec(execSQL, models)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// BatchReplaceInto 批量新增，使用 replace into 方式
+// omitColumns 不需要 insert 的字段
+func (dao *Dao) BatchReplaceInto(models interface{}, omitColumns ...string) (int64, error) {
+	tableMeta := dao.TableMeta
+	var columns []string
+	if tableMeta.IsAutoIncrement {
+		omitColumns = append(omitColumns, tableMeta.PrimaryKey)
+	}
+	columns = tableMeta.OmitColumns(omitColumns...)
+	execSQL, err := dao.SQLBuilder().Insert().
+		Columns(columns...).
+		IsReplaceInto(true).
+		NameSQL()
 	if err != nil {
 		return 0, nil
 	}
