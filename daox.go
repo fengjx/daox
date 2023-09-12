@@ -89,7 +89,7 @@ func (dao *Dao) Save(dest Model, omitColumns ...string) (int64, error) {
 	columns := tableMeta.OmitColumns(omitColumns...)
 	execSql, err := dao.SQLBuilder().Insert().Columns(columns...).NameSQL()
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 	res, err := dao.DBMaster.NamedExec(execSql, dest)
 	if err != nil {
@@ -111,7 +111,7 @@ func (dao *Dao) ReplaceInto(dest Model, omitColumns ...string) (int64, error) {
 		IsReplaceInto(true).
 		NameSQL()
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 	res, err := dao.DBMaster.NamedExec(execSql, dest)
 	if err != nil {
@@ -131,7 +131,7 @@ func (dao *Dao) BatchSave(models interface{}, omitColumns ...string) (int64, err
 	columns = tableMeta.OmitColumns(omitColumns...)
 	execSQL, err := dao.SQLBuilder().Insert().Columns(columns...).NameSQL()
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 	res, err := dao.DBMaster.NamedExec(execSQL, models)
 	if err != nil {
@@ -154,7 +154,7 @@ func (dao *Dao) BatchReplaceInto(models interface{}, omitColumns ...string) (int
 		IsReplaceInto(true).
 		NameSQL()
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 	res, err := dao.DBMaster.NamedExec(execSQL, models)
 	if err != nil {
