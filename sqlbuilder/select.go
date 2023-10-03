@@ -7,10 +7,10 @@ import (
 type Selector struct {
 	sqlBuilder
 	tableName   string
+	queryString string
 	distinct    bool
 	columns     []string
-	queryString string
-	where       *condition
+	where       ConditionBuilder
 	orderBy     []OrderBy
 	groupBy     []string
 	limit       *int
@@ -25,56 +25,71 @@ func NewSelector(tableName string) *Selector {
 	return selector
 }
 
-func (s *Selector) StructColumns(m interface{}, tagName string, omitColumns ...string) *Selector {
-	columns := GetColumnsByModel(GetMapperByTagName(tagName), m, omitColumns...)
-	return s.Columns(columns...)
-}
-
+// QueryString 自定义select字段，sql原样输出
 func (s *Selector) QueryString(queryString string) *Selector {
 	s.queryString = queryString
 	return s
 }
 
+// StructColumns 通过任意model解析出表字段
+// tagName 解析数据库字段的 tag-name
+// omitColumns 排除哪些字段
+func (s *Selector) StructColumns(model interface{}, tagName string, omitColumns ...string) *Selector {
+	columns := GetColumnsByModel(GetMapperByTagName(tagName), model, omitColumns...)
+	return s.Columns(columns...)
+}
+
+// Columns select 的数据库字段
 func (s *Selector) Columns(columns ...string) *Selector {
 	s.columns = columns
 	return s
 }
 
+// Distinct select distinct
 func (s *Selector) Distinct() *Selector {
 	s.distinct = true
 	return s
 }
 
-func (s *Selector) Where(condition *condition) *Selector {
-	s.where = condition
+// Where 条件
+// condition 可以通过 sqlbuilder.C() 方法创建
+func (s *Selector) Where(where ConditionBuilder) *Selector {
+	s.where = where
 	return s
 }
 
+// ForUpdate select for update
 func (s *Selector) ForUpdate(isForUpdate bool) *Selector {
 	s.IsForUpdate = isForUpdate
 	return s
 }
 
+// GroupBy group by
 func (s *Selector) GroupBy(columns ...string) *Selector {
 	s.groupBy = columns
 	return s
 }
 
+// OrderBy order by
+// orderBy sqlbuilder.Desc("col")
 func (s *Selector) OrderBy(orderBy ...OrderBy) *Selector {
 	s.orderBy = orderBy
 	return s
 }
 
+// Limit 分页 limit
 func (s *Selector) Limit(limit int) *Selector {
 	s.limit = &limit
 	return s
 }
 
+// Offset 分页 offset
 func (s *Selector) Offset(offset int) *Selector {
 	s.offset = &offset
 	return s
 }
 
+// SQL 拼接sql语句
 func (s *Selector) SQL() (string, error) {
 	s.reset()
 	s.writeString("SELECT ")
@@ -139,6 +154,13 @@ func (s *Selector) SQL() (string, error) {
 	}
 	s.end()
 	return s.sb.String(), nil
+}
+
+// SQLArgs 构造 sql 并返回对应参数
+func (s *Selector) SQLArgs() (string, []interface{}, error) {
+	sql, err := s.SQL()
+	args := s.whereArgs(s.where)
+	return sql, args, err
 }
 
 type OrderType string
