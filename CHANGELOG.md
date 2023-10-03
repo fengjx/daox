@@ -13,4 +13,5 @@
 - [单条数据查询返回是否存在数据](https://github.com/fengjx/daox/pull/20)
 - [调整方法命名](https://github.com/fengjx/daox/pull/21)
 - [支持 replace into](https://github.com/fengjx/daox/pull/24)
-
+- [支持 replace into](https://github.com/fengjx/daox/pull/26)
+- [where 条件支持参数拼接](https://github.com/fengjx/daox/pull/29)

@@ -1,7 +1,7 @@
 # 单元测试
 .PHONY: test
 test:
-	go test -race ./...
+	go test -race -cover ./...
 
 .PHONY: lint
 lint:

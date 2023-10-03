@@ -16,7 +16,7 @@ type testInfo struct {
 }
 
 func TestFetch(t *testing.T) {
-	redisCtl := createRedisClient(t)
+	redisCtl := createMockRedisClient(t)
 	cacheTool := NewCacheProvider(redisCtl, "fetch-test-user", "v1", time.Minute*10)
 	tinfo := &testInfo{
 		Id:   1,
@@ -40,7 +40,7 @@ func TestFetch(t *testing.T) {
 }
 
 func TestBatchFetch(t *testing.T) {
-	redisCtl := createRedisClient(t)
+	redisCtl := createMockRedisClient(t)
 	cache := NewCacheProvider(redisCtl, "test-cache", "v1", time.Minute*10)
 	for i := 0; i < 10; i++ {
 		var testInfos []*testInfo
