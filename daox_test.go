@@ -1,96 +1,69 @@
-package daox
+package daox_test
 
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/fengjx/daox"
+	"github.com/fengjx/daox/sqlbuilder/ql"
 )
 
 func sqliteDB() (*sql.DB, error) {
-	return sql.Open("sqlite3", "file:.cache/test.db?cache=shared&mode=memory")
-}
-
-// lint:ignore U1000 Ignore unused function temporarily
-func mysqlDB() (*sql.DB, error) {
-	return sql.Open("mysql", "root:1234@tcp(192.168.1.200:3306)/fjx?charset=utf8mb4,utf8&tls=false&timeout=10s")
-}
-
-func createMockRedisClient(t *testing.T) *redis.Client {
-	serv := miniredis.RunT(t)
-	return redis.NewClient(&redis.Options{
-		Addr:     serv.Addr(),
-		Password: "",
-		DB:       0,
-	})
-}
-
-func createRedisClient(t *testing.T) *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-	})
-}
-
-func newDb() (*sqlx.DB, error) {
-	db, err := mysqlDB()
+	err := os.MkdirAll(".db", 0755)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	dbx := sqlx.NewDb(db, "mysql")
-	dbx.Mapper = reflectx.NewMapperFunc("json", strings.ToLower)
-	return dbx, nil
+	return sql.Open("sqlite3", "./.db/test.db")
 }
 
-func newSqliteDb() (*sqlx.DB, error) {
+func newMySQLDb() *sqlx.DB {
+	dbx := sqlx.MustOpen("mysql", "root:1234@tcp(192.168.1.200:3306)/fjx?charset=utf8mb4,utf8&tls=false&timeout=10s")
+	dbx.Mapper = reflectx.NewMapperFunc("json", strings.ToLower)
+	return dbx
+}
+
+func newSqliteDb() *sqlx.DB {
 	db, err := sqliteDB()
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	dbx := sqlx.NewDb(db, "sqlite3")
 	dbx.Mapper = reflectx.NewMapperFunc("json", strings.ToLower)
-	return dbx, nil
+	return dbx
+}
+
+func newDb() *sqlx.DB {
+	return newSqliteDb()
 }
 
 var once sync.Once
 
-func Init() {
+func before(t *testing.T) {
 	once.Do(func() {
-		log.Println("before...")
-		db, err := newSqliteDb()
+		t.Log("before...")
+		db := newDb()
+		_, err := db.Exec(createSqliteTableSQL)
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
-		_, err = db.Exec(`
-		CREATE TABLE user (
-		  id integer primary key autoincrement,
-		  uid integer,
-		  name text,
-		  sex text,
-		  login_time integer,
-		  utime integer,
-		  ctime integer
-		);	
-	`)
-		if err != nil {
-			panic(err)
-		}
-		dao := NewDAO(db, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
+		t.Log("create table success")
+		dao := daox.NewDAO(db, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
 		for i := 0; i < 10; i++ {
 			nowSec := time.Now().Unix()
-			id, err := dao.Save(&user{
-				Uid:       int64(100 + i),
+			id, err := dao.Save(&DemoInfo{
+				UID:       int64(100 + i),
 				Name:      fmt.Sprintf("u-%d", i),
 				Sex:       "male",
 				LoginTime: nowSec,
@@ -100,40 +73,23 @@ func Init() {
 			if err != nil {
 				panic(err)
 			}
-			log.Printf("save id - %d \n", id)
+			t.Logf("save id - %d \r", id)
 		}
 	})
 }
 
-type user struct {
-	Id        int64  `json:"id"`
-	Uid       int64  `json:"uid"`
-	Name      string `json:"name"`
-	Sex       string `json:"sex"`
-	LoginTime int64  `json:"login_time"`
-	Utime     int64  `json:"utime"`
-	Ctime     int64  `json:"ctime"`
-}
-
-func (u *user) GetID() interface{} {
-	return u.Id
-}
-
-func TestCreate(t *testing.T) {
-	DBMaster, err := newSqliteDb()
+func after(t *testing.T) {
+	db := newDb()
+	t.Log("drop table")
+	_, err := db.Exec("drop table if exists demo_info")
 	if err != nil {
-		log.Panic(err)
+		t.Fatal(err)
 	}
-	redisClient := createMockRedisClient(t)
-	dao := NewDAO(
-		DBMaster,
-		"user",
-		"id",
-		reflect.TypeOf(&user{}),
-		IsAutoIncrement(),
-		WithCache(redisClient),
-		WithCacheVersion("v1"),
-	)
+}
+
+func testCreate(t *testing.T) {
+	DBMaster := newDb()
+	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
 	assert.Equal(t, len(dao.TableMeta.Columns), 7)
 	assert.Equal(t, dao.TableMeta.PrimaryKey, "id")
 	for _, column := range dao.TableMeta.Columns {
@@ -141,15 +97,11 @@ func TestCreate(t *testing.T) {
 	}
 }
 
-func TestCrud(t *testing.T) {
-	Init()
-	DBMaster, err := newSqliteDb()
-	if err != nil {
-		log.Panic(err)
-	}
-	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
-	u1 := &user{
-		Uid:       10000,
+func testCrud(t *testing.T) {
+	DBMaster := newDb()
+	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	u1 := &DemoInfo{
+		UID:       10000,
 		Name:      "fengjx",
 		Sex:       "1",
 		LoginTime: time.Now().Unix(),
@@ -161,18 +113,18 @@ func TestCrud(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	t.Logf("id: %d", id)
-	u2 := &user{}
-	exist, err := dao.GetByID(id, u2)
+	u2 := &DemoInfo{}
+	ok, err := dao.GetByID(id, u2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !exist {
+	if !ok {
 		t.Fatal("GetByID not exist")
 	}
-	assert.Equal(t, u1.Uid, u2.Uid)
+	assert.Equal(t, u1.UID, u2.UID)
 
 	updateName := "fengjx_2023"
-	ok, err := dao.UpdateField(id, map[string]interface{}{
+	ok, err = dao.UpdateField(id, map[string]interface{}{
 		"name": updateName,
 	})
 	if err != nil {
@@ -181,10 +133,13 @@ func TestCrud(t *testing.T) {
 	if !ok {
 		t.Fatal("update affected is 0")
 	}
-	u2 = &user{}
-	_, err = dao.GetByID(id, u2)
+	u2 = &DemoInfo{}
+	ok, err = dao.GetByID(id, u2)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("GetByID not exist")
 	}
 	assert.Equal(t, updateName, u2.Name)
 	ok, err = dao.DeleteByID(id)
@@ -194,30 +149,62 @@ func TestCrud(t *testing.T) {
 	if !ok {
 		t.Fatal("delete by id fail")
 	}
-	u2 = &user{}
-	exist, err = dao.GetByID(id, u2)
+	u2 = &DemoInfo{}
+	_, err = dao.GetByID(id, u2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if exist {
-		t.Fatal("DeleteById error")
-	}
-	assert.Equal(t, int64(0), u2.Id)
+	assert.Equal(t, int64(0), u2.ID)
 	assert.Equal(t, "", u2.Name)
 }
 
-func TestBatchSave(t *testing.T) {
-	Init()
-	// DBMaster := newDb(t)
-	DBMaster, err := newSqliteDb()
+func testSelect(t *testing.T) {
+	//before(t)
+	DBMaster := newDb()
+	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	var list []*DemoInfo
+	selector := dao.Selector().Where(
+		ql.EC().Where(
+			DemoInfoMeta.UidIn(101, 102),
+			DemoInfoMeta.SexEQ("male"),
+		),
+	)
+	err := dao.Select(&list, selector)
 	if err != nil {
-		log.Panic(err)
+		t.Fatal(err)
 	}
-	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
+	for _, item := range list {
+		t.Log(item.UID)
+	}
+}
+
+func testGet(t *testing.T) {
+	//before(t)
+	DBMaster := newDb()
+	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	demoInfo := &DemoInfo{}
+	selector := dao.Selector().
+		Where(
+			ql.EC().Where(DemoInfoMeta.UidGT(100)),
+		).
+		Limit(1).
+		OrderBy(ql.Asc(DemoInfoMeta.UID))
+	exist, err := dao.Get(demoInfo, selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, true, exist)
+	assert.Equal(t, int64(101), demoInfo.UID)
+	t.Log("demoInfo[uid]", demoInfo.UID)
+}
+
+func testBatchSave(t *testing.T) {
+	DBMaster := newDb()
+	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
 	nowUnix := time.Now().Unix()
-	users := []*user{
+	users := []*DemoInfo{
 		{
-			Uid:       1000,
+			UID:       1000,
 			Name:      "fengjx0",
 			Sex:       "1",
 			LoginTime: nowUnix,
@@ -225,7 +212,7 @@ func TestBatchSave(t *testing.T) {
 			Ctime:     nowUnix,
 		},
 		{
-			Uid:       1001,
+			UID:       1001,
 			Name:      "fengjx1",
 			Sex:       "2",
 			LoginTime: nowUnix,
@@ -235,29 +222,25 @@ func TestBatchSave(t *testing.T) {
 	}
 	affected, err := dao.BatchSave(users)
 	if err != nil {
-		t.Fatal(err.Error())
+		t.Fatal(err)
 	}
 	assert.Equal(t, int64(2), affected)
-	u := &user{}
-	exist, err := dao.GetByColumn(OfKv("uid", 1000), u)
+	u := &DemoInfo{}
+	ok, err := dao.GetByColumn(daox.OfKv("uid", 1000), u)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !exist {
+	if !ok {
 		t.Fatal("GetByColumn not exist")
 	}
 	assert.Equal(t, "fengjx0", u.Name)
 }
 
-func TestUpdate(t *testing.T) {
-	Init()
-	DBMaster, err := newSqliteDb()
-	if err != nil {
-		log.Panic(err)
-	}
-	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
-	u1 := &user{
-		Uid:       20000,
+func testUpdate(t *testing.T) {
+	DBMaster := newDb()
+	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	u1 := &DemoInfo{
+		UID:       20000,
 		Name:      "fengjx",
 		Sex:       "1",
 		LoginTime: time.Now().Unix(),
@@ -269,7 +252,7 @@ func TestUpdate(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	t.Logf("save id: %d", id)
-	u1.Id = id
+	u1.ID = id
 	u1.Name = "fjx"
 	u1.Utime = time.Now().Unix()
 	ok, err := dao.Update(u1)
@@ -279,12 +262,40 @@ func TestUpdate(t *testing.T) {
 	if !ok {
 		t.Fatal("dao update not success")
 	}
-	u2 := &user{}
-	_, err = dao.GetByID(id, u2)
+	u2 := &DemoInfo{}
+	ok, err = dao.GetByID(id, u2)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !ok {
+		t.Fatal("GetByID not exist")
+	}
 	assert.Equal(t, u1.Name, u2.Name)
+}
+
+func testUpdateByCond(t *testing.T) {
+	DBMaster := newDb()
+	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	rows, err := dao.UpdateByCond(
+		map[string]interface{}{
+			DemoInfoMeta.Sex: "female",
+		},
+		ql.EC().Where(DemoInfoMeta.UidGT(105)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("update rows", rows)
+}
+
+func testDeleteByColumns(t *testing.T) {
+	DBMaster := newDb()
+	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	num, err := dao.DeleteByColumns(daox.OfMultiKv(DemoInfoMeta.UID, 100, 101))
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, int64(2), num)
 }
 
 type blog struct {
@@ -297,28 +308,21 @@ type blog struct {
 	Utime      *time.Time `json:"-"`
 }
 
-func TestIgnoreField(t *testing.T) {
-	DBMaster, err := newSqliteDb()
-	if err != nil {
-		log.Panic(err)
-	}
-	dao := NewDAO(DBMaster, "blog", "id", reflect.TypeOf(&blog{}), IsAutoIncrement())
+func testIgnoreField(t *testing.T) {
+	DBMaster := newDb()
+	dao := daox.NewDAO(DBMaster, "blog", "id", reflect.TypeOf(&blog{}), daox.IsAutoIncrement())
 	t.Log(strings.Join(dao.TableMeta.Columns, ","))
 	assert.Equal(t, "id,uid,title,content,create_time", strings.Join(dao.TableMeta.Columns, ","))
 }
 
-func TestPage(t *testing.T) {
-	Init()
-	DBMaster, err := newSqliteDb()
-	if err != nil {
-		log.Panic(err)
-	}
-	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
+func testPage(t *testing.T) {
+	DBMaster := newDb()
+	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
 	querySQL, err := dao.SQLBuilder().Select().Limit(10).Offset(5).SQL()
 	if err != nil {
 		t.Fatal(err)
 	}
-	var list []user
+	var list []*DemoInfo
 	err = dao.DBRead.Select(&list, querySQL)
 	if err != nil {
 		t.Fatal(err)
@@ -328,24 +332,17 @@ func TestPage(t *testing.T) {
 	}
 }
 
-func TestReplaceInto(t *testing.T) {
-	Init()
-	DBMaster, err := newSqliteDb()
-	if err != nil {
-		log.Panic(err)
-	}
-	dao := NewDAO(DBMaster, "user", "id", reflect.TypeOf(&user{}), IsAutoIncrement())
-	u1 := &user{
-		Uid:       10000,
-		Name:      "fengjx",
-		Sex:       "1",
-		LoginTime: time.Now().Unix(),
-		Utime:     time.Now().Unix(),
-		Ctime:     time.Now().Unix(),
-	}
-	id, err := dao.ReplaceInto(u1)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	t.Logf("id: %d", id)
+func TestDaox(t *testing.T) {
+	before(t)
+	t.Run("testCreate", testCreate)
+	t.Run("testCrud", testCrud)
+	t.Run("testSelect", testSelect)
+	t.Run("testGet", testGet)
+	t.Run("testBatchSave", testBatchSave)
+	t.Run("testUpdate", testUpdate)
+	t.Run("testIgnoreField", testIgnoreField)
+	t.Run("testPage", testPage)
+	t.Run("testUpdateByCond", testUpdateByCond)
+	t.Run("testDeleteByColumns", testDeleteByColumns)
+	after(t)
 }
