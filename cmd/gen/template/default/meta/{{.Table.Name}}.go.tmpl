@@ -1,8 +1,8 @@
 package meta
 
 import (
-    "gitit.cc/social/common/daox/sqlbuilder"
-    "gitit.cc/social/common/daox/sqlbuilder/ql"
+    "github.com/fengjx/daox/sqlbuilder"
+    "github.com/fengjx/daox/sqlbuilder/ql"
 {{$ilen := len .Table.GoImports}}
 {{if gt $ilen 0}}
     {{range .Table.GoImports}}"{{.}}"{{end}}
