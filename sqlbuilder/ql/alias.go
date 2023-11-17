@@ -13,3 +13,9 @@ var C = sqlbuilder.C
 
 // SC alias for sqlbuilder.SC
 var SC = sqlbuilder.SC
+
+// EC alias for sqlbuilder.EC
+var EC = sqlbuilder.EC
+
+// Col alias for sqlbuilder.Col
+var Col = sqlbuilder.Col

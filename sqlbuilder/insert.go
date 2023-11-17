@@ -41,7 +41,7 @@ func (ins *Inserter) OnDuplicateKeyUpdateString(updateString string) *Inserter {
 
 func (ins *Inserter) NameSQL() (string, error) {
 	if len(ins.columns) == 0 {
-		return "", SQLErrColumnsRequire
+		return "", ErrColumnsRequire
 	}
 	ins.reset()
 	if ins.replaceInto {
@@ -77,7 +77,7 @@ func (ins *Inserter) NameSQL() (string, error) {
 
 func (ins *Inserter) SQL() (string, error) {
 	if len(ins.columns) == 0 {
-		return "", SQLErrColumnsRequire
+		return "", ErrColumnsRequire
 	}
 	ins.reset()
 	if ins.replaceInto {
