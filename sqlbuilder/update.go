@@ -39,7 +39,7 @@ func (u *Updater) Where(where ConditionBuilder) *Updater {
 // SQL 输出sql语句
 func (u *Updater) SQL() (string, error) {
 	if len(u.columns) == 0 {
-		return "", SQLErrColumnsRequire
+		return "", ErrColumnsRequire
 	}
 	u.reset()
 	u.writeString("UPDATE ")
@@ -73,7 +73,7 @@ func (u *Updater) SQLArgs() (string, []interface{}, error) {
 
 func (u *Updater) NameSql() (string, error) {
 	if len(u.columns) == 0 {
-		return "", SQLErrColumnsRequire
+		return "", ErrColumnsRequire
 	}
 	u.reset()
 	u.writeString("UPDATE ")

@@ -142,7 +142,7 @@ func testCrud(t *testing.T) {
 		t.Fatal("GetByID not exist")
 	}
 	assert.Equal(t, updateName, u2.Name)
-	ok, err = dao.DeleteById(id)
+	ok, err = dao.DeleteByID(id)
 	if err != nil {
 		t.Fatal(err)
 	}

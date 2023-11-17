@@ -386,13 +386,13 @@ func (dao *Dao) DeleteByColumnsTx(tx *sqlx.Tx, kvs *MultiKV) (int64, error) {
 	return dao.DeleteByCondTX(tx, ql.EC().Where(ql.Col(kvs.Key).In(kvs.Values...)))
 }
 
-// DeleteById 根据id删除数据
-func (dao *Dao) DeleteById(id interface{}) (bool, error) {
-	return dao.DeleteByIdTx(nil, id)
+// DeleteByID 根据id删除数据
+func (dao *Dao) DeleteByID(id interface{}) (bool, error) {
+	return dao.DeleteByIDTx(nil, id)
 }
 
-// DeleteByIdTx 根据id删除数据，支持事务
-func (dao *Dao) DeleteByIdTx(tx *sqlx.Tx, id interface{}) (bool, error) {
+// DeleteByIDTx 根据id删除数据，支持事务
+func (dao *Dao) DeleteByIDTx(tx *sqlx.Tx, id interface{}) (bool, error) {
 	tableMeta := dao.TableMeta
 	affected, err := dao.DeleteByColumnTx(tx, OfKv(tableMeta.PrimaryKey, id))
 	if err != nil {

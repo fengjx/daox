@@ -2,15 +2,10 @@ package sqlbuilder
 
 import (
 	"errors"
-	"fmt"
 )
 
 var (
-	SQLErrTableNameRequire = errors.New("[sqlbuilder] tableName requires")
-	SQLErrColumnsRequire   = errors.New("[sqlbuilder] columns requires")
-	SQLErrDeleteMissWhere  = errors.New("[sqlbuilder] delete sql miss where")
+	ErrTableNameRequire = errors.New("[sqlbuilder] tableName requires")
+	ErrColumnsRequire   = errors.New("[sqlbuilder] columns requires")
+	ErrDeleteMissWhere  = errors.New("[sqlbuilder] delete sql miss where")
 )
-
-func newUnsupportedOperatorError(op string) error {
-	return fmt.Errorf("[sqlbuilder]: operator[%v] not support", op)
-}

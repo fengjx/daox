@@ -37,7 +37,7 @@ func (d *Deleter) Limit(limit int) *Deleter {
 // SQL 输出sql语句
 func (d *Deleter) SQL() (string, error) {
 	if d.where == nil || len(d.where.getPredicates()) == 0 {
-		return "", SQLErrDeleteMissWhere
+		return "", ErrDeleteMissWhere
 	}
 	d.reset()
 	d.writeString("DELETE FROM ")

@@ -416,7 +416,7 @@ func TestDelete(t *testing.T) {
 			name:    "delete",
 			deleter: sqlbuilder.New("user").Delete(),
 			wantSQL: "DELETE FROM `user`;",
-			wantErr: sqlbuilder.SQLErrDeleteMissWhere,
+			wantErr: sqlbuilder.ErrDeleteMissWhere,
 		},
 		{
 			name: "delete by id",
