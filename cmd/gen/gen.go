@@ -71,11 +71,6 @@ func run(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = os.RemoveAll(config.Target.Custom.OutDir)
-	if err != nil {
-		fmt.Println(err.Error())
-		return err
-	}
 	for _, tableName := range config.Target.Tables {
 		table := loadTableMeta(db, dsnCfg.DBName, tableName)
 		fmt.Println(table.Name, table.Comment)
@@ -105,6 +100,7 @@ func loadTableMeta(db *sqlx.DB, dbName, tableName string) *Table {
 			log.Fatal(err)
 		}
 		table.Name = name
+		table.StructName = utils.GonicCase(name)
 		if comment != nil {
 			table.Comment = *comment
 		}
@@ -129,7 +125,7 @@ func loadTableMeta(db *sqlx.DB, dbName, tableName string) *Table {
 func loadColumnMeta(db *sqlx.DB, dbName, tableName string) ([]Column, Column) {
 	args := []interface{}{dbName, tableName}
 	querySQL := "SELECT column_name, column_type, column_comment, column_key FROM information_schema.columns " +
-		"WHERE table_schema = ? AND table_name = ? ORDER BY ORDINAL_POSITION"
+		"WHERE table_schema = ? AND table_name = ?"
 	rows, err := db.Query(querySQL, args...)
 	if err != nil {
 		log.Fatal(err)
@@ -184,11 +180,11 @@ func gen(config *Config, table *Table) {
 		"TagName": config.Target.Custom.TagName,
 		"Table":   table,
 	}
-	out := filepath.Join(config.Target.Custom.OutDir, table.Name)
+	out := filepath.Join(config.Target.Custom.OutDir)
 	render(isEmbed, filepath.Join(dir), "", entries, out, attr)
 }
 
-// 生成文件
+// render 递归生成文件
 func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry, outDir string, attr map[string]interface{}) {
 	if parent == "" {
 		parent = basePath
@@ -220,7 +216,12 @@ func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry,
 			}
 			continue
 		}
-		targetFile := filepath.Join(targetDir, strings.ReplaceAll(entry.Name(), ".tmpl", ""))
+		filenameBytes, err := parse(strings.ReplaceAll(entry.Name(), ".tmpl", ""), attr)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		targetFile := filepath.Join(targetDir, string(filenameBytes))
 		fmt.Println(targetFile)
 		bs, err := ReadFile(path, isEmbed)
 		if err != nil {
@@ -287,6 +288,7 @@ type Custom struct {
 // Table represents a database table
 type Table struct {
 	Name          string
+	StructName    string
 	Columns       []Column
 	PrimaryKey    Column
 	AutoIncrement bool

@@ -16,7 +16,7 @@ func main() {
 		).
 		OrderBy(sqlbuilder.Desc("ctime")).
 		Offset(10).
-		Limit(10).Sql()
+		Limit(10).SQL()
 	if err != nil {
 		log.Panic(err)
 	}
@@ -25,10 +25,10 @@ func main() {
 	inserter := sqlbuilder.New("user_info").Insert().
 		Columns("username", "age", "sex")
 
-	sql, err := inserter.Sql()
+	sql, err := inserter.SQL()
 	log.Println(sql)
 
-	nameSql, err := inserter.NameSql()
+	nameSql, err := inserter.NameSQL()
 	log.Println(nameSql)
 
 	updateSQL, err := sqlbuilder.New("user_info").
@@ -37,12 +37,11 @@ func main() {
 		Where(
 			sqlbuilder.C().
 				Where(true, "id = ?")).
-		Sql()
+		SQL()
 	log.Println(updateSQL)
 
 	deleteSQL, err := sqlbuilder.New("user_info").Delete().
 		Where(sqlbuilder.C().Where(true, "id = ?")).
-		Sql()
+		SQL()
 	log.Println(deleteSQL)
-
 }

@@ -12,7 +12,6 @@
 - [文档完善](https://github.com/fengjx/daox/pull/15)
 - [单条数据查询返回是否存在数据](https://github.com/fengjx/daox/pull/20)
 - [调整方法命名](https://github.com/fengjx/daox/pull/21)
-- [支持 replace into](https://github.com/fengjx/daox/pull/24)
 - [支持 replace into](https://github.com/fengjx/daox/pull/26)
-- [代码生成器优化](https://github.com/fengjx/daox/pull/22)
-
+- [代码生成路径支持变量替换](https://github.com/fengjx/daox/pull/22)
+- [where 条件支持参数拼接](https://github.com/fengjx/daox/pull/29)
