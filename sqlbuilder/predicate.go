@@ -1,27 +1,21 @@
 package sqlbuilder
 
-type op struct {
-	symbol string
-	text   string
-}
-
-var (
-	OpAnd = &op{symbol: "AND", text: " AND "}
-	OpOr  = &op{symbol: "OR", text: " OR "}
-)
-
+// Predicate where 断言
 type Predicate struct {
-	Op      *op
-	Express string
-	Args    []interface{}
+	Op       Op
+	Express  string
+	Args     []interface{}
+	HasInSQL bool
 }
 
+// ConditionBuilder 条件构造器
 type ConditionBuilder interface {
-	getPredicates() []*Predicate
+	getPredicates() []Predicate
 }
 
+// Condition 条件构造器实现
 type Condition struct {
-	predicates []*Predicate
+	predicates []Predicate
 }
 
 // C where 条件
@@ -36,7 +30,8 @@ func (c *Condition) Where(meet bool, express string, args ...interface{}) *Condi
 	if !meet {
 		return c
 	}
-	c.predicates = append(c.predicates, &Predicate{
+	c.predicates = append(c.predicates, Predicate{
+		Op:      emptyOp,
 		Express: express,
 		Args:    args,
 	})
@@ -50,7 +45,7 @@ func (c *Condition) And(meet bool, express string, args ...interface{}) *Conditi
 	if !meet {
 		return c
 	}
-	c.predicates = append(c.predicates, &Predicate{
+	c.predicates = append(c.predicates, Predicate{
 		Op:      OpAnd,
 		Express: express,
 		Args:    args,
@@ -65,7 +60,7 @@ func (c *Condition) Or(meet bool, express string, args ...interface{}) *Conditio
 	if !meet {
 		return c
 	}
-	c.predicates = append(c.predicates, &Predicate{
+	c.predicates = append(c.predicates, Predicate{
 		Op:      OpOr,
 		Express: express,
 		Args:    args,
@@ -73,13 +68,13 @@ func (c *Condition) Or(meet bool, express string, args ...interface{}) *Conditio
 	return c
 }
 
-func (c *Condition) getPredicates() []*Predicate {
+func (c *Condition) getPredicates() []Predicate {
 	return c.predicates
 }
 
-// SimpleCondition 简单 where 语句
+// SimpleCondition 简单 where 条件构造
 type SimpleCondition struct {
-	predicates []*Predicate
+	predicates []Predicate
 }
 
 // SC 简单 where 条件
@@ -87,14 +82,15 @@ func SC() *SimpleCondition {
 	return new(SimpleCondition)
 }
 
-func (c *SimpleCondition) Predicates() []*Predicate {
+func (c *SimpleCondition) Predicates() []Predicate {
 	return c.predicates
 }
 
 // Where
 // express where 表达式
 func (c *SimpleCondition) Where(express string, args ...interface{}) *SimpleCondition {
-	c.predicates = append(c.predicates, &Predicate{
+	c.predicates = append(c.predicates, Predicate{
+		Op:      emptyOp,
 		Express: express,
 		Args:    args,
 	})
@@ -104,7 +100,7 @@ func (c *SimpleCondition) Where(express string, args ...interface{}) *SimpleCond
 // And and 语句
 // express where 表达式
 func (c *SimpleCondition) And(express string, args ...interface{}) *SimpleCondition {
-	c.predicates = append(c.predicates, &Predicate{
+	c.predicates = append(c.predicates, Predicate{
 		Op:      OpAnd,
 		Express: express,
 		Args:    args,
@@ -115,7 +111,7 @@ func (c *SimpleCondition) And(express string, args ...interface{}) *SimpleCondit
 // Or or 语句
 // express where 表达式
 func (c *SimpleCondition) Or(express string, args ...interface{}) *SimpleCondition {
-	c.predicates = append(c.predicates, &Predicate{
+	c.predicates = append(c.predicates, Predicate{
 		Op:      OpOr,
 		Express: express,
 		Args:    args,
@@ -123,6 +119,67 @@ func (c *SimpleCondition) Or(express string, args ...interface{}) *SimpleConditi
 	return c
 }
 
-func (c *SimpleCondition) getPredicates() []*Predicate {
+func (c *SimpleCondition) getPredicates() []Predicate {
 	return c.predicates
+}
+
+// ExpressCondition 基于表达式的条件构造
+type ExpressCondition struct {
+	predicates []Predicate
+}
+
+func (e *ExpressCondition) getPredicates() []Predicate {
+	return e.predicates
+}
+
+// Where 增加 and 条件
+func (e *ExpressCondition) Where(cols ...Column) *ExpressCondition {
+	for _, c := range cols {
+		if !c.isUse {
+			continue
+		}
+		e.predicates = append(e.predicates, Predicate{
+			Op:       OpAnd,
+			Express:  c.Express(),
+			Args:     []interface{}{c.arg},
+			HasInSQL: c.op == OpIn || c.op == OpNot,
+		})
+	}
+	return e
+}
+
+// And 增加 and 条件
+func (e *ExpressCondition) And(cols ...Column) *ExpressCondition {
+	for _, c := range cols {
+		if !c.isUse {
+			continue
+		}
+		e.predicates = append(e.predicates, Predicate{
+			Op:       OpAnd,
+			Express:  c.Express(),
+			Args:     []interface{}{c.arg},
+			HasInSQL: c.op == OpIn || c.op == OpNot,
+		})
+	}
+	return e
+}
+
+// Or 增加 and 条件
+func (e *ExpressCondition) Or(c Column) *ExpressCondition {
+	if !c.isUse {
+		return e
+	}
+	e.predicates = append(e.predicates, Predicate{
+		Op:       OpOr,
+		Express:  c.Express(),
+		Args:     []interface{}{c.arg},
+		HasInSQL: c.op == OpIn || c.op == OpNot,
+	})
+	return e
+}
+
+// EC 创建一个使用?占位符的 ExpressCondition 条件构造器
+func EC() *ExpressCondition {
+	ec := &ExpressCondition{}
+	return ec
 }

@@ -1,20 +1,13 @@
 package sqlbuilder
 
 import (
-	"errors"
 	"reflect"
 	"strings"
 	"sync"
 
-	"github.com/fengjx/daox/utils"
-
 	"github.com/jmoiron/sqlx/reflectx"
-)
 
-var (
-	SQLErrTableNameRequire = errors.New("[sqlbuilder] tableName requires")
-	SQLErrColumnsRequire   = errors.New("[sqlbuilder] columns requires")
-	SQLErrDeleteMissWhere  = errors.New("[sqlbuilder] delete sql miss where")
+	"github.com/fengjx/daox/utils"
 )
 
 var mapperMap = map[string]*reflectx.Mapper{}
@@ -119,9 +112,9 @@ func (b *sqlBuilder) comma() {
 func (b *sqlBuilder) whereSQL(where ConditionBuilder) {
 	if where != nil && len(where.getPredicates()) > 0 {
 		b.writeString(" WHERE ")
-		for _, predicate := range where.getPredicates() {
-			if predicate.Op != nil {
-				b.writeString(predicate.Op.text)
+		for i, predicate := range where.getPredicates() {
+			if i > 0 {
+				b.writeString(predicate.Op.Text)
 			}
 			b.writeString(predicate.Express)
 		}
@@ -129,13 +122,15 @@ func (b *sqlBuilder) whereSQL(where ConditionBuilder) {
 }
 
 // whereArgs where 条件中的参数
-func (b *sqlBuilder) whereArgs(where ConditionBuilder) []interface{} {
-	var args []interface{}
+func (b *sqlBuilder) whereArgs(where ConditionBuilder) (args []interface{}, hasInSQL bool) {
 	if where != nil && len(where.getPredicates()) > 0 {
 		b.writeString(" WHERE ")
 		for _, predicate := range where.getPredicates() {
 			args = append(args, predicate.Args...)
+			if predicate.HasInSQL {
+				hasInSQL = true
+			}
 		}
 	}
-	return args
+	return
 }

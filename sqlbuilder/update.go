@@ -1,9 +1,12 @@
 package sqlbuilder
 
+import "github.com/jmoiron/sqlx"
+
 type Updater struct {
 	sqlBuilder
 	tableName string
 	columns   []string
+	vals      []interface{}
 	where     ConditionBuilder
 }
 
@@ -13,12 +16,11 @@ func NewUpdater(tableName string) *Updater {
 	}
 }
 
-// StructColumns 通过任意model解析出表字段
-// tagName 解析数据库字段的 tag-name
-// omitColumns 排除哪些字段
-func (u *Updater) StructColumns(model interface{}, tagName string, omitColumns ...string) *Updater {
-	columns := GetColumnsByModel(GetMapperByTagName(tagName), model, omitColumns...)
-	return u.Columns(columns...)
+// Set 设置字段值
+func (u *Updater) Set(column string, val interface{}) *Updater {
+	u.columns = append(u.columns, column)
+	u.vals = append(u.vals, val)
+	return u
 }
 
 // Columns update 的数据库字段
@@ -34,7 +36,7 @@ func (u *Updater) Where(where ConditionBuilder) *Updater {
 	return u
 }
 
-// SQL 拼接sql语句
+// SQL 输出sql语句
 func (u *Updater) SQL() (string, error) {
 	if len(u.columns) == 0 {
 		return "", SQLErrColumnsRequire
@@ -58,11 +60,18 @@ func (u *Updater) SQL() (string, error) {
 // SQLArgs 构造 sql 并返回对应参数
 func (u *Updater) SQLArgs() (string, []interface{}, error) {
 	sql, err := u.SQL()
-	args := u.whereArgs(u.where)
-	return sql, args, err
+	args := u.vals
+	wargs, hasInSQL := u.whereArgs(u.where)
+	if len(wargs) > 0 {
+		args = append(args, wargs...)
+	}
+	if !hasInSQL {
+		return sql, args, err
+	}
+	return sqlx.In(sql, args...)
 }
 
-func (u *Updater) NameSQL() (string, error) {
+func (u *Updater) NameSql() (string, error) {
 	if len(u.columns) == 0 {
 		return "", SQLErrColumnsRequire
 	}

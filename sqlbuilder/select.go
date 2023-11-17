@@ -2,6 +2,8 @@ package sqlbuilder
 
 import (
 	"strconv"
+
+	"github.com/jmoiron/sqlx"
 )
 
 type Selector struct {
@@ -89,7 +91,7 @@ func (s *Selector) Offset(offset int) *Selector {
 	return s
 }
 
-// SQL 拼接sql语句
+// SQL 输出sql语句
 func (s *Selector) SQL() (string, error) {
 	s.reset()
 	s.writeString("SELECT ")
@@ -159,8 +161,11 @@ func (s *Selector) SQL() (string, error) {
 // SQLArgs 构造 sql 并返回对应参数
 func (s *Selector) SQLArgs() (string, []interface{}, error) {
 	sql, err := s.SQL()
-	args := s.whereArgs(s.where)
-	return sql, args, err
+	args, hasInSQL := s.whereArgs(s.where)
+	if !hasInSQL {
+		return sql, args, err
+	}
+	return sqlx.In(sql, args...)
 }
 
 type OrderType string

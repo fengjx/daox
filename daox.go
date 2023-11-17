@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 
 	"github.com/fengjx/daox/sqlbuilder"
+	"github.com/fengjx/daox/sqlbuilder/ql"
 	"github.com/fengjx/daox/utils"
 )
 
@@ -23,10 +23,9 @@ var ctx = context.TODO()
 type SliceToMapFun = func([]*Model) map[interface{}]*Model
 
 type Dao struct {
-	DBMaster      *DB
-	DBRead        *DB
-	TableMeta     *TableMeta
-	CacheProvider *CacheProvider
+	DBMaster  *DB
+	DBRead    *DB
+	TableMeta *TableMeta
 }
 
 func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
@@ -40,8 +39,6 @@ func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType ref
 		PrimaryKey: primaryKey,
 		Columns:    columns,
 	}
-	keyPrefix := fmt.Sprintf("data_%v", structType.Elem())
-	dao.CacheProvider = NewCacheProvider(nil, keyPrefix, "v1", time.Minute*3)
 	for _, opt := range opts {
 		opt(dao)
 	}
@@ -53,6 +50,13 @@ func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType ref
 
 func (dao *Dao) SQLBuilder() *sqlbuilder.Builder {
 	return sqlbuilder.New(dao.TableMeta.TableName)
+}
+
+func (dao *Dao) Selector(columns ...string) *sqlbuilder.Selector {
+	if len(columns) == 0 {
+		columns = dao.DBColumns()
+	}
+	return sqlbuilder.New(dao.TableMeta.TableName).Select(columns...)
 }
 
 func (dao *Dao) GetColumnsByModel(model interface{}, omitColumns ...string) []string {
@@ -183,19 +187,6 @@ func (dao *Dao) GetByColumn(kv *KV, dest Model) (bool, error) {
 	return true, nil
 }
 
-func (dao *Dao) GetByColumnCache(kv *KV, dest Model) (bool, error) {
-	exist := true
-	err := dao.CacheProvider.Fetch(kv.Key, utils.ToString(kv.Value), dest, func() (interface{}, error) {
-		var err error
-		exist, err = dao.GetByColumn(kv, dest)
-		if err != nil {
-			return nil, err
-		}
-		return dest, nil
-	})
-	return exist, err
-}
-
 func (dao *Dao) ListByColumns(kvs *MultiKV, dest interface{}) error {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return nil
@@ -230,68 +221,112 @@ func (dao *Dao) GetByID(id interface{}, dest Model) (bool, error) {
 	return dao.GetByColumn(OfKv(tableMeta.PrimaryKey, id), dest)
 }
 
-func (dao *Dao) GetByIDCache(id interface{}, dest Model) (bool, error) {
-	primaryKey := dao.TableMeta.PrimaryKey
-	exist := true
-	err := dao.CacheProvider.Fetch(primaryKey, id, dest, func() (interface{}, error) {
-		var err error
-		exist, err = dao.GetByID(id, dest)
-		if err != nil {
-			return nil, err
-		}
-		return dest, nil
-	})
-	return exist, err
-}
-
 func (dao *Dao) ListByIDs(dest interface{}, ids ...interface{}) error {
 	tableMeta := dao.TableMeta
 	return dao.ListByColumns(OfMultiKv(tableMeta.PrimaryKey, ids...), dest)
 }
 
+// Select 根据查询条件查询列表
+// dest 必须是一个 slice 指针
+func (dao *Dao) Select(dest interface{}, selector *sqlbuilder.Selector) error {
+	querySQL, args, err := selector.SQLArgs()
+	if err != nil {
+		return err
+	}
+	return dao.DBRead.Select(dest, querySQL, args...)
+}
+
+// Get 根据查询条件查询单条记录
+// dest 必须是一个指针
+func (dao *Dao) Get(dest interface{}, selector *sqlbuilder.Selector) (bool, error) {
+	querySQL, args, err := selector.SQLArgs()
+	if err != nil {
+		return false, err
+	}
+	err = dao.DBRead.Get(dest, querySQL, args...)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// UpdateByCond 根据条件更新字段
+func (dao *Dao) UpdateByCond(attr map[string]interface{}, where sqlbuilder.ConditionBuilder) (int64, error) {
+	return dao.UpdateByCondTX(nil, attr, where)
+}
+
+// UpdateByCondTX 根据条件更新字段，支持事务
+func (dao *Dao) UpdateByCondTX(tx *sqlx.Tx, attr map[string]interface{}, where sqlbuilder.ConditionBuilder) (int64, error) {
+	updater := dao.SQLBuilder().Update()
+	for col, val := range attr {
+		updater.Set(col, val)
+	}
+	updater.Where(where)
+	updateSQL, args, err := updater.SQLArgs()
+	if err != nil {
+		return 0, err
+	}
+	var res sql.Result
+	if tx == nil {
+		res, err = dao.DBMaster.Exec(updateSQL, args...)
+	} else {
+		res, err = tx.Exec(updateSQL, args...)
+	}
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// UpdateField 部分字段更新
 func (dao *Dao) UpdateField(idValue interface{}, fieldMap map[string]interface{}) (bool, error) {
+	return dao.UpdateFieldTx(nil, idValue, fieldMap)
+}
+
+// UpdateFieldTx 部分字段更新，支持事务
+func (dao *Dao) UpdateFieldTx(tx *sqlx.Tx, idValue interface{}, attr map[string]interface{}) (bool, error) {
 	if utils.IsIDEmpty(idValue) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := dao.TableMeta
-	columns := make([]string, 0, len(fieldMap))
-	args := make([]interface{}, 0, len(fieldMap))
-	for k, v := range fieldMap {
-		columns = append(columns, k)
-		args = append(args, v)
-	}
-	args = append(args, idValue)
-	updateSQL, err := dao.SQLBuilder().Update().
-		Columns(columns...).
-		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", tableMeta.PrimaryKey))).
-		SQL()
+	rows, err := dao.UpdateByCondTX(tx, attr, ql.EC().
+		Where(ql.Col(tableMeta.PrimaryKey).EQ(idValue)),
+	)
 	if err != nil {
 		return false, err
 	}
-	res, err := dao.DBMaster.Exec(updateSQL, args...)
-	if err != nil {
-		return false, err
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-	return affected > 0, nil
+	return rows > 0, nil
 }
 
+// Update 全字段更新
 func (dao *Dao) Update(m Model) (bool, error) {
+	return dao.UpdateTx(nil, m)
+}
+
+// UpdateTx 全字段更新，支持事务
+func (dao *Dao) UpdateTx(tx *sqlx.Tx, m Model) (bool, error) {
 	if utils.IsIDEmpty(m.GetID()) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := dao.TableMeta
 	updateSQL, err := dao.SQLBuilder().Update().
 		Columns(dao.DBColumns(tableMeta.PrimaryKey)...).
-		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey))).
-		NameSQL()
+		Where(
+			ql.SC().Where(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey)),
+		).
+		NameSql()
 	if err != nil {
 		return false, err
 	}
-	res, err := dao.DBMaster.NamedExec(updateSQL, m)
+	var res sql.Result
+	if tx == nil {
+		res, err = dao.DBMaster.NamedExec(updateSQL, m)
+	} else {
+		res, err = tx.NamedExec(updateSQL, m)
+	}
 	if err != nil {
 		return false, err
 	}
@@ -302,69 +337,66 @@ func (dao *Dao) Update(m Model) (bool, error) {
 	return affected > 0, nil
 }
 
+// DeleteByCond 根据where条件删除
+func (dao *Dao) DeleteByCond(where sqlbuilder.ConditionBuilder) (int64, error) {
+	return dao.DeleteByCondTX(nil, where)
+}
+
+// DeleteByCondTX 根据where条件删除，支持事务
+func (dao *Dao) DeleteByCondTX(tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (int64, error) {
+	deleteSQL, args, err := dao.SQLBuilder().Delete().Where(where).SQLArgs()
+	if err != nil {
+		return 0, err
+	}
+	var res sql.Result
+	if tx == nil {
+		res, err = dao.DBMaster.Exec(deleteSQL, args...)
+	} else {
+		res, err = tx.Exec(deleteSQL, args...)
+	}
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// DeleteByColumn 按字段名删除
 func (dao *Dao) DeleteByColumn(kv *KV) (int64, error) {
+	return dao.DeleteByColumnTx(nil, kv)
+}
+
+// DeleteByColumnTx 按字段名删除，支持事务
+func (dao *Dao) DeleteByColumnTx(tx *sqlx.Tx, kv *KV) (int64, error) {
 	if kv == nil {
 		return 0, nil
 	}
-	execSql, err := dao.SQLBuilder().Delete().
-		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", kv.Key))).
-		SQL()
-	if err != nil {
-		return 0, err
-	}
-	res, err := dao.DBMaster.Exec(execSql, kv.Value)
-	if err != nil {
-		return 0, err
-	}
-	return res.RowsAffected()
+	return dao.DeleteByCondTX(tx, ql.EC().Where(ql.Col(kv.Key).EQ(kv.Value)))
 }
 
+// DeleteByColumns 指定字段删除多个值
 func (dao *Dao) DeleteByColumns(kvs *MultiKV) (int64, error) {
+	return dao.DeleteByColumnsTx(nil, kvs)
+}
+
+// DeleteByColumnsTx 指定字段多个值删除
+func (dao *Dao) DeleteByColumnsTx(tx *sqlx.Tx, kvs *MultiKV) (int64, error) {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return 0, nil
 	}
-
-	execSql, err := dao.SQLBuilder().Delete().
-		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s in (?)", kvs.Key))).
-		SQL()
-	if err != nil {
-		return 0, err
-	}
-	execSql, args, err := sqlx.In(execSql, kvs.Values)
-	if err != nil {
-		return 0, err
-	}
-	res, err := dao.DBMaster.Exec(execSql, args...)
-	if err != nil {
-		return 0, err
-	}
-	return res.RowsAffected()
+	return dao.DeleteByCondTX(tx, ql.EC().Where(ql.Col(kvs.Key).In(kvs.Values...)))
 }
 
-func (dao *Dao) DeleteByID(id interface{}) (bool, error) {
+// DeleteById 根据id删除数据
+func (dao *Dao) DeleteById(id interface{}) (bool, error) {
+	return dao.DeleteByIdTx(nil, id)
+}
+
+// DeleteByIdTx 根据id删除数据，支持事务
+func (dao *Dao) DeleteByIdTx(tx *sqlx.Tx, id interface{}) (bool, error) {
 	tableMeta := dao.TableMeta
-	affected, err := dao.DeleteByColumn(OfKv(tableMeta.PrimaryKey, id))
+	affected, err := dao.DeleteByColumnTx(tx, OfKv(tableMeta.PrimaryKey, id))
 	if err != nil {
 		return false, err
 	}
 	return affected == 1, nil
-}
-
-// Fetch query one row
-func (dao *Dao) Fetch(field string, item string, dest interface{}, fun CreateDataFun) error {
-	return dao.CacheProvider.Fetch(field, item, dest, fun)
-}
-
-// BatchFetch
-// 注意不会按 items 顺序返回
-func (dao *Dao) BatchFetch(field string, items []interface{}, dest interface{}, fun BatchCreateDataFun) error {
-	return dao.CacheProvider.BatchFetch(field, items, dest, fun)
-}
-
-func (dao *Dao) DeleteCache(field string, values ...interface{}) error {
-	items := make([]string, len(values))
-	for i, item := range values {
-		items[i] = utils.ToString(item)
-	}
-	return dao.CacheProvider.BatchDel(field, items...)
 }
