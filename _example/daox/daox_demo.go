@@ -29,28 +29,44 @@ func randString(n int) string {
 	return string(b)
 }
 
+var createTableSQL = `
+create table if not exists demo_user
+(
+    id         bigint auto_increment,
+    uid        bigint,
+    name       varchar(32) default '',
+    sex        tinyint  default 0,
+    utime      bigint      default 0,
+    ctime      bigint      default 0,
+    primary key pk (id),
+    unique uni_uid (uid)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin;
+`
+
 type User struct {
-	Id       int64  `json:"id"`
-	Uid      int64  `json:"uid"`
-	Nickname string `json:"nickname"`
-	Sex      int32  `json:"sex"`
-	Utime    int64  `json:"utime"`
-	Ctime    int64  `json:"ctime"`
+	Id    int64  `json:"id"`
+	Uid   int64  `json:"uid"`
+	Name  string `json:"name"`
+	Sex   int32  `json:"sex"`
+	Utime int64  `json:"utime"`
+	Ctime int64  `json:"ctime"`
 }
 
-func (receiver User) GetID() interface{} {
-	return receiver.Id
+func (u *User) GetID() interface{} {
+	return u.Id
 }
 
 func insertUser(dao *daox.Dao) {
 	for i := 0; i < 20; i++ {
 		sec := time.Now().Unix()
 		user := &User{
-			Uid:      100 + int64(i),
-			Nickname: randString(6),
-			Sex:      int32(i) % 2,
-			Utime:    sec,
-			Ctime:    sec,
+			Uid:   100 + int64(i),
+			Name:  randString(6),
+			Sex:   int32(i) % 2,
+			Utime: sec,
+			Ctime: sec,
 		}
 		id, err := dao.Save(user)
 		if err != nil {
@@ -65,11 +81,11 @@ func batchInsertUser(dao *daox.Dao) {
 	for i := 0; i < 20; i++ {
 		sec := time.Now().Unix()
 		user := &User{
-			Uid:      10000 + int64(i),
-			Nickname: randString(6),
-			Sex:      int32(i) % 2,
-			Utime:    sec,
-			Ctime:    sec,
+			Uid:   10000 + int64(i),
+			Name:  randString(6),
+			Sex:   int32(i) % 2,
+			Utime: sec,
+			Ctime: sec,
 		}
 		users = append(users, user)
 	}
@@ -139,7 +155,7 @@ func updateUser(dao *daox.Dao) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	user.Nickname = "update-name-10"
+	user.Name = "update-name-10"
 	// 全字段更新
 	ok, err := dao.Update(user)
 	if err != nil {
@@ -149,7 +165,7 @@ func updateUser(dao *daox.Dao) {
 
 	// 部分字段更新
 	ok, err = dao.UpdateField(11, map[string]interface{}{
-		"nickname": "update-name-11",
+		"name": "update-name-11",
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -229,10 +245,14 @@ func main() {
 
 	db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
 	db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
+	_, err := db.Exec(createTableSQL)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	dao := daox.NewDAO(
 		db,
-		"user_info",
+		"demo_user",
 		"id",
 		reflect.TypeOf(&User{}),
 		daox.IsAutoIncrement(),
@@ -240,11 +260,15 @@ func main() {
 		daox.WithCacheVersion("v1"),
 	)
 	log.Printf("columns: %v\n", dao.TableMeta.Columns)
-	// insertUser(dao)
-	// batchInsertUser(dao)
+	insertUser(dao)
+	batchInsertUser(dao)
 	selectUser(dao)
 	queryList(dao)
-	// updateUser(dao)
-	// deleteUSer(dao)
+	updateUser(dao)
+	deleteUSer(dao)
 	cache(dao)
+	_, err = db.Exec("drop table demo_user")
+	if err != nil {
+		log.Fatal(err)
+	}
 }

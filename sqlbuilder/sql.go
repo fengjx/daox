@@ -115,14 +115,27 @@ func (b *sqlBuilder) comma() {
 	b.writeByte(',')
 }
 
-func (b *sqlBuilder) whereSQL(condition *condition) {
-	if condition != nil && len(condition.predicates) > 0 {
+// whereSQL 拼接 where 条件
+func (b *sqlBuilder) whereSQL(where ConditionBuilder) {
+	if where != nil && len(where.getPredicates()) > 0 {
 		b.writeString(" WHERE ")
-		for _, predicate := range condition.predicates {
-			if predicate.op != nil {
-				b.writeString(predicate.op.text)
+		for _, predicate := range where.getPredicates() {
+			if predicate.Op != nil {
+				b.writeString(predicate.Op.text)
 			}
-			b.writeString(predicate.express)
+			b.writeString(predicate.Express)
 		}
 	}
+}
+
+// whereArgs where 条件中的参数
+func (b *sqlBuilder) whereArgs(where ConditionBuilder) []interface{} {
+	var args []interface{}
+	if where != nil && len(where.getPredicates()) > 0 {
+		b.writeString(" WHERE ")
+		for _, predicate := range where.getPredicates() {
+			args = append(args, predicate.Args...)
+		}
+	}
+	return args
 }

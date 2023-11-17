@@ -124,7 +124,7 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		log.Panic(err)
 	}
-	redisClient := createRedisClient(t)
+	redisClient := createMockRedisClient(t)
 	dao := NewDAO(
 		DBMaster,
 		"user",
