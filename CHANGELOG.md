@@ -16,3 +16,4 @@
 - [代码生成路径支持变量替换](https://github.com/fengjx/daox/pull/22)
 - [where 条件支持参数拼接](https://github.com/fengjx/daox/pull/29)
 - [sqlbuilder 条件构造器支持表达式方法](https://github.com/fengjx/daox/pull/32)
+- [修复 not in 语句错误](https://github.com/fengjx/daox/pull/34)

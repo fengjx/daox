@@ -39,15 +39,15 @@ func TestSelect(t *testing.T) {
 			name: "select by id",
 			selector: sqlbuilder.New("user").Select().
 				Columns("id", "username").
-				Where(ql.C().Where(true, "id = ?")),
-			wantSQL: "SELECT `id`, `username` FROM `user` WHERE id = ?;",
+				Where(ql.C().Where(true, "`id` = ?")),
+			wantSQL: "SELECT `id`, `username` FROM `user` WHERE `id` = ?;",
 		},
 		{
 			name: "select by id use ExpressCondition",
 			selector: sqlbuilder.New("user").Select().
 				Columns("id", "username").
 				Where(ql.EC().Where(ql.Col("id").EQ(1000))),
-			wantSQL:  "SELECT `id`, `username` FROM `user` WHERE id = ?;",
+			wantSQL:  "SELECT `id`, `username` FROM `user` WHERE `id` = ?;",
 			wantArgs: []interface{}{1000},
 		},
 		{
@@ -55,10 +55,10 @@ func TestSelect(t *testing.T) {
 			selector: sqlbuilder.New("user").Select().
 				Columns("id", "username", "age", "sex").
 				Where(
-					ql.C().Where(true, "age > ?").
-						And(true, "sex = ?"),
+					ql.C().Where(true, "`age` > ?").
+						And(true, "`sex` = ?"),
 				),
-			wantSQL: "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE age > ? AND sex = ?;",
+			wantSQL: "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `age` > ? AND `sex` = ?;",
 		},
 		{
 			name: "select where use ExpressCondition",
@@ -70,7 +70,7 @@ func TestSelect(t *testing.T) {
 						ql.Col("sex").EQ("male"),
 					),
 				),
-			wantSQL:  "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE age > ? AND sex = ?;",
+			wantSQL:  "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `age` > ? AND `sex` = ?;",
 			wantArgs: []interface{}{20, "male"},
 		},
 		{
@@ -83,7 +83,7 @@ func TestSelect(t *testing.T) {
 						ql.Col("sex").EQ("male").Use(false),
 					),
 				),
-			wantSQL:  "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE age > ?;",
+			wantSQL:  "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `age` > ?;",
 			wantArgs: []interface{}{20},
 		},
 		{
@@ -102,47 +102,47 @@ func TestSelect(t *testing.T) {
 			name: "select where not meet",
 			selector: sqlbuilder.New("user").Select().Columns("id", "username", "age", "sex").
 				Where(
-					ql.C().Where(true, "age > ?").
-						And(true, "sex = ?").
-						And(false, "username like ?"),
+					ql.C().Where(true, "`age` > ?").
+						And(true, "`sex` = ?").
+						And(false, "`username` like ?"),
 				),
-			wantSQL: "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE age > ? AND sex = ?;",
+			wantSQL: "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `age` > ? AND `sex` = ?;",
 		},
 		{
 			name: "select order by",
 			selector: sqlbuilder.New("user").Select().
 				Columns("id", "username", "age", "sex", "ctime").
 				Where(
-					ql.SC().Where("age > ?").
-						And("sex = ?"),
+					ql.C().Where(true, "`age` > ?").
+						And(true, "`sex` = ?"),
 				).
 				OrderBy(ql.Desc("ctime")),
-			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE age > ? AND sex = ? ORDER BY `ctime` DESC;",
+			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE `age` > ? AND `sex` = ? ORDER BY `ctime` DESC;",
 		},
 		{
 			name: "select limit",
 			selector: sqlbuilder.New("user").Select().
 				Columns("id", "username", "age", "sex", "ctime").
 				Where(
-					ql.SC().Where("age > ?").
-						And("sex = ?"),
+					ql.C().Where(true, "`age` > ?").
+						And(true, "`sex` = ?"),
 				).
 				OrderBy(ql.Desc("ctime")).
 				Limit(10),
-			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE age > ? AND sex = ? ORDER BY `ctime` DESC LIMIT 10;",
+			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE `age` > ? AND `sex` = ? ORDER BY `ctime` DESC LIMIT 10;",
 		},
 		{
 			name: "select limit offset",
 			selector: sqlbuilder.New("user").Select().
 				Columns("id", "username", "age", "sex", "ctime").
 				Where(
-					ql.SC().Where("age > ?").
-						And("sex = ?"),
+					ql.C().Where(true, "`age` > ?").
+						And(true, "`sex` = ?"),
 				).
 				OrderBy(ql.Desc("ctime")).
 				Offset(10).
 				Limit(10),
-			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE age > ? AND sex = ? ORDER BY `ctime` DESC LIMIT 10 OFFSET 10;",
+			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE `age` > ? AND `sex` = ? ORDER BY `ctime` DESC LIMIT 10 OFFSET 10;",
 		},
 		{
 			name: "select model",
@@ -165,30 +165,30 @@ func TestSelect(t *testing.T) {
 		{
 			name: "select group by",
 			selector: sqlbuilder.New("user").Select().
-				QueryString("sum(coin) as total, uid, type").
+				QueryString("sum(`coin`) as total, `uid`, `type`").
 				GroupBy("uid", "type"),
-			wantSQL: "SELECT sum(coin) as total, uid, type FROM `user` GROUP BY `uid`, `type`;",
+			wantSQL: "SELECT sum(`coin`) as total, `uid`, `type` FROM `user` GROUP BY `uid`, `type`;",
 		},
 		{
 			name: "select for update",
 			selector: sqlbuilder.New("user").Select().
 				Columns("uid", "nickname").
-				Where(ql.SC().Where("id = 1")).
+				Where(ql.C().Where(true, "`id` = 1")).
 				ForUpdate(true),
-			wantSQL: "SELECT `uid`, `nickname` FROM `user` WHERE id = 1 FOR UPDATE ;",
+			wantSQL: "SELECT `uid`, `nickname` FROM `user` WHERE `id` = 1 FOR UPDATE ;",
 		},
 		{
 			name: "select * with args",
 			selector: sqlbuilder.New("user").Select().
-				Where(ql.SC().Where("id = ?", 100)),
-			wantSQL:  "SELECT * FROM `user` WHERE id = ?;",
+				Where(ql.C().Where(true, "`id` = ?", 100)),
+			wantSQL:  "SELECT * FROM `user` WHERE `id` = ?;",
 			wantArgs: []interface{}{100},
 		},
 		{
 			name: "select * with multiple args",
 			selector: sqlbuilder.New("user").Select().
-				Where(ql.SC().Where("id IN (?, ?)", 100, 101)),
-			wantSQL:  "SELECT * FROM `user` WHERE id IN (?, ?);",
+				Where(ql.C().Where(true, "`id` IN (?, ?)", 100, 101)),
+			wantSQL:  "SELECT * FROM `user` WHERE `id` IN (?, ?);",
 			wantArgs: []interface{}{100, 101},
 		},
 		{
@@ -200,18 +200,29 @@ func TestSelect(t *testing.T) {
 						ql.Col("age").GT(20),
 					),
 				),
-			wantSQL:  "SELECT * FROM `user` WHERE id IN (?, ?) AND age > ?;",
+			wantSQL:  "SELECT * FROM `user` WHERE `id` IN (?, ?) AND `age` > ?;",
 			wantArgs: []interface{}{100, 101, 20},
+		},
+		{
+			name: "select * with not in args use ExpressCondition",
+			selector: sqlbuilder.New("user").Select().
+				Where(
+					ql.EC().Where(
+						ql.Col("id").NotIn(100, 101),
+					),
+				),
+			wantSQL:  "SELECT * FROM `user` WHERE `id` NOT IN (?, ?);",
+			wantArgs: []interface{}{100, 101},
 		},
 		{
 			name: "select where not meet with args",
 			selector: sqlbuilder.New("user").Select().Columns("id", "username", "age", "sex").
 				Where(
-					ql.C().Where(true, "age > ?", 18).
-						And(true, "sex = ?", 1).
-						And(false, "username like ?", "%hello%"),
+					ql.C().Where(true, "`age` > ?", 18).
+						And(true, "`sex` = ?", 1).
+						And(false, "`username` like ?", "%hello%"),
 				),
-			wantSQL:  "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE age > ? AND sex = ?;",
+			wantSQL:  "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `age` > ? AND `sex` = ?;",
 			wantArgs: []interface{}{18, 1},
 		},
 	}
@@ -315,8 +326,8 @@ func TestUpdate(t *testing.T) {
 			updater: sqlbuilder.New("user").
 				Update().
 				Columns("username", "age").
-				Where(ql.C().Where(true, "id = ?")),
-			wantSQL: "UPDATE `user` SET `username` = ?, `age` = ? WHERE id = ?;",
+				Where(ql.C().Where(true, "`id` = ?")),
+			wantSQL: "UPDATE `user` SET `username` = ?, `age` = ? WHERE `id` = ?;",
 		},
 		{
 			name: "update where use ExpressCondition",
@@ -324,7 +335,7 @@ func TestUpdate(t *testing.T) {
 				Update().
 				Columns("username", "age").
 				Where(ql.EC().Where(ql.Col("id").EQ(100))),
-			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE id = ?;",
+			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE `id` = ?;",
 			wantArgs: []interface{}{100},
 		},
 		{
@@ -332,8 +343,8 @@ func TestUpdate(t *testing.T) {
 			updater: sqlbuilder.New("user").
 				Update().
 				Columns("username", "age").
-				Where(ql.C().Where(true, "id = ?", 100)),
-			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE id = ?;",
+				Where(ql.C().Where(true, "`id` = ?", 100)),
+			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE `id` = ?;",
 			wantArgs: []interface{}{100},
 		},
 		{
@@ -341,8 +352,8 @@ func TestUpdate(t *testing.T) {
 			updater: sqlbuilder.New("user").
 				Update().
 				Columns("username", "age").
-				Where(ql.C().Where(true, "id in (?, ?)", 100, 101)),
-			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE id in (?, ?);",
+				Where(ql.C().Where(true, "`id` in (?, ?)", 100, 101)),
+			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE `id` in (?, ?);",
 			wantArgs: []interface{}{100, 101},
 		},
 		{
@@ -350,8 +361,11 @@ func TestUpdate(t *testing.T) {
 			updater: sqlbuilder.New("user").
 				Update().
 				Columns("username", "age").
-				Where(ql.C().Where(true, "id = ?", 100).And(false, "status = ?", 1)),
-			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE id = ?;",
+				Where(ql.C().
+					Where(true, "`id` = ?", 100).
+					And(false, "`status` = ?", 1),
+				),
+			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE `id` = ?;",
 			wantArgs: []interface{}{100},
 		},
 		{
@@ -359,8 +373,8 @@ func TestUpdate(t *testing.T) {
 			updater: sqlbuilder.New("user").
 				Update().
 				Columns("username", "age").
-				Where(ql.C().Where(true, "id = :id")),
-			wantNameSQL: "UPDATE `user` SET `username` = :username, `age` = :age WHERE id = :id;",
+				Where(ql.C().Where(true, "`id` = :id")),
+			wantNameSQL: "UPDATE `user` SET `username` = :username, `age` = :age WHERE `id` = :id;",
 		},
 		{
 			name: "update with set",
@@ -369,7 +383,7 @@ func TestUpdate(t *testing.T) {
 				Set("name", "fengjx").
 				Set("age", 20).
 				Where(ql.EC().Where(ql.Col("id").EQ(1000))),
-			wantSQL:  "UPDATE `user` SET `name` = ?, `age` = ? WHERE id = ?;",
+			wantSQL:  "UPDATE `user` SET `name` = ?, `age` = ? WHERE `id` = ?;",
 			wantArgs: []interface{}{"fengjx", 20, 1000},
 		},
 	}
@@ -421,40 +435,41 @@ func TestDelete(t *testing.T) {
 		{
 			name: "delete by id",
 			deleter: sqlbuilder.New("user").Delete().Where(
-				ql.C().Where(true, "id = ?"),
+				ql.C().Where(true, "`id` = ?"),
 			),
-			wantSQL: "DELETE FROM `user` WHERE id = ?;",
+			wantSQL: "DELETE FROM `user` WHERE `id` = ?;",
 		},
 		{
 			name: "delete by id with args",
 			deleter: sqlbuilder.New("user").Delete().Where(
-				ql.C().Where(true, "id = ?", 100),
+				ql.C().Where(true, "`id` = ?", 100),
 			),
-			wantSQL:  "DELETE FROM `user` WHERE id = ?;",
+			wantSQL:  "DELETE FROM `user` WHERE `id` = ?;",
 			wantArgs: []interface{}{100},
 		},
 		{
 			name: "delete by where not meet with args",
 			deleter: sqlbuilder.New("user").Delete().Where(
-				ql.C().Where(true, "id = ?", 100).And(false, "status = ?", 1),
+				ql.C().Where(true, "`id` = ?", 100).
+					And(false, "`status` = ?", 1),
 			),
-			wantSQL:  "DELETE FROM `user` WHERE id = ?;",
+			wantSQL:  "DELETE FROM `user` WHERE `id` = ?;",
 			wantArgs: []interface{}{100},
 		},
 		{
 			name: "delete by id with multiple args",
 			deleter: sqlbuilder.New("user").Delete().Where(
-				ql.C().Where(true, "id in (?, ?)", 100, 101),
+				ql.C().Where(true, "`id` in (?, ?)", 100, 101),
 			),
-			wantSQL:  "DELETE FROM `user` WHERE id in (?, ?);",
+			wantSQL:  "DELETE FROM `user` WHERE `id` in (?, ?);",
 			wantArgs: []interface{}{100, 101},
 		},
 		{
 			name: "delete with limit",
 			deleter: sqlbuilder.New("user").Delete().Where(
-				ql.C().Where(true, "id = ?"),
+				ql.C().Where(true, "`id` = ?"),
 			).Limit(10),
-			wantSQL: "DELETE FROM `user` WHERE id = ? LIMIT 10;",
+			wantSQL: "DELETE FROM `user` WHERE `id` = ? LIMIT 10;",
 		},
 	}
 
