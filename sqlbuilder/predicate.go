@@ -142,7 +142,7 @@ func (e *ExpressCondition) Where(cols ...Column) *ExpressCondition {
 			Op:       OpAnd,
 			Express:  c.Express(),
 			Args:     []interface{}{c.arg},
-			HasInSQL: c.op == OpIn || c.op == OpNot,
+			HasInSQL: c.HasInSQL(),
 		})
 	}
 	return e
@@ -158,7 +158,7 @@ func (e *ExpressCondition) And(cols ...Column) *ExpressCondition {
 			Op:       OpAnd,
 			Express:  c.Express(),
 			Args:     []interface{}{c.arg},
-			HasInSQL: c.op == OpIn || c.op == OpNot,
+			HasInSQL: c.HasInSQL(),
 		})
 	}
 	return e
@@ -173,7 +173,7 @@ func (e *ExpressCondition) Or(c Column) *ExpressCondition {
 		Op:       OpOr,
 		Express:  c.Express(),
 		Args:     []interface{}{c.arg},
-		HasInSQL: c.op == OpIn || c.op == OpNot,
+		HasInSQL: c.HasInSQL(),
 	})
 	return e
 }

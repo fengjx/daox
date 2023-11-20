@@ -96,12 +96,18 @@ func (c Column) NotIn(vals ...any) Column {
 
 func (c Column) Express() string {
 	sb := strings.Builder{}
+	sb.WriteByte('`')
 	sb.WriteString(c.name)
+	sb.WriteByte('`')
 	sb.WriteString(c.op.Text)
-	if c.op == OpIn {
+	if c.HasInSQL() {
 		sb.WriteString("(?)")
 	} else {
 		sb.WriteString("?")
 	}
 	return sb.String()
+}
+
+func (c Column) HasInSQL() bool {
+	return c.op == OpIn || c.op == OpNotIN
 }
