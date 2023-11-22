@@ -71,7 +71,7 @@ func (u *Updater) SQLArgs() (string, []interface{}, error) {
 	return sqlx.In(sql, args...)
 }
 
-func (u *Updater) NameSql() (string, error) {
+func (u *Updater) NameSQL() (string, error) {
 	if len(u.columns) == 0 {
 		return "", ErrColumnsRequire
 	}

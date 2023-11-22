@@ -1,7 +1,6 @@
 package daox
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -17,8 +16,6 @@ import (
 var (
 	ErrUpdatePrimaryKeyRequire = errors.New("[daox] Primary key require for update")
 )
-
-var ctx = context.TODO()
 
 type SliceToMapFun = func([]*Model) map[interface{}]*Model
 
@@ -167,53 +164,38 @@ func (dao *Dao) BatchReplaceInto(models interface{}, omitColumns ...string) (int
 	return res.RowsAffected()
 }
 
-// GetByColumn get one row
-// bool: exist or not
+// GetByColumn 按指定字段查询单条数据
+// bool 数据是否存在
 func (dao *Dao) GetByColumn(kv *KV, dest Model) (bool, error) {
 	if kv == nil {
 		return false, nil
 	}
-	querySql, err := dao.SQLBuilder().Select().
-		Columns(dao.DBColumns()...).
-		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", kv.Key))).
-		SQL()
-	if err != nil {
-		return false, err
-	}
-	err = dao.DBRead.Get(dest, querySql, kv.Value)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	return true, nil
+	selector := dao.SQLBuilder().Select().
+		Where(ql.EC().Where(ql.Col(kv.Key).EQ(kv.Value)))
+	return dao.Get(dest, selector)
 }
 
+// ListByColumns 指定字段多个值查询多条数据
+// dest: slice pointer
 func (dao *Dao) ListByColumns(kvs *MultiKV, dest interface{}) error {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return nil
 	}
-	querySql, err := dao.SQLBuilder().Select().
+	selector := dao.SQLBuilder().Select().
 		Columns(dao.DBColumns()...).
-		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s in (?)", kvs.Key))).
-		SQL()
-	if err != nil {
-		return err
-	}
-	querySql, args, err := sqlx.In(querySql, kvs.Values)
-	return dao.DBRead.Select(dest, querySql, args...)
+		Where(ql.EC().Where(ql.Col(kvs.Key).In(kvs.Values...)))
+	return dao.Select(dest, selector)
 }
 
+// List 指定字段查询多条数据
 func (dao *Dao) List(kv *KV, dest interface{}) error {
 	if kv == nil {
 		return nil
 	}
-	querySql, err := dao.SQLBuilder().Select().
+	selector := dao.SQLBuilder().Select().
 		Columns(dao.DBColumns()...).
-		Where(sqlbuilder.C().Where(true, fmt.Sprintf("%s = ?", kv.Key))).
-		SQL()
-	if err != nil {
-		return err
-	}
-	return dao.DBRead.Select(dest, querySql, kv.Value)
+		Where(ql.EC().Where(ql.Col(kv.Key).EQ(kv.Value)))
+	return dao.Select(dest, selector)
 }
 
 func (dao *Dao) GetByID(id interface{}, dest Model) (bool, error) {
@@ -316,8 +298,7 @@ func (dao *Dao) UpdateTx(tx *sqlx.Tx, m Model) (bool, error) {
 		Columns(dao.DBColumns(tableMeta.PrimaryKey)...).
 		Where(
 			ql.SC().Where(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey)),
-		).
-		NameSql()
+		).NameSQL()
 	if err != nil {
 		return false, err
 	}

@@ -407,7 +407,7 @@ func TestUpdate(t *testing.T) {
 			}
 
 			if tc.wantNameSQL != "" {
-				sql, err = tc.updater.NameSql()
+				sql, err = tc.updater.NameSQL()
 				assert.Equal(t, tc.wantErr, err)
 				if err != nil {
 					return
