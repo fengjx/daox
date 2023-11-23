@@ -25,6 +25,13 @@ type Dao struct {
 	TableMeta *TableMeta
 }
 
+// NewDAO 函数用于创建一个新的Dao对象
+// master 参数用于连接数据库
+// tableName 参数表示表名
+// primaryKey 参数表示主键
+// structType 参数表示数据结构类型
+// opts 参数表示可选的选项
+// 返回值为创建的Dao对象指针
 func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
 	dao := &Dao{
 		DBMaster: NewDB(master),
@@ -45,10 +52,13 @@ func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType ref
 	return dao
 }
 
+// SQLBuilder 创建当前表的 sqlbuilder
 func (dao *Dao) SQLBuilder() *sqlbuilder.Builder {
 	return sqlbuilder.New(dao.TableMeta.TableName)
 }
 
+// Selector 创建当前表的 selector
+// columns 是查询指定字段，为空则是全部字段
 func (dao *Dao) Selector(columns ...string) *sqlbuilder.Selector {
 	if len(columns) == 0 {
 		columns = dao.DBColumns()
@@ -56,6 +66,8 @@ func (dao *Dao) Selector(columns ...string) *sqlbuilder.Selector {
 	return sqlbuilder.New(dao.TableMeta.TableName).Select(columns...)
 }
 
+// GetColumnsByModel 根据 model 结构获取数据库字段
+// omitColumns 表示需要忽略的字段
 func (dao *Dao) GetColumnsByModel(model interface{}, omitColumns ...string) []string {
 	return dao.GetColumnsByType(reflect.TypeOf(model), omitColumns...)
 }
@@ -65,6 +77,8 @@ func (dao *Dao) GetColumnsByType(typ reflect.Type, omitColumns ...string) []stri
 	return sqlbuilder.GetColumnsByType(dao.DBMaster.Mapper, typ, omitColumns...)
 }
 
+// DBColumns 获取当前表数据库字段
+// omitColumns 表示需要忽略的字段
 func (dao *Dao) DBColumns(omitColumns ...string) []string {
 	columns := make([]string, 0)
 	for _, column := range dao.TableMeta.Columns {
@@ -76,11 +90,12 @@ func (dao *Dao) DBColumns(omitColumns ...string) []string {
 	return columns
 }
 
+// TableName 获取当前表名
 func (dao *Dao) TableName() string {
 	return dao.TableMeta.TableName
 }
 
-// Save
+// Save 插入数据
 // omitColumns 不需要 insert 的字段
 func (dao *Dao) Save(dest Model, omitColumns ...string) (int64, error) {
 	tableMeta := dao.TableMeta
@@ -99,7 +114,7 @@ func (dao *Dao) Save(dest Model, omitColumns ...string) (int64, error) {
 	return res.LastInsertId()
 }
 
-// ReplaceInto
+// ReplaceInto replace into table
 // omitColumns 不需要 insert 的字段
 func (dao *Dao) ReplaceInto(dest Model, omitColumns ...string) (int64, error) {
 	tableMeta := dao.TableMeta
@@ -198,11 +213,13 @@ func (dao *Dao) List(kv *KV, dest interface{}) error {
 	return dao.Select(dest, selector)
 }
 
+// GetByID 根据 id 查询单条数据
 func (dao *Dao) GetByID(id interface{}, dest Model) (bool, error) {
 	tableMeta := dao.TableMeta
 	return dao.GetByColumn(OfKv(tableMeta.PrimaryKey, id), dest)
 }
 
+// ListByIDs 根据 id 查询多条数据
 func (dao *Dao) ListByIDs(dest interface{}, ids ...interface{}) error {
 	tableMeta := dao.TableMeta
 	return dao.ListByColumns(OfMultiKv(tableMeta.PrimaryKey, ids...), dest)
@@ -236,6 +253,7 @@ func (dao *Dao) Get(dest interface{}, selector *sqlbuilder.Selector) (bool, erro
 }
 
 // UpdateByCond 根据条件更新字段
+// attr 字段更新值
 func (dao *Dao) UpdateByCond(attr map[string]interface{}, where sqlbuilder.ConditionBuilder) (int64, error) {
 	return dao.UpdateByCondTX(nil, attr, where)
 }
