@@ -8,5 +8,5 @@ target:
     var:
       foo: bar
   tables:
-    - user
-    - blog
+    user: {module: sys}
+    blog: {module: core}

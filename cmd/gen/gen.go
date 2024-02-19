@@ -71,7 +71,7 @@ func run(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, tableName := range config.Target.Tables {
+	for tableName := range config.Target.Tables {
 		table := loadTableMeta(db, dsnCfg.DBName, tableName)
 		fmt.Println(table.Name, table.Comment)
 		gen(config, table)
@@ -176,9 +176,10 @@ func gen(config *Config, table *Table) {
 		return
 	}
 	attr := map[string]interface{}{
-		"Var":     config.Target.Custom.Var,
-		"TagName": config.Target.Custom.TagName,
-		"Table":   table,
+		"Var":      config.Target.Custom.Var,
+		"TagName":  config.Target.Custom.TagName,
+		"Table":    table,
+		"TableVar": config.Target.Tables[table.Name],
 	}
 	out := filepath.Join(config.Target.Custom.OutDir)
 	render(isEmbed, filepath.Join(dir), "", entries, out, attr)
@@ -200,8 +201,12 @@ func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry,
 			render(isEmbed, basePath, path, children, outDir, attr)
 			continue
 		}
-		targetDir := filepath.Join(outDir, strings.ReplaceAll(parent, basePath, ""))
-		err := os.MkdirAll(targetDir, 0755)
+		targetDirBys, err := parse(strings.ReplaceAll(parent, basePath, ""), attr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		targetDir := filepath.Join(outDir, string(targetDirBys))
+		err = os.MkdirAll(targetDir, 0755)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -216,12 +221,11 @@ func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry,
 			}
 			continue
 		}
-		filenameBytes, err := parse(strings.ReplaceAll(entry.Name(), ".tmpl", ""), attr)
+		filenameBys, err := parse(strings.ReplaceAll(entry.Name(), ".tmpl", ""), attr)
 		if err != nil {
-			fmt.Println(err.Error())
-			return
+			log.Fatal(err)
 		}
-		targetFile := filepath.Join(targetDir, string(filenameBytes))
+		targetFile := filepath.Join(targetDir, string(filenameBys))
 		fmt.Println(targetFile)
 		bs, err := ReadFile(path, isEmbed)
 		if err != nil {
@@ -273,9 +277,11 @@ type DS struct {
 	Dsn  string
 }
 
+type TableVar map[string]string
+
 type ReverseTarget struct {
 	Custom *Custom
-	Tables []string
+	Tables map[string]TableVar
 }
 
 type Custom struct {
