@@ -19,6 +19,7 @@ func init() {
 
 var createMapperLock sync.Mutex
 
+// GetMapperByTagName 根据 tag name 返回对应 mapper
 func GetMapperByTagName(tagName string) *reflectx.Mapper {
 	if mapper, ok := mapperMap[tagName]; ok {
 		return mapper
@@ -30,6 +31,7 @@ func GetMapperByTagName(tagName string) *reflectx.Mapper {
 	return mapper
 }
 
+// GetColumnsByModel 解析 model 所有字段名
 func GetColumnsByModel(mapper *reflectx.Mapper, model interface{}, omitColumns ...string) []string {
 	return GetColumnsByType(mapper, reflect.TypeOf(model), omitColumns...)
 }

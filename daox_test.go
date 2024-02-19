@@ -164,7 +164,7 @@ func testSelect(t *testing.T) {
 	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
 	var list []*DemoInfo
 	selector := dao.Selector().Where(
-		ql.EC().Where(
+		ql.C().And(
 			DemoInfoMeta.UidIn(101, 102),
 			DemoInfoMeta.SexEQ("male"),
 		),
@@ -185,7 +185,7 @@ func testGet(t *testing.T) {
 	demoInfo := &DemoInfo{}
 	selector := dao.Selector().
 		Where(
-			ql.EC().Where(DemoInfoMeta.UidGT(100)),
+			ql.C().And(DemoInfoMeta.UidGT(100)),
 		).
 		Limit(1).
 		OrderBy(ql.Asc(DemoInfoMeta.UID))
@@ -280,7 +280,7 @@ func testUpdateByCond(t *testing.T) {
 		map[string]interface{}{
 			DemoInfoMeta.Sex: "female",
 		},
-		ql.EC().Where(DemoInfoMeta.UidGT(105)),
+		ql.C().And(DemoInfoMeta.UidGT(105)),
 	)
 	if err != nil {
 		t.Fatal(err)

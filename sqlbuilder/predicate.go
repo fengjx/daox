@@ -13,65 +13,6 @@ type ConditionBuilder interface {
 	getPredicates() []Predicate
 }
 
-// Condition 条件构造器实现
-type Condition struct {
-	predicates []Predicate
-}
-
-// C where 条件
-func C() *Condition {
-	return new(Condition)
-}
-
-// Where
-// meet 判断是否需要拼接这个where表达式
-// express where 表达式
-func (c *Condition) Where(meet bool, express string, args ...interface{}) *Condition {
-	if !meet {
-		return c
-	}
-	c.predicates = append(c.predicates, Predicate{
-		Op:      emptyOp,
-		Express: express,
-		Args:    args,
-	})
-	return c
-}
-
-// And and 语句
-// meet 判断是否需要拼接这个where表达式
-// express where 表达式
-func (c *Condition) And(meet bool, express string, args ...interface{}) *Condition {
-	if !meet {
-		return c
-	}
-	c.predicates = append(c.predicates, Predicate{
-		Op:      OpAnd,
-		Express: express,
-		Args:    args,
-	})
-	return c
-}
-
-// Or or 语句
-// meet 判断是否需要拼接这个where表达式
-// express where 表达式
-func (c *Condition) Or(meet bool, express string, args ...interface{}) *Condition {
-	if !meet {
-		return c
-	}
-	c.predicates = append(c.predicates, Predicate{
-		Op:      OpOr,
-		Express: express,
-		Args:    args,
-	})
-	return c
-}
-
-func (c *Condition) getPredicates() []Predicate {
-	return c.predicates
-}
-
 // SimpleCondition 简单 where 条件构造
 type SimpleCondition struct {
 	predicates []Predicate
@@ -84,17 +25,6 @@ func SC() *SimpleCondition {
 
 func (c *SimpleCondition) Predicates() []Predicate {
 	return c.predicates
-}
-
-// Where
-// express where 表达式
-func (c *SimpleCondition) Where(express string, args ...interface{}) *SimpleCondition {
-	c.predicates = append(c.predicates, Predicate{
-		Op:      emptyOp,
-		Express: express,
-		Args:    args,
-	})
-	return c
 }
 
 // And and 语句
@@ -123,33 +53,17 @@ func (c *SimpleCondition) getPredicates() []Predicate {
 	return c.predicates
 }
 
-// ExpressCondition 基于表达式的条件构造
-type ExpressCondition struct {
+// Condition 条件构造器实现
+type Condition struct {
 	predicates []Predicate
 }
 
-func (e *ExpressCondition) getPredicates() []Predicate {
+func (e *Condition) getPredicates() []Predicate {
 	return e.predicates
 }
 
-// Where 增加 and 条件
-func (e *ExpressCondition) Where(cols ...Column) *ExpressCondition {
-	for _, c := range cols {
-		if !c.isUse {
-			continue
-		}
-		e.predicates = append(e.predicates, Predicate{
-			Op:       OpAnd,
-			Express:  c.Express(),
-			Args:     []interface{}{c.arg},
-			HasInSQL: c.HasInSQL(),
-		})
-	}
-	return e
-}
-
 // And 增加 and 条件
-func (e *ExpressCondition) And(cols ...Column) *ExpressCondition {
+func (e *Condition) And(cols ...Column) *Condition {
 	for _, c := range cols {
 		if !c.isUse {
 			continue
@@ -165,7 +79,7 @@ func (e *ExpressCondition) And(cols ...Column) *ExpressCondition {
 }
 
 // Or 增加 and 条件
-func (e *ExpressCondition) Or(c Column) *ExpressCondition {
+func (e *Condition) Or(c Column) *Condition {
 	if !c.isUse {
 		return e
 	}
@@ -178,8 +92,8 @@ func (e *ExpressCondition) Or(c Column) *ExpressCondition {
 	return e
 }
 
-// EC 创建一个使用?占位符的 ExpressCondition 条件构造器
-func EC() *ExpressCondition {
-	ec := &ExpressCondition{}
+// C 创建 Condition 条件构造器
+func C() *Condition {
+	ec := &Condition{}
 	return ec
 }

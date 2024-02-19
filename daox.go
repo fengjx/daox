@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/reflectx"
 
 	"github.com/fengjx/daox/sqlbuilder"
 	"github.com/fengjx/daox/sqlbuilder/ql"
@@ -15,6 +16,7 @@ import (
 
 var (
 	ErrUpdatePrimaryKeyRequire = errors.New("[daox] Primary key require for update")
+	ErrTxNil                   = errors.New("[daox] Tx is nil")
 )
 
 type SliceToMapFun = func([]*Model) map[interface{}]*Model
@@ -22,6 +24,7 @@ type SliceToMapFun = func([]*Model) map[interface{}]*Model
 type Dao struct {
 	DBMaster  *DB
 	DBRead    *DB
+	Mapper    *reflectx.Mapper
 	TableMeta *TableMeta
 }
 
@@ -74,7 +77,7 @@ func (dao *Dao) GetColumnsByModel(model interface{}, omitColumns ...string) []st
 
 // GetColumnsByType 通过字段 tag 解析数据库字段
 func (dao *Dao) GetColumnsByType(typ reflect.Type, omitColumns ...string) []string {
-	return sqlbuilder.GetColumnsByType(dao.DBMaster.Mapper, typ, omitColumns...)
+	return sqlbuilder.GetColumnsByType(dao.getMapper(), typ, omitColumns...)
 }
 
 // DBColumns 获取当前表数据库字段
@@ -179,38 +182,125 @@ func (dao *Dao) BatchReplaceInto(models interface{}, omitColumns ...string) (int
 	return res.RowsAffected()
 }
 
+// GetTx 根据查询条件查询单条记录，支持事务
+// dest 必须是一个指针
+func (dao *Dao) GetTx(tx *sqlx.Tx, dest interface{}, selector *sqlbuilder.Selector) (bool, error) {
+	if err := dao.checkTxNil(tx); err != nil {
+		return false, err
+	}
+	return dao.getTx(tx, dest, selector)
+}
+
+func (dao *Dao) getTx(tx *sqlx.Tx, dest interface{}, selector *sqlbuilder.Selector) (bool, error) {
+	querySQL, args, err := selector.SQLArgs()
+	if err != nil {
+		return false, err
+	}
+	if tx == nil {
+		err = dao.DBRead.Get(dest, querySQL, args...)
+	} else {
+		err = tx.Get(dest, querySQL, args...)
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// SelectTx 根据查询条件查询列表
+// dest 必须是一个 slice 指针
+func (dao *Dao) SelectTx(tx *sqlx.Tx, dest interface{}, selector *sqlbuilder.Selector) error {
+	if err := dao.checkTxNil(tx); err != nil {
+		return err
+	}
+	return dao.selectTx(tx, dest, selector)
+}
+
+func (dao *Dao) selectTx(tx *sqlx.Tx, dest interface{}, selector *sqlbuilder.Selector) error {
+	querySQL, args, err := selector.SQLArgs()
+	if err != nil {
+		return err
+	}
+	if tx == nil {
+		err = dao.DBRead.Select(dest, querySQL, args...)
+	} else {
+		err = tx.Select(dest, querySQL, args...)
+	}
+	return err
+}
+
 // GetByColumn 按指定字段查询单条数据
 // bool 数据是否存在
 func (dao *Dao) GetByColumn(kv *KV, dest Model) (bool, error) {
+	return dao.getByColumnTx(nil, kv, dest)
+}
+
+// GetByColumnTx 按指定字段查询单条数据，支持事务
+// bool 数据是否存在
+func (dao *Dao) GetByColumnTx(tx *sqlx.Tx, kv *KV, dest Model) (bool, error) {
+	if err := dao.checkTxNil(tx); err != nil {
+		return false, err
+	}
+	return dao.getByColumnTx(tx, kv, dest)
+}
+
+func (dao *Dao) getByColumnTx(tx *sqlx.Tx, kv *KV, dest Model) (bool, error) {
 	if kv == nil {
 		return false, nil
 	}
-	selector := dao.SQLBuilder().Select().
-		Where(ql.EC().Where(ql.Col(kv.Key).EQ(kv.Value)))
-	return dao.Get(dest, selector)
+	selector := dao.Selector().
+		Where(ql.C().And(ql.Col(kv.Key).EQ(kv.Value)))
+	return dao.getTx(tx, dest, selector)
 }
 
 // ListByColumns 指定字段多个值查询多条数据
 // dest: slice pointer
 func (dao *Dao) ListByColumns(kvs *MultiKV, dest interface{}) error {
+	return dao.listByColumnsTx(nil, kvs, dest)
+}
+
+// ListByColumnsTx 指定字段多个值查询多条数据，支持事务
+func (dao *Dao) ListByColumnsTx(tx *sqlx.Tx, kvs *MultiKV, dest interface{}) error {
+	if err := dao.checkTxNil(tx); err != nil {
+		return err
+	}
+	return dao.listByColumnsTx(tx, kvs, dest)
+}
+
+func (dao *Dao) listByColumnsTx(tx *sqlx.Tx, kvs *MultiKV, dest interface{}) error {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return nil
 	}
-	selector := dao.SQLBuilder().Select().
+	selector := dao.Selector().
 		Columns(dao.DBColumns()...).
-		Where(ql.EC().Where(ql.Col(kvs.Key).In(kvs.Values...)))
-	return dao.Select(dest, selector)
+		Where(ql.C().And(ql.Col(kvs.Key).In(kvs.Values...)))
+	return dao.selectTx(tx, dest, selector)
 }
 
 // List 指定字段查询多条数据
 func (dao *Dao) List(kv *KV, dest interface{}) error {
+	return dao.listTx(nil, kv, dest)
+}
+
+// ListTx 指定字段查询多条数据，支持事务
+func (dao *Dao) ListTx(tx *sqlx.Tx, kv *KV, dest interface{}) error {
+	if err := dao.checkTxNil(tx); err != nil {
+		return err
+	}
+	return dao.listTx(tx, kv, dest)
+}
+
+func (dao *Dao) listTx(tx *sqlx.Tx, kv *KV, dest interface{}) error {
 	if kv == nil {
 		return nil
 	}
-	selector := dao.SQLBuilder().Select().
+	selector := dao.Selector().
 		Columns(dao.DBColumns()...).
-		Where(ql.EC().Where(ql.Col(kv.Key).EQ(kv.Value)))
-	return dao.Select(dest, selector)
+		Where(ql.C().And(ql.Col(kv.Key).EQ(kv.Value)))
+	return dao.SelectTx(tx, dest, selector)
 }
 
 // GetByID 根据 id 查询单条数据
@@ -225,41 +315,39 @@ func (dao *Dao) ListByIDs(dest interface{}, ids ...interface{}) error {
 	return dao.ListByColumns(OfMultiKv(tableMeta.PrimaryKey, ids...), dest)
 }
 
+// ListByIdsTx 查询多个id值
+func (dao *Dao) ListByIdsTx(tx *sqlx.Tx, dest interface{}, ids ...interface{}) error {
+	tableMeta := dao.TableMeta
+	return dao.ListByColumnsTx(tx, OfMultiKv(tableMeta.PrimaryKey, ids...), dest)
+}
+
 // Select 根据查询条件查询列表
 // dest 必须是一个 slice 指针
 func (dao *Dao) Select(dest interface{}, selector *sqlbuilder.Selector) error {
-	querySQL, args, err := selector.SQLArgs()
-	if err != nil {
-		return err
-	}
-	return dao.DBRead.Select(dest, querySQL, args...)
+	return dao.selectTx(nil, dest, selector)
 }
 
 // Get 根据查询条件查询单条记录
 // dest 必须是一个指针
 func (dao *Dao) Get(dest interface{}, selector *sqlbuilder.Selector) (bool, error) {
-	querySQL, args, err := selector.SQLArgs()
-	if err != nil {
-		return false, err
-	}
-	err = dao.DBRead.Get(dest, querySQL, args...)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return dao.getTx(nil, dest, selector)
 }
 
 // UpdateByCond 根据条件更新字段
 // attr 字段更新值
 func (dao *Dao) UpdateByCond(attr map[string]interface{}, where sqlbuilder.ConditionBuilder) (int64, error) {
-	return dao.UpdateByCondTX(nil, attr, where)
+	return dao.updateByCondTx(nil, attr, where)
 }
 
-// UpdateByCondTX 根据条件更新字段，支持事务
-func (dao *Dao) UpdateByCondTX(tx *sqlx.Tx, attr map[string]interface{}, where sqlbuilder.ConditionBuilder) (int64, error) {
+// UpdateByCondTx 根据条件更新字段，支持事务
+func (dao *Dao) UpdateByCondTx(tx *sqlx.Tx, attr map[string]interface{}, where sqlbuilder.ConditionBuilder) (int64, error) {
+	if err := dao.checkTxNil(tx); err != nil {
+		return 0, err
+	}
+	return dao.updateByCondTx(tx, attr, where)
+}
+
+func (dao *Dao) updateByCondTx(tx *sqlx.Tx, attr map[string]interface{}, where sqlbuilder.ConditionBuilder) (int64, error) {
 	updater := dao.SQLBuilder().Update()
 	for col, val := range attr {
 		updater.Set(col, val)
@@ -283,17 +371,24 @@ func (dao *Dao) UpdateByCondTX(tx *sqlx.Tx, attr map[string]interface{}, where s
 
 // UpdateField 部分字段更新
 func (dao *Dao) UpdateField(idValue interface{}, fieldMap map[string]interface{}) (bool, error) {
-	return dao.UpdateFieldTx(nil, idValue, fieldMap)
+	return dao.updateFieldTx(nil, idValue, fieldMap)
 }
 
 // UpdateFieldTx 部分字段更新，支持事务
-func (dao *Dao) UpdateFieldTx(tx *sqlx.Tx, idValue interface{}, attr map[string]interface{}) (bool, error) {
+func (dao *Dao) UpdateFieldTx(tx *sqlx.Tx, idValue interface{}, fieldMap map[string]interface{}) (bool, error) {
+	if err := dao.checkTxNil(tx); err != nil {
+		return false, err
+	}
+	return dao.updateFieldTx(tx, idValue, fieldMap)
+}
+
+func (dao *Dao) updateFieldTx(tx *sqlx.Tx, idValue interface{}, attr map[string]interface{}) (bool, error) {
 	if utils.IsIDEmpty(idValue) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := dao.TableMeta
-	rows, err := dao.UpdateByCondTX(tx, attr, ql.EC().
-		Where(ql.Col(tableMeta.PrimaryKey).EQ(idValue)),
+	rows, err := dao.updateByCondTx(tx, attr, ql.C().
+		And(ql.Col(tableMeta.PrimaryKey).EQ(idValue)),
 	)
 	if err != nil {
 		return false, err
@@ -303,11 +398,18 @@ func (dao *Dao) UpdateFieldTx(tx *sqlx.Tx, idValue interface{}, attr map[string]
 
 // Update 全字段更新
 func (dao *Dao) Update(m Model) (bool, error) {
-	return dao.UpdateTx(nil, m)
+	return dao.updateTx(nil, m)
 }
 
 // UpdateTx 全字段更新，支持事务
 func (dao *Dao) UpdateTx(tx *sqlx.Tx, m Model) (bool, error) {
+	if err := dao.checkTxNil(tx); err != nil {
+		return false, err
+	}
+	return dao.updateTx(tx, m)
+}
+
+func (dao *Dao) updateTx(tx *sqlx.Tx, m Model) (bool, error) {
 	if utils.IsIDEmpty(m.GetID()) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
@@ -315,7 +417,7 @@ func (dao *Dao) UpdateTx(tx *sqlx.Tx, m Model) (bool, error) {
 	updateSQL, err := dao.SQLBuilder().Update().
 		Columns(dao.DBColumns(tableMeta.PrimaryKey)...).
 		Where(
-			ql.SC().Where(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey)),
+			ql.SC().And(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey)),
 		).NameSQL()
 	if err != nil {
 		return false, err
@@ -338,11 +440,18 @@ func (dao *Dao) UpdateTx(tx *sqlx.Tx, m Model) (bool, error) {
 
 // DeleteByCond 根据where条件删除
 func (dao *Dao) DeleteByCond(where sqlbuilder.ConditionBuilder) (int64, error) {
-	return dao.DeleteByCondTX(nil, where)
+	return dao.deleteByCondTx(nil, where)
 }
 
-// DeleteByCondTX 根据where条件删除，支持事务
-func (dao *Dao) DeleteByCondTX(tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (int64, error) {
+// DeleteByCondTx 根据where条件删除，支持事务
+func (dao *Dao) DeleteByCondTx(tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (int64, error) {
+	if err := dao.checkTxNil(tx); err != nil {
+		return 0, err
+	}
+	return dao.deleteByCondTx(tx, where)
+}
+
+func (dao *Dao) deleteByCondTx(tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (int64, error) {
 	deleteSQL, args, err := dao.SQLBuilder().Delete().Where(where).SQLArgs()
 	if err != nil {
 		return 0, err
@@ -361,41 +470,89 @@ func (dao *Dao) DeleteByCondTX(tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (
 
 // DeleteByColumn 按字段名删除
 func (dao *Dao) DeleteByColumn(kv *KV) (int64, error) {
-	return dao.DeleteByColumnTx(nil, kv)
+	return dao.deleteByColumnTx(nil, kv)
 }
 
 // DeleteByColumnTx 按字段名删除，支持事务
 func (dao *Dao) DeleteByColumnTx(tx *sqlx.Tx, kv *KV) (int64, error) {
+	if err := dao.checkTxNil(tx); err != nil {
+		return 0, err
+	}
+	return dao.deleteByColumnTx(tx, kv)
+}
+
+func (dao *Dao) deleteByColumnTx(tx *sqlx.Tx, kv *KV) (int64, error) {
 	if kv == nil {
 		return 0, nil
 	}
-	return dao.DeleteByCondTX(tx, ql.EC().Where(ql.Col(kv.Key).EQ(kv.Value)))
+	return dao.deleteByCondTx(tx, ql.C().And(ql.Col(kv.Key).EQ(kv.Value)))
 }
 
 // DeleteByColumns 指定字段删除多个值
 func (dao *Dao) DeleteByColumns(kvs *MultiKV) (int64, error) {
-	return dao.DeleteByColumnsTx(nil, kvs)
+	return dao.deleteByColumnsTx(nil, kvs)
 }
 
 // DeleteByColumnsTx 指定字段多个值删除
 func (dao *Dao) DeleteByColumnsTx(tx *sqlx.Tx, kvs *MultiKV) (int64, error) {
+	if err := dao.checkTxNil(tx); err != nil {
+		return 0, err
+	}
+	return dao.deleteByColumnsTx(tx, kvs)
+}
+
+func (dao *Dao) deleteByColumnsTx(tx *sqlx.Tx, kvs *MultiKV) (int64, error) {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return 0, nil
 	}
-	return dao.DeleteByCondTX(tx, ql.EC().Where(ql.Col(kvs.Key).In(kvs.Values...)))
+	return dao.deleteByCondTx(tx, ql.C().And(ql.Col(kvs.Key).In(kvs.Values...)))
 }
 
 // DeleteByID 根据id删除数据
 func (dao *Dao) DeleteByID(id interface{}) (bool, error) {
-	return dao.DeleteByIDTx(nil, id)
+	return dao.deleteByIDTx(nil, id)
 }
 
 // DeleteByIDTx 根据id删除数据，支持事务
 func (dao *Dao) DeleteByIDTx(tx *sqlx.Tx, id interface{}) (bool, error) {
+	if err := dao.checkTxNil(tx); err != nil {
+		return false, err
+	}
+	return dao.deleteByIDTx(tx, id)
+}
+
+func (dao *Dao) deleteByIDTx(tx *sqlx.Tx, id interface{}) (bool, error) {
 	tableMeta := dao.TableMeta
-	affected, err := dao.DeleteByColumnTx(tx, OfKv(tableMeta.PrimaryKey, id))
+	affected, err := dao.deleteByColumnTx(tx, OfKv(tableMeta.PrimaryKey, id))
 	if err != nil {
 		return false, err
 	}
 	return affected == 1, nil
+}
+
+func (dao *Dao) checkTxNil(tx *sqlx.Tx) error {
+	if tx == nil {
+		return ErrTxNil
+	}
+	return nil
+}
+
+// With 使用新的数据库连接创建 Dao
+func (dao *Dao) With(master, read *sqlx.DB, opts ...Option) *Dao {
+	newDao := &Dao{
+		DBMaster:  NewDB(master),
+		DBRead:    NewDB(read),
+		TableMeta: dao.TableMeta,
+	}
+	for _, opt := range opts {
+		opt(newDao)
+	}
+	return newDao
+}
+
+func (dao *Dao) getMapper() *reflectx.Mapper {
+	if dao.Mapper != nil {
+		return dao.Mapper
+	}
+	return dao.DBMaster.Mapper
 }
