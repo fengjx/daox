@@ -1,13 +1,13 @@
 ds:
   type: mysql
-  dsn: root:1234@tcp(localhost:3306)/demo
+  dsn: root:1234@tcp(192.168.1.200:3306)/gogo
 target:
   custom:
     tag-name: json
-    out-dir: ./out
-    template-dir: ./template
+    out-dir: ./out/demo
+    template-dir: ./_example/gen/template
     var:
       a: aa
-      b: bb
   tables:
-    - user_info
+    user: { module: sys }
+    blog: { module: core }

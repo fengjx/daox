@@ -210,7 +210,15 @@ func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry,
 		if err != nil {
 			log.Fatal(err)
 		}
-		if !strings.HasSuffix(entry.Name(), ".tmpl") {
+		suffix := ""
+		override := false
+		if strings.HasSuffix(entry.Name(), ".override.tmpl") {
+			suffix = ".override.tmpl"
+			override = true
+		} else if strings.HasSuffix(entry.Name(), ".tmpl") {
+			suffix = ".tmpl"
+		}
+		if suffix == "" {
 			targetFile := filepath.Join(targetDir, entry.Name())
 			fmt.Println(targetFile)
 			// 其他不需要渲染的文件直接复制
@@ -221,11 +229,14 @@ func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry,
 			}
 			continue
 		}
-		filenameBys, err := parse(strings.ReplaceAll(entry.Name(), ".tmpl", ""), attr)
+		filenameBys, err := parse(strings.ReplaceAll(entry.Name(), suffix, ""), attr)
 		if err != nil {
 			log.Fatal(err)
 		}
 		targetFile := filepath.Join(targetDir, string(filenameBys))
+		if _, err = os.Stat(targetFile); !override && err == nil {
+			targetFile = fmt.Sprintf("%s.%d", targetFile, time.Now().Unix())
+		}
 		fmt.Println(targetFile)
 		bs, err := ReadFile(path, isEmbed)
 		if err != nil {
