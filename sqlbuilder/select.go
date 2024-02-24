@@ -15,8 +15,8 @@ type Selector struct {
 	where       ConditionBuilder
 	orderBy     []OrderBy
 	groupBy     []string
-	limit       *int
-	offset      *int
+	limit       *int64
+	offset      *int64
 	IsForUpdate bool
 }
 
@@ -80,13 +80,13 @@ func (s *Selector) OrderBy(orderBy ...OrderBy) *Selector {
 }
 
 // Limit 分页 limit
-func (s *Selector) Limit(limit int) *Selector {
+func (s *Selector) Limit(limit int64) *Selector {
 	s.limit = &limit
 	return s
 }
 
 // Offset 分页 offset
-func (s *Selector) Offset(offset int) *Selector {
+func (s *Selector) Offset(offset int64) *Selector {
 	s.offset = &offset
 	return s
 }
@@ -145,11 +145,11 @@ func (s *Selector) SQL() (string, error) {
 
 	if s.limit != nil {
 		s.writeString(" LIMIT ")
-		s.writeString(strconv.Itoa(*s.limit))
+		s.writeString(strconv.FormatInt(*s.limit, 10))
 	}
 	if s.offset != nil {
 		s.writeString(" OFFSET ")
-		s.writeString(strconv.Itoa(*s.offset))
+		s.writeString(strconv.FormatInt(*s.offset, 10))
 	}
 	if s.IsForUpdate {
 		s.writeString(" FOR UPDATE ")
@@ -158,9 +158,41 @@ func (s *Selector) SQL() (string, error) {
 	return s.sb.String(), nil
 }
 
+// CountSQL 构造 count 查询 sql
+func (s *Selector) CountSQL() (string, error) {
+	s.reset()
+	s.writeString("SELECT COUNT(*)")
+	s.writeString(" FROM ")
+	s.quote(s.tableName)
+	s.whereSQL(s.where)
+
+	if len(s.groupBy) > 0 {
+		s.writeString(" GROUP BY ")
+		for i, column := range s.groupBy {
+			if i > 0 {
+				s.comma()
+				s.space()
+			}
+			s.quote(column)
+		}
+	}
+	s.end()
+	return s.sb.String(), nil
+}
+
 // SQLArgs 构造 sql 并返回对应参数
 func (s *Selector) SQLArgs() (string, []interface{}, error) {
 	sql, err := s.SQL()
+	args, hasInSQL := s.whereArgs(s.where)
+	if !hasInSQL {
+		return sql, args, err
+	}
+	return sqlx.In(sql, args...)
+}
+
+// CountSQLArgs 构造 count 查询 sql 并返回对应参数
+func (s *Selector) CountSQLArgs() (string, []interface{}, error) {
+	sql, err := s.CountSQL()
 	args, hasInSQL := s.whereArgs(s.where)
 	if !hasInSQL {
 		return sql, args, err

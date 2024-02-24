@@ -333,6 +333,7 @@ func testPage(t *testing.T) {
 }
 
 func TestDaox(t *testing.T) {
+	after(t)
 	before(t)
 	t.Run("testCreate", testCreate)
 	t.Run("testCrud", testCrud)
