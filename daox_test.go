@@ -6,7 +6,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -48,40 +47,37 @@ func newDb() *sqlx.DB {
 	return newSqliteDb()
 }
 
-var once sync.Once
-
-func before(t *testing.T) {
-	once.Do(func() {
-		t.Log("before...")
-		db := newDb()
-		_, err := db.Exec(createSqliteTableSQL)
+func before(t *testing.T, tableName string) {
+	after(t, tableName)
+	t.Log("before...", tableName)
+	db := newDb()
+	_, err := db.Exec(fmt.Sprintf(createSqliteTableSQL, tableName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log("create table success", tableName)
+	dao := daox.NewDAO(db, tableName, "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	for i := 0; i < 10; i++ {
+		nowSec := time.Now().Unix()
+		id, err := dao.Save(&DemoInfo{
+			UID:       int64(100 + i),
+			Name:      fmt.Sprintf("u-%d", i),
+			Sex:       "male",
+			LoginTime: nowSec,
+			Utime:     nowSec,
+			Ctime:     nowSec,
+		})
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
-		t.Log("create table success")
-		dao := daox.NewDAO(db, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
-		for i := 0; i < 10; i++ {
-			nowSec := time.Now().Unix()
-			id, err := dao.Save(&DemoInfo{
-				UID:       int64(100 + i),
-				Name:      fmt.Sprintf("u-%d", i),
-				Sex:       "male",
-				LoginTime: nowSec,
-				Utime:     nowSec,
-				Ctime:     nowSec,
-			})
-			if err != nil {
-				panic(err)
-			}
-			t.Logf("save id - %d \r", id)
-		}
-	})
+		t.Logf("save id - %d \r", id)
+	}
 }
 
-func after(t *testing.T) {
+func after(t *testing.T, tableName string) {
 	db := newDb()
-	t.Log("drop table")
-	_, err := db.Exec("drop table if exists demo_info")
+	t.Log("drop table", tableName)
+	_, err := db.Exec(fmt.Sprintf("drop table if exists %s", tableName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,8 +329,7 @@ func testPage(t *testing.T) {
 }
 
 func TestDaox(t *testing.T) {
-	after(t)
-	before(t)
+	before(t, "demo_info")
 	t.Run("testCreate", testCreate)
 	t.Run("testCrud", testCrud)
 	t.Run("testSelect", testSelect)
@@ -345,5 +340,4 @@ func TestDaox(t *testing.T) {
 	t.Run("testPage", testPage)
 	t.Run("testUpdateByCond", testUpdateByCond)
 	t.Run("testDeleteByColumns", testDeleteByColumns)
-	after(t)
 }

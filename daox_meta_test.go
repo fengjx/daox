@@ -23,7 +23,7 @@ create table if not exists demo_info
 `
 
 const createSqliteTableSQL = `
-CREATE TABLE demo_info (
+CREATE TABLE %s (
   id integer primary key autoincrement,
   uid integer,
   name text,

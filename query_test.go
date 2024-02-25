@@ -47,10 +47,11 @@ func TestQuery_ToSQLArgs(t *testing.T) {
 }
 
 func TestFind(t *testing.T) {
-	after(t)
-	before(t)
+	ctx := context.Background()
+	tableName := "test_find_info"
+	before(t, tableName)
 	q := daox.Query{
-		TableName: "demo_info",
+		TableName: tableName,
 		Fields:    []string{"id", "uid", "name", "sex", "login_time", "ctime"},
 		Conditions: []daox.Condition{
 			{
@@ -66,20 +67,20 @@ func TestFind(t *testing.T) {
 			Limit:  3,
 		},
 	}
-	list, page, err := daox.Find[DemoInfo](context.Background(), newDb(), q)
+	list, page, err := daox.Find[DemoInfo](ctx, newDb(), q)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log("list:", list)
 	t.Log("page:", page)
-	after(t)
 }
 
 func TestListMap(t *testing.T) {
-	after(t)
-	before(t)
+	ctx := context.Background()
+	tableName := "test_find_map_info"
+	before(t, tableName)
 	q := daox.Query{
-		TableName: "demo_info",
+		TableName: tableName,
 		Fields:    []string{"id", "uid", "name", "sex", "login_time", "ctime"},
 		Conditions: []daox.Condition{
 			{
@@ -95,11 +96,10 @@ func TestListMap(t *testing.T) {
 			Limit:  2,
 		},
 	}
-	list, page, err := daox.FindListMap(context.Background(), newDb(), q)
+	list, page, err := daox.FindListMap(ctx, newDb(), q)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log("list:", list)
 	t.Log("page:", page)
-	after(t)
 }

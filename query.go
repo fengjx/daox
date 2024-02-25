@@ -76,52 +76,7 @@ func (q Query) ToCountSQLArgs() (sql string, args []any, err error) {
 func (q Query) buildSelector() *sqlbuilder.Selector {
 	selector := sqlbuilder.NewSelector(q.TableName)
 	selector.Columns(q.Fields...)
-	where := ql.C()
-	for _, c := range q.Conditions {
-		switch {
-		case c.ConditionType == ConditionTypeEq && c.Op == OpAnd:
-			where.And(ql.Col(c.Field).EQ(c.Vals[0]))
-		case c.ConditionType == ConditionTypeEq && c.Op == OpOr:
-			where.Or(ql.Col(c.Field).EQ(c.Vals[0]))
-		case c.ConditionType == ConditionTypeNotEq && c.Op == OpAnd:
-			where.And(ql.Col(c.Field).NotEQ(c.Vals[0]))
-		case c.ConditionType == ConditionTypeNotEq && c.Op == OpOr:
-			where.Or(ql.Col(c.Field).NotEQ(c.Vals[0]))
-		case c.ConditionType == ConditionTypeLike && c.Op == OpAnd:
-			where.And(ql.Col(c.Field).Like(c.Vals[0]))
-		case c.ConditionType == ConditionTypeLike && c.Op == OpOr:
-			where.Or(ql.Col(c.Field).Like(c.Vals[0]))
-		case c.ConditionType == ConditionTypeNotLike && c.Op == OpAnd:
-			where.And(ql.Col(c.Field).NotLike(c.Vals[0]))
-		case c.ConditionType == ConditionTypeNotLike && c.Op == OpOr:
-			where.Or(ql.Col(c.Field).NotLike(c.Vals[0]))
-		case c.ConditionType == ConditionTypeIn && c.Op == OpAnd:
-			where.And(ql.Col(c.Field).In(c.Vals...))
-		case c.ConditionType == ConditionTypeIn && c.Op == OpOr:
-			where.Or(ql.Col(c.Field).In(c.Vals...))
-		case c.ConditionType == ConditionTypeNotIn && c.Op == OpAnd:
-			where.And(ql.Col(c.Field).NotIn(c.Vals...))
-		case c.ConditionType == ConditionTypeNotIn && c.Op == OpOr:
-			where.Or(ql.Col(c.Field).NotIn(c.Vals...))
-		case c.ConditionType == ConditionTypeGt && c.Op == OpAnd:
-			where.And(ql.Col(c.Field).GT(c.Vals[0]))
-		case c.ConditionType == ConditionTypeGt && c.Op == OpOr:
-			where.Or(ql.Col(c.Field).GT(c.Vals[0]))
-		case c.ConditionType == ConditionTypeLt && c.Op == OpAnd:
-			where.And(ql.Col(c.Field).LT(c.Vals[0]))
-		case c.ConditionType == ConditionTypeLt && c.Op == OpOr:
-			where.Or(ql.Col(c.Field).LT(c.Vals[0]))
-		case c.ConditionType == ConditionTypeGte && c.Op == OpAnd:
-			where.And(ql.Col(c.Field).GTEQ(c.Vals[0]))
-		case c.ConditionType == ConditionTypeGte && c.Op == OpOr:
-			where.Or(ql.Col(c.Field).GTEQ(c.Vals[0]))
-		case c.ConditionType == ConditionTypeLte && c.Op == OpAnd:
-			where.And(ql.Col(c.Field).LTEQ(c.Vals[0]))
-		case c.ConditionType == ConditionTypeLte && c.Op == OpOr:
-			where.Or(ql.Col(c.Field).LTEQ(c.Vals[0]))
-		}
-	}
-	selector.Where(where)
+	selector.Where(buildCondition(q.Conditions))
 	if q.Page != nil {
 		selector.Offset(q.Page.Offset).Limit(q.Page.Limit)
 	}
@@ -203,4 +158,53 @@ func getCount(_ context.Context, dbx *sqlx.DB, query Query) (int64, error) {
 		}
 	}
 	return count, nil
+}
+
+func buildCondition(conditions []Condition) sqlbuilder.ConditionBuilder {
+	where := ql.C()
+	for _, c := range conditions {
+		switch {
+		case c.ConditionType == ConditionTypeEq && c.Op == OpAnd:
+			where.And(ql.Col(c.Field).EQ(c.Vals[0]))
+		case c.ConditionType == ConditionTypeEq && c.Op == OpOr:
+			where.Or(ql.Col(c.Field).EQ(c.Vals[0]))
+		case c.ConditionType == ConditionTypeNotEq && c.Op == OpAnd:
+			where.And(ql.Col(c.Field).NotEQ(c.Vals[0]))
+		case c.ConditionType == ConditionTypeNotEq && c.Op == OpOr:
+			where.Or(ql.Col(c.Field).NotEQ(c.Vals[0]))
+		case c.ConditionType == ConditionTypeLike && c.Op == OpAnd:
+			where.And(ql.Col(c.Field).Like(c.Vals[0]))
+		case c.ConditionType == ConditionTypeLike && c.Op == OpOr:
+			where.Or(ql.Col(c.Field).Like(c.Vals[0]))
+		case c.ConditionType == ConditionTypeNotLike && c.Op == OpAnd:
+			where.And(ql.Col(c.Field).NotLike(c.Vals[0]))
+		case c.ConditionType == ConditionTypeNotLike && c.Op == OpOr:
+			where.Or(ql.Col(c.Field).NotLike(c.Vals[0]))
+		case c.ConditionType == ConditionTypeIn && c.Op == OpAnd:
+			where.And(ql.Col(c.Field).In(c.Vals...))
+		case c.ConditionType == ConditionTypeIn && c.Op == OpOr:
+			where.Or(ql.Col(c.Field).In(c.Vals...))
+		case c.ConditionType == ConditionTypeNotIn && c.Op == OpAnd:
+			where.And(ql.Col(c.Field).NotIn(c.Vals...))
+		case c.ConditionType == ConditionTypeNotIn && c.Op == OpOr:
+			where.Or(ql.Col(c.Field).NotIn(c.Vals...))
+		case c.ConditionType == ConditionTypeGt && c.Op == OpAnd:
+			where.And(ql.Col(c.Field).GT(c.Vals[0]))
+		case c.ConditionType == ConditionTypeGt && c.Op == OpOr:
+			where.Or(ql.Col(c.Field).GT(c.Vals[0]))
+		case c.ConditionType == ConditionTypeLt && c.Op == OpAnd:
+			where.And(ql.Col(c.Field).LT(c.Vals[0]))
+		case c.ConditionType == ConditionTypeLt && c.Op == OpOr:
+			where.Or(ql.Col(c.Field).LT(c.Vals[0]))
+		case c.ConditionType == ConditionTypeGte && c.Op == OpAnd:
+			where.And(ql.Col(c.Field).GTEQ(c.Vals[0]))
+		case c.ConditionType == ConditionTypeGte && c.Op == OpOr:
+			where.Or(ql.Col(c.Field).GTEQ(c.Vals[0]))
+		case c.ConditionType == ConditionTypeLte && c.Op == OpAnd:
+			where.And(ql.Col(c.Field).LTEQ(c.Vals[0]))
+		case c.ConditionType == ConditionTypeLte && c.Op == OpOr:
+			where.Or(ql.Col(c.Field).LTEQ(c.Vals[0]))
+		}
+	}
+	return where
 }
