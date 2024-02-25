@@ -36,7 +36,7 @@ type Page struct {
 	QueryCount bool  `json:"query_count"` // 是否查询总数
 }
 
-type Query struct {
+type QueryRecord struct {
 	TableName   string       `json:"table_name"`             // 查询表
 	Fields      []string     `json:"fields"`                 // 投影字段
 	Conditions  []Condition  `json:"conditions,omitempty"`   // 查找字段
@@ -63,17 +63,17 @@ type ConditionType string
 // Op and or连接符
 type Op string
 
-func (q Query) ToSQLArgs() (sql string, args []any, err error) {
+func (q QueryRecord) ToSQLArgs() (sql string, args []any, err error) {
 	selector := q.buildSelector()
 	return selector.SQLArgs()
 }
 
-func (q Query) ToCountSQLArgs() (sql string, args []any, err error) {
+func (q QueryRecord) ToCountSQLArgs() (sql string, args []any, err error) {
 	selector := q.buildSelector()
 	return selector.CountSQLArgs()
 }
 
-func (q Query) buildSelector() *sqlbuilder.Selector {
+func (q QueryRecord) buildSelector() *sqlbuilder.Selector {
 	selector := sqlbuilder.NewSelector(q.TableName)
 	selector.Columns(q.Fields...)
 	selector.Where(buildCondition(q.Conditions))
@@ -93,71 +93,6 @@ func (q Query) buildSelector() *sqlbuilder.Selector {
 		selector.OrderBy(orderBy...)
 	}
 	return selector
-}
-
-// Find 通用查询封装
-func Find[T any](ctx context.Context, dbx *sqlx.DB, query Query) (list []T, page *Page, err error) {
-	sql, args, err := query.ToSQLArgs()
-	if err != nil {
-		return nil, query.Page, err
-	}
-	err = dbx.Select(&list, sql, args...)
-	if err != nil {
-		return nil, query.Page, err
-	}
-	if query.Page != nil && query.Page.QueryCount {
-		count, err := getCount(ctx, dbx, query)
-		if err != nil {
-			return nil, query.Page, err
-		}
-		page.Count = count
-	}
-	return
-}
-
-func FindListMap(ctx context.Context, dbx *sqlx.DB, query Query) (list []map[string]any, page *Page, err error) {
-	sql, args, err := query.ToSQLArgs()
-	if err != nil {
-		return nil, query.Page, err
-	}
-	rows, err := dbx.Queryx(sql, args...)
-	if err != nil {
-		return nil, query.Page, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		record := make(map[string]any)
-		err = rows.MapScan(record)
-		if err != nil {
-			return nil, query.Page, err
-		}
-		list = append(list, record)
-	}
-	page = query.Page
-	page.Offset += int64(len(list))
-	if query.Page != nil && query.Page.QueryCount {
-		count, err := getCount(ctx, dbx, query)
-		if err != nil {
-			return nil, query.Page, err
-		}
-		page.Count = count
-	}
-	return
-}
-
-func getCount(_ context.Context, dbx *sqlx.DB, query Query) (int64, error) {
-	var count int64
-	if query.Page != nil && query.Page.QueryCount {
-		countSQL, countArgs, err := query.ToCountSQLArgs()
-		if err != nil {
-			return 0, err
-		}
-		err = dbx.Get(&count, countSQL, countArgs...)
-		if err != nil {
-			return 0, err
-		}
-	}
-	return count, nil
 }
 
 func buildCondition(conditions []Condition) sqlbuilder.ConditionBuilder {
@@ -207,4 +142,109 @@ func buildCondition(conditions []Condition) sqlbuilder.ConditionBuilder {
 		}
 	}
 	return where
+}
+
+// Find 通用查询封装
+func Find[T any](ctx context.Context, dbx *sqlx.DB, query QueryRecord) (list []T, page *Page, err error) {
+	sql, args, err := query.ToSQLArgs()
+	if err != nil {
+		return nil, query.Page, err
+	}
+	err = dbx.SelectContext(ctx, &list, sql, args...)
+	if err != nil {
+		return nil, query.Page, err
+	}
+	if query.Page != nil && query.Page.QueryCount {
+		count, err := getCount(ctx, dbx, query)
+		if err != nil {
+			return nil, query.Page, err
+		}
+		page.Count = count
+	}
+	return
+}
+
+func FindListMap(ctx context.Context, dbx *sqlx.DB, query QueryRecord) (list []map[string]any, page *Page, err error) {
+	sql, args, err := query.ToSQLArgs()
+	if err != nil {
+		return nil, query.Page, err
+	}
+	rows, err := dbx.QueryxContext(ctx, sql, args...)
+	if err != nil {
+		return nil, query.Page, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		record := make(map[string]any)
+		err = rows.MapScan(record)
+		if err != nil {
+			return nil, query.Page, err
+		}
+		list = append(list, record)
+	}
+	page = query.Page
+	page.Offset += int64(len(list))
+	if query.Page != nil && query.Page.QueryCount {
+		count, err := getCount(ctx, dbx, query)
+		if err != nil {
+			return nil, query.Page, err
+		}
+		page.Count = count
+	}
+	return
+}
+
+func getCount(ctx context.Context, dbx *sqlx.DB, query QueryRecord) (int64, error) {
+	var count int64
+	if query.Page != nil && query.Page.QueryCount {
+		countSQL, countArgs, err := query.ToCountSQLArgs()
+		if err != nil {
+			return 0, err
+		}
+		err = dbx.GetContext(ctx, &count, countSQL, countArgs...)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return count, nil
+}
+
+type GetRecord struct {
+	TableName  string      `json:"table_name"`           // 查询表
+	Fields     []string    `json:"fields"`               // 投影字段
+	Conditions []Condition `json:"conditions,omitempty"` // 查找字段
+}
+
+func (r GetRecord) ToSQLArgs() (sql string, args []any, err error) {
+	selector := sqlbuilder.NewSelector(r.TableName)
+	selector.Columns(r.Fields...)
+	selector.Where(buildCondition(r.Conditions))
+	return selector.SQLArgs()
+}
+
+func Get[T any](ctx context.Context, dbx *sqlx.DB, record GetRecord) (*T, error) {
+	sql, args, err := record.ToSQLArgs()
+	if err != nil {
+		return nil, err
+	}
+	data := new(T)
+	err = dbx.GetContext(ctx, data, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func GetMap(ctx context.Context, dbx *sqlx.DB, record GetRecord) (map[string]any, error) {
+	sql, args, err := record.ToSQLArgs()
+	if err != nil {
+		return nil, err
+	}
+	row := dbx.QueryRowxContext(ctx, sql, args...)
+	data := make(map[string]any)
+	err = row.MapScan(data)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
