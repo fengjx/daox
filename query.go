@@ -28,6 +28,7 @@ const (
 	OrderTypeDesc OrderType = "desc" // 降序
 )
 
+// Page 分页参数
 type Page struct {
 	Offset     int64 `json:"offset"`      // 游标起始位置
 	Limit      int64 `json:"limit"`       // 每页记录数
@@ -36,6 +37,7 @@ type Page struct {
 	QueryCount bool  `json:"query_count"` // 是否查询总数
 }
 
+// QueryRecord 查询参数
 type QueryRecord struct {
 	TableName   string       `json:"table_name"`             // 查询表
 	Fields      []string     `json:"fields"`                 // 投影字段
@@ -44,6 +46,7 @@ type QueryRecord struct {
 	Page        *Page        `json:"page,omitempty"`         // 分页参数
 }
 
+// OrderField 排序字段
 type OrderField struct {
 	Field     string    `json:"field"`
 	OrderType OrderType `json:"order_type"`
@@ -51,6 +54,7 @@ type OrderField struct {
 
 type OrderType string
 
+// Condition 条件语句
 type Condition struct {
 	Op            Op            `json:"op"`             // and or 连接符
 	Field         string        `json:"field"`          // 查询条件字段
@@ -63,11 +67,13 @@ type ConditionType string
 // Op and or连接符
 type Op string
 
+// ToSQLArgs 返回 sql 语句和参数
 func (q QueryRecord) ToSQLArgs() (sql string, args []any, err error) {
 	selector := q.buildSelector()
 	return selector.SQLArgs()
 }
 
+// ToCountSQLArgs 返回 count 查询 sql 语句和参数
 func (q QueryRecord) ToCountSQLArgs() (sql string, args []any, err error) {
 	selector := q.buildSelector()
 	return selector.CountSQLArgs()
@@ -164,6 +170,7 @@ func Find[T any](ctx context.Context, dbx *sqlx.DB, query QueryRecord) (list []T
 	return
 }
 
+// FindListMap 通用查询封装，返回 map 类型
 func FindListMap(ctx context.Context, dbx *sqlx.DB, query QueryRecord) (list []map[string]any, page *Page, err error) {
 	sql, args, err := query.ToSQLArgs()
 	if err != nil {
@@ -209,12 +216,14 @@ func getCount(ctx context.Context, dbx *sqlx.DB, query QueryRecord) (int64, erro
 	return count, nil
 }
 
+// GetRecord 单条记录查询
 type GetRecord struct {
 	TableName  string      `json:"table_name"`           // 查询表
 	Fields     []string    `json:"fields"`               // 投影字段
 	Conditions []Condition `json:"conditions,omitempty"` // 查找字段
 }
 
+// ToSQLArgs 返回 sql 语句和参数
 func (r GetRecord) ToSQLArgs() (sql string, args []any, err error) {
 	selector := sqlbuilder.NewSelector(r.TableName)
 	selector.Columns(r.Fields...)
@@ -222,6 +231,7 @@ func (r GetRecord) ToSQLArgs() (sql string, args []any, err error) {
 	return selector.SQLArgs()
 }
 
+// Get 查询单条记录
 func Get[T any](ctx context.Context, dbx *sqlx.DB, record GetRecord) (*T, error) {
 	sql, args, err := record.ToSQLArgs()
 	if err != nil {
@@ -235,6 +245,7 @@ func Get[T any](ctx context.Context, dbx *sqlx.DB, record GetRecord) (*T, error)
 	return data, nil
 }
 
+// GetMap 查询单条记录，返回 map
 func GetMap(ctx context.Context, dbx *sqlx.DB, record GetRecord) (map[string]any, error) {
 	sql, args, err := record.ToSQLArgs()
 	if err != nil {
