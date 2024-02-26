@@ -183,6 +183,6 @@ func TestGetMap(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log("data", data)
-	assert.Equal(t, int64(1), data["id"])
-	assert.Equal(t, int64(100), data["uid"])
+	assert.Equal(t, int32(1), data["id"])
+	assert.Equal(t, int32(100), data["uid"])
 }

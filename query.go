@@ -2,11 +2,13 @@ package daox
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/jmoiron/sqlx"
 
 	"github.com/fengjx/daox/sqlbuilder"
 	"github.com/fengjx/daox/sqlbuilder/ql"
+	"github.com/fengjx/daox/types"
 	"github.com/fengjx/daox/utils"
 )
 
@@ -204,15 +206,31 @@ func FindListMap(ctx context.Context, dbx *sqlx.DB, query QueryRecord, opts ...S
 	}
 	defer rows.Close()
 	for rows.Next() {
-		record := make(map[string]any)
-		err = rows.MapScan(record)
+		columns, err := rows.Columns()
 		if err != nil {
 			return nil, query.Page, err
 		}
-		if opt.ResultWrapper != nil {
-			record = opt.ResultWrapper(ctx, record).(map[string]any)
+		colTypes, err := rows.ColumnTypes()
+		if err != nil {
+			return nil, query.Page, err
 		}
-		list = append(list, record)
+		values := make([]interface{}, len(colTypes))
+		for i, typ := range colTypes {
+			t := types.SQLType2GolangType(typ.DatabaseTypeName())
+			values[i] = reflect.New(t).Interface()
+		}
+		err = rows.Scan(values...)
+		if err != nil {
+			return nil, query.Page, err
+		}
+		data := make(map[string]any)
+		for i, column := range columns {
+			data[column] = reflect.ValueOf(values[i]).Elem().Interface()
+		}
+		if opt.ResultWrapper != nil {
+			data = opt.ResultWrapper(ctx, data).(map[string]any)
+		}
+		list = append(list, data)
 	}
 	page = query.Page
 	page.Offset += int64(len(list))
@@ -294,10 +312,26 @@ func GetMap(ctx context.Context, dbx *sqlx.DB, record GetRecord, opts ...SelectO
 		return nil, err
 	}
 	row := dbx.QueryRowxContext(ctx, sql, args...)
-	data := make(map[string]any)
-	err = row.MapScan(data)
+	columns, err := row.Columns()
 	if err != nil {
 		return nil, err
+	}
+	colTypes, err := row.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+	values := make([]any, len(colTypes))
+	for i, typ := range colTypes {
+		t := types.SQLType2GolangType(typ.DatabaseTypeName())
+		values[i] = reflect.New(t).Interface()
+	}
+	err = row.Scan(values...)
+	if err != nil {
+		return nil, err
+	}
+	data := make(map[string]any)
+	for i, column := range columns {
+		data[column] = reflect.ValueOf(values[i]).Elem().Interface()
 	}
 	if opt.ResultWrapper != nil {
 		data = opt.ResultWrapper(ctx, data).(map[string]any)
