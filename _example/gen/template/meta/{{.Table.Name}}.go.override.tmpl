@@ -14,10 +14,12 @@ import (
 // {{$ObjName}}M {{.Table.Comment}}
 // auto generate by gen cmd tool
 type {{GonicCase .Table.Name}}M struct {
+    TableName string
 {{range .Table.Columns}}    {{GonicCase .Name}} string
 {{end}}}
 
 var {{GonicCase .Table.Name}}Meta = {{GonicCase .Table.Name}}M{
+    TableName: "{{.Table.Name}}",
 {{range .Table.Columns}}    {{GonicCase .Name}}: "{{.Name}}",
 {{end}}}
 
