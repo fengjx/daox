@@ -8,7 +8,6 @@ import (
 {{end}}
 {{$TagName := .TagName}}
 // {{GonicCase .Table.Name}} {{.Table.Comment}}
-// auto generate by gen cmd tool
 type {{GonicCase .Table.Name}} struct {
 {{range .Table.Columns}}    {{GonicCase .Name}} {{SQLType2GoTypeString .SQLType}} `{{$TagName}}:"{{.Name}}"` // {{LineString .Comment}}
 {{end}}}

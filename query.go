@@ -183,6 +183,7 @@ func Find[T any](ctx context.Context, dbx *sqlx.DB, query QueryRecord, opts ...S
 			return nil, query.Page, err
 		}
 		page.Count = count
+		page.HasNext = count > page.Offset
 	}
 	return
 }
@@ -240,6 +241,7 @@ func FindListMap(ctx context.Context, dbx *sqlx.DB, query QueryRecord, opts ...S
 			return nil, query.Page, err
 		}
 		page.Count = count
+		page.HasNext = count > page.Offset
 	}
 	return
 }
