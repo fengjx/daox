@@ -59,6 +59,7 @@ type OrderType string
 
 // Condition 条件语句
 type Condition struct {
+	Disable       bool          `json:"disable"`        // true 禁用该条件
 	Op            Op            `json:"op"`             // and or 连接符
 	Field         string        `json:"field"`          // 查询条件字段
 	Vals          []any         `json:"vals"`           // 查询字段值
@@ -107,6 +108,9 @@ func (q QueryRecord) buildSelector() *sqlbuilder.Selector {
 func buildCondition(conditions []Condition) sqlbuilder.ConditionBuilder {
 	where := ql.C()
 	for _, c := range conditions {
+		if c.Disable {
+			continue
+		}
 		switch {
 		case c.ConditionType == ConditionTypeEq && c.Op == OpAnd:
 			where.And(ql.Col(c.Field).EQ(c.Vals[0]))
