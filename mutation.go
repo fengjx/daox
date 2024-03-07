@@ -48,7 +48,7 @@ func Insert(ctx context.Context, dbx *sqlx.DB, record InsertRecord, opts ...Inse
 // UpdateRecord 更新记录
 type UpdateRecord struct {
 	TableName  string         `json:"table_name"` // 表名
-	Fields     map[string]any `json:"fields"`     // 修改的字段
+	Row        map[string]any `json:"row"`        // 要修改的行记录
 	Conditions []Condition    `json:"conditions"` // 条件字段
 }
 
@@ -60,11 +60,11 @@ func Update(ctx context.Context, dbx *sqlx.DB, record UpdateRecord, opts ...Upda
 	}
 	if opt.FieldsFilter != nil {
 		for _, disableField := range opt.FieldsFilter(ctx) {
-			delete(record.Fields, disableField)
+			delete(record.Row, disableField)
 		}
 	}
 	updater := sqlbuilder.NewUpdater(record.TableName)
-	for col, val := range record.Fields {
+	for col, val := range record.Row {
 		updater.Set(col, val)
 	}
 	updater.Where(buildCondition(record.Conditions))
