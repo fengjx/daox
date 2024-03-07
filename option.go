@@ -94,8 +94,8 @@ func WithUpdateFieldsFilter(fieldsFilter FieldsFilter) UpdateOption {
 }
 
 // WithUpdateDataWrapper 数据转换
-func WithUpdateDataWrapper(dataWrapper DataWrapper[map[string]any, map[string]any]) InsertOption {
-	return func(o *InsertOptions) {
+func WithUpdateDataWrapper(dataWrapper DataWrapper[map[string]any, map[string]any]) UpdateOption {
+	return func(o *UpdateOptions) {
 		o.DataWrapper = dataWrapper
 	}
 }
