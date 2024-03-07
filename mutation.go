@@ -58,6 +58,9 @@ func Update(ctx context.Context, dbx *sqlx.DB, record UpdateRecord, opts ...Upda
 	for _, option := range opts {
 		option(opt)
 	}
+	if opt.DataWrapper != nil {
+		record.Row = opt.DataWrapper(ctx, record.Row)
+	}
 	if opt.FieldsFilter != nil {
 		for _, disableField := range opt.FieldsFilter(ctx) {
 			delete(record.Row, disableField)
