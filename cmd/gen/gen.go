@@ -210,9 +210,13 @@ func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry,
 		}
 		suffix := ""
 		override := false
+		re := false
 		if strings.HasSuffix(entry.Name(), ".override.tmpl") {
 			suffix = ".override.tmpl"
 			override = true
+		} else if strings.HasSuffix(entry.Name(), ".re.tmpl") {
+			suffix = "re..tmpl"
+			re = true
 		} else if strings.HasSuffix(entry.Name(), ".tmpl") {
 			suffix = ".tmpl"
 		}
@@ -233,6 +237,9 @@ func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry,
 		}
 		targetFile := filepath.Join(targetDir, string(filenameBys))
 		if _, err = os.Stat(targetFile); !override && err == nil {
+			if !re {
+				continue
+			}
 			targetFile = fmt.Sprintf("%s.%d", targetFile, time.Now().Unix())
 		}
 		fmt.Println(targetFile)

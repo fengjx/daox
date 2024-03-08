@@ -11,15 +11,25 @@ import (
 )
 {{$TagName := .TagName}}
 {{$ObjName := GonicCase .Table.Name}}
+
+var {{$ObjName}}Columns = []string{
+{{range .Table.Columns}}    "{{.Name}}",
+{{end}}}
+
 // {{$ObjName}}M {{.Table.Comment}}
-// auto generate by gen cmd tool
-type {{GonicCase .Table.Name}}M struct {
-    TableName string
+type {{$ObjName}}M struct {
 {{range .Table.Columns}}    {{GonicCase .Name}} string
 {{end}}}
 
-var {{GonicCase .Table.Name}}Meta = {{GonicCase .Table.Name}}M{
-    TableName: "{{.Table.Name}}",
+func (m {{$ObjName}}M) TableName() string {
+    return "{{.Table.Name}}"
+}
+
+func (m {{$ObjName}}M) PrimaryKey() string {
+    return "{{.Table.PrimaryKey.Name}}"
+}
+
+var {{$ObjName}}Meta = {{$ObjName}}M{
 {{range .Table.Columns}}    {{GonicCase .Name}}: "{{.Name}}",
 {{end}}}
 

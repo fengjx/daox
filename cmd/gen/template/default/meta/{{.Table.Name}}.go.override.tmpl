@@ -12,8 +12,6 @@ import (
 {{$TagName := .TagName}}
 {{$ObjName := GonicCase .Table.Name}}
 
-const {{$ObjName}}TableName = "{{.Table.Name}}"
-
 var {{$ObjName}}Columns = []string{
 {{range .Table.Columns}}    "{{.Name}}",
 {{end}}}
@@ -22,6 +20,14 @@ var {{$ObjName}}Columns = []string{
 type {{$ObjName}}M struct {
 {{range .Table.Columns}}    {{GonicCase .Name}} string
 {{end}}}
+
+func (m {{$ObjName}}M) TableName() string {
+    return "{{.Table.Name}}"
+}
+
+func (m {{$ObjName}}M) PrimaryKey() string {
+    return "{{.Table.PrimaryKey.Name}}"
+}
 
 var {{$ObjName}}Meta = {{$ObjName}}M{
 {{range .Table.Columns}}    {{GonicCase .Name}}: "{{.Name}}",
