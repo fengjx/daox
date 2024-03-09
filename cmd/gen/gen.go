@@ -270,6 +270,8 @@ func parse(text string, attr map[string]interface{}) ([]byte, error) {
 		"GonicCase":            utils.GonicCase,
 		"LineString":           utils.LineString,
 		"IsLastIndex":          utils.IsLastIndex,
+		"Add":                  utils.Add,
+		"Sub":                  utils.Sub,
 		"SQLType2GoTypeString": types.SQLType2GoTypeString,
 	}
 	t, err := template.New("").Funcs(funcMap).Parse(text)

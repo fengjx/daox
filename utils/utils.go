@@ -47,3 +47,11 @@ func ContainsString(collection []string, element string) bool {
 func IsLastIndex(idx int, s any) bool {
 	return idx == reflect.ValueOf(s).Len()-1
 }
+
+func Add(y, x int) int {
+	return x + y
+}
+
+func Sub(y, x int) int {
+	return x - y
+}
