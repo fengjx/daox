@@ -29,6 +29,12 @@ func (m {{$ObjName}}M) PrimaryKey() string {
     return "{{.Table.PrimaryKey.Name}}"
 }
 
+func (m {{$ObjName}}M) Columns() []string {
+	return []string{
+    {{range .Table.Columns}}    "{{.Name}}",
+    {{end}}}
+}
+
 var {{$ObjName}}Meta = {{$ObjName}}M{
 {{range .Table.Columns}}    {{GonicCase .Name}}: "{{.Name}}",
 {{end}}}

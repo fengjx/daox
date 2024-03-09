@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 )
 
 func IsIDEmpty(id interface{}) bool {
@@ -41,4 +42,8 @@ func ContainsString(collection []string, element string) bool {
 		}
 	}
 	return false
+}
+
+func IsLastIndex(idx int, s any) bool {
+	return idx == reflect.ValueOf(s).Len()-1
 }

@@ -269,6 +269,7 @@ func parse(text string, attr map[string]interface{}) ([]byte, error) {
 		"TitleCase":            utils.TitleCase,
 		"GonicCase":            utils.GonicCase,
 		"LineString":           utils.LineString,
+		"IsLastIndex":          utils.IsLastIndex,
 		"SQLType2GoTypeString": types.SQLType2GoTypeString,
 	}
 	t, err := template.New("").Funcs(funcMap).Parse(text)
@@ -276,7 +277,7 @@ func parse(text string, attr map[string]interface{}) ([]byte, error) {
 		return nil, err
 	}
 	buf := bytes.NewBufferString("")
-	if err := t.Execute(buf, attr); err != nil {
+	if err = t.Execute(buf, attr); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
