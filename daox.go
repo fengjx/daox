@@ -97,8 +97,9 @@ func registerMeta(meta TableMeta) {
 }
 
 // GetMeta 根据表名获得元信息
-func GetMeta(tableName string) TableMeta {
-	return metaMap[tableName]
+func GetMeta(tableName string) (meta TableMeta, ok bool) {
+	meta, ok = metaMap[tableName]
+	return
 }
 
 // SQLBuilder 创建当前表的 sqlbuilder
