@@ -142,6 +142,19 @@ func (dao *Dao) TableName() string {
 // Save 插入数据
 // omitColumns 不需要 insert 的字段
 func (dao *Dao) Save(dest Model, omitColumns ...string) (int64, error) {
+	return dao.saveTx(nil, dest, omitColumns...)
+}
+
+// SaveTx 插入数据，支持事务
+// omitColumns 不需要 insert 的字段
+func (dao *Dao) SaveTx(tx *sqlx.Tx, dest Model, omitColumns ...string) (int64, error) {
+	if err := dao.checkTxNil(tx); err != nil {
+		return 0, err
+	}
+	return dao.saveTx(tx, dest, omitColumns...)
+}
+
+func (dao *Dao) saveTx(tx *sqlx.Tx, dest Model, omitColumns ...string) (int64, error) {
 	tableMeta := dao.TableMeta
 	if tableMeta.IsAutoIncrement {
 		omitColumns = append(omitColumns, tableMeta.PrimaryKey)
@@ -151,7 +164,12 @@ func (dao *Dao) Save(dest Model, omitColumns ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := dao.GetMasterDB().NamedExec(execSql, dest)
+	var res sql.Result
+	if tx == nil {
+		res, err = dao.GetMasterDB().NamedExec(execSql, dest)
+	} else {
+		res, err = tx.NamedExec(execSql, dest)
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -438,25 +456,26 @@ func (dao *Dao) updateFieldTx(tx *sqlx.Tx, idValue interface{}, attr map[string]
 }
 
 // Update 全字段更新
-func (dao *Dao) Update(m Model) (bool, error) {
-	return dao.updateTx(nil, m)
+func (dao *Dao) Update(m Model, omitColumns ...string) (bool, error) {
+	return dao.updateTx(nil, m, omitColumns...)
 }
 
 // UpdateTx 全字段更新，支持事务
-func (dao *Dao) UpdateTx(tx *sqlx.Tx, m Model) (bool, error) {
+func (dao *Dao) UpdateTx(tx *sqlx.Tx, m Model, omitColumns ...string) (bool, error) {
 	if err := dao.checkTxNil(tx); err != nil {
 		return false, err
 	}
-	return dao.updateTx(tx, m)
+	return dao.updateTx(tx, m, omitColumns...)
 }
 
-func (dao *Dao) updateTx(tx *sqlx.Tx, m Model) (bool, error) {
+func (dao *Dao) updateTx(tx *sqlx.Tx, m Model, omitColumns ...string) (bool, error) {
 	if utils.IsIDEmpty(m.GetID()) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := dao.TableMeta
+	omitColumns = append(omitColumns, tableMeta.PrimaryKey)
 	updateSQL, err := dao.SQLBuilder().Update().
-		Columns(dao.DBColumns(tableMeta.PrimaryKey)...).
+		Columns(dao.DBColumns(omitColumns...)...).
 		Where(
 			ql.SC().And(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey)),
 		).NameSQL()

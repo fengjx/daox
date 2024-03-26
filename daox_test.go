@@ -252,7 +252,7 @@ func testUpdate(t *testing.T) {
 	u1.ID = id
 	u1.Name = "fjx"
 	u1.Utime = time.Now().Unix()
-	ok, err := dao.Update(u1)
+	ok, err := dao.Update(u1, "ctime")
 	if err != nil {
 		t.Fatal(err)
 	}
