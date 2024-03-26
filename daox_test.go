@@ -56,7 +56,8 @@ func before(t *testing.T, tableName string) {
 		t.Fatal(err)
 	}
 	t.Log("create table success", tableName)
-	dao := daox.NewDAO(db, tableName, "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	daox.UseDefaultMasterDB(db)
+	dao := daox.CreateDAO(tableName, "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
 	for i := 0; i < 10; i++ {
 		nowSec := time.Now().Unix()
 		id, err := dao.Save(&DemoInfo{
@@ -319,7 +320,7 @@ func testPage(t *testing.T) {
 		t.Fatal(err)
 	}
 	var list []*DemoInfo
-	err = dao.DBRead.Select(&list, querySQL)
+	err = dao.GetReadDB().Select(&list, querySQL)
 	if err != nil {
 		t.Fatal(err)
 	}

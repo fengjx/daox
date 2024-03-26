@@ -71,7 +71,7 @@ func TestUpdate(t *testing.T) {
 	nowSec := time.Now().Unix()
 	record := daox.UpdateRecord{
 		TableName: tableName,
-		Fields: map[string]any{
+		Row: map[string]any{
 			"login_time": nowSec,
 			"utime":      nowSec,
 			"ctime":      nowSec,

@@ -9,12 +9,21 @@ import (
 
 type Option func(*Dao)
 
-func WithDBRead(read *sqlx.DB) Option {
+// WithDBMaster 设置主库
+func WithDBMaster(master *sqlx.DB) Option {
 	return func(p *Dao) {
-		p.DBRead = NewDB(read)
+		p.masterDB = NewDB(master)
 	}
 }
 
+// WithDBRead 设置从库
+func WithDBRead(read *sqlx.DB) Option {
+	return func(p *Dao) {
+		p.ReadDB = NewDB(read)
+	}
+}
+
+// IsAutoIncrement 是否自增主键
 func IsAutoIncrement() Option {
 	return func(dao *Dao) {
 		dao.TableMeta.IsAutoIncrement = true

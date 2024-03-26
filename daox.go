@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
@@ -17,15 +18,51 @@ import (
 var (
 	ErrUpdatePrimaryKeyRequire = errors.New("[daox] Primary key require for update")
 	ErrTxNil                   = errors.New("[daox] Tx is nil")
+
+	// defaultMasterDB 全局默认master数据库
+	defaultMasterDB *DB
+	// defaultReadDB 全局默认read数据库
+	defaultReadDB *DB
+
+	metaMap     = map[string]TableMeta{}
+	metaMapLock sync.Mutex
 )
 
-type SliceToMapFun = func([]*Model) map[interface{}]*Model
+func UseDefaultMasterDB(master *sqlx.DB) {
+	defaultMasterDB = NewDB(master)
+}
+
+func UseDefaultReadDB(read *sqlx.DB) {
+	defaultMasterDB = NewDB(read)
+}
 
 type Dao struct {
-	DBMaster  *DB
-	DBRead    *DB
+	masterDB  *DB
+	ReadDB    *DB
 	Mapper    *reflectx.Mapper
-	TableMeta *TableMeta
+	TableMeta TableMeta
+}
+
+// CreateDAO 函数用于创建一个新的Dao对象
+// tableName 参数表示表名
+// primaryKey 参数表示主键
+// structType 参数表示数据结构类型
+// opts 参数表示可选的选项
+// 返回值为创建的Dao对象指针
+func CreateDAO(tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
+	dao := &Dao{}
+	columns := dao.GetColumnsByType(structType)
+	dao.TableMeta = TableMeta{
+		TableName:  tableName,
+		StructType: structType,
+		PrimaryKey: primaryKey,
+		Columns:    columns,
+	}
+	for _, opt := range opts {
+		opt(dao)
+	}
+	registerMeta(dao.TableMeta)
+	return dao
 }
 
 // NewDAO 函数用于创建一个新的Dao对象
@@ -37,10 +74,10 @@ type Dao struct {
 // 返回值为创建的Dao对象指针
 func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
 	dao := &Dao{
-		DBMaster: NewDB(master),
+		masterDB: NewDB(master),
 	}
 	columns := dao.GetColumnsByType(structType)
-	dao.TableMeta = &TableMeta{
+	dao.TableMeta = TableMeta{
 		TableName:  tableName,
 		StructType: structType,
 		PrimaryKey: primaryKey,
@@ -49,10 +86,14 @@ func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType ref
 	for _, opt := range opts {
 		opt(dao)
 	}
-	if dao.DBRead == nil {
-		dao.DBRead = dao.DBMaster
-	}
+	registerMeta(dao.TableMeta)
 	return dao
+}
+
+func registerMeta(meta TableMeta) {
+	metaMapLock.Lock()
+	defer metaMapLock.Unlock()
+	metaMap[meta.TableName] = meta
 }
 
 // SQLBuilder 创建当前表的 sqlbuilder
@@ -110,7 +151,7 @@ func (dao *Dao) Save(dest Model, omitColumns ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := dao.DBMaster.NamedExec(execSql, dest)
+	res, err := dao.GetMasterDB().NamedExec(execSql, dest)
 	if err != nil {
 		return 0, err
 	}
@@ -132,7 +173,7 @@ func (dao *Dao) ReplaceInto(dest Model, omitColumns ...string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := dao.DBMaster.NamedExec(execSql, dest)
+	res, err := dao.GetMasterDB().NamedExec(execSql, dest)
 	if err != nil {
 		return 0, err
 	}
@@ -152,7 +193,7 @@ func (dao *Dao) BatchSave(models interface{}, omitColumns ...string) (int64, err
 	if err != nil {
 		return 0, err
 	}
-	res, err := dao.DBMaster.NamedExec(execSQL, models)
+	res, err := dao.GetMasterDB().NamedExec(execSQL, models)
 	if err != nil {
 		return 0, err
 	}
@@ -175,7 +216,7 @@ func (dao *Dao) BatchReplaceInto(models interface{}, omitColumns ...string) (int
 	if err != nil {
 		return 0, err
 	}
-	res, err := dao.DBMaster.NamedExec(execSQL, models)
+	res, err := dao.GetMasterDB().NamedExec(execSQL, models)
 	if err != nil {
 		return 0, err
 	}
@@ -197,7 +238,7 @@ func (dao *Dao) getTx(tx *sqlx.Tx, dest interface{}, selector *sqlbuilder.Select
 		return false, err
 	}
 	if tx == nil {
-		err = dao.DBRead.Get(dest, querySQL, args...)
+		err = dao.GetReadDB().Get(dest, querySQL, args...)
 	} else {
 		err = tx.Get(dest, querySQL, args...)
 	}
@@ -225,7 +266,7 @@ func (dao *Dao) selectTx(tx *sqlx.Tx, dest interface{}, selector *sqlbuilder.Sel
 		return err
 	}
 	if tx == nil {
-		err = dao.DBRead.Select(dest, querySQL, args...)
+		err = dao.GetReadDB().Select(dest, querySQL, args...)
 	} else {
 		err = tx.Select(dest, querySQL, args...)
 	}
@@ -359,7 +400,7 @@ func (dao *Dao) updateByCondTx(tx *sqlx.Tx, attr map[string]interface{}, where s
 	}
 	var res sql.Result
 	if tx == nil {
-		res, err = dao.DBMaster.Exec(updateSQL, args...)
+		res, err = dao.GetMasterDB().Exec(updateSQL, args...)
 	} else {
 		res, err = tx.Exec(updateSQL, args...)
 	}
@@ -424,7 +465,7 @@ func (dao *Dao) updateTx(tx *sqlx.Tx, m Model) (bool, error) {
 	}
 	var res sql.Result
 	if tx == nil {
-		res, err = dao.DBMaster.NamedExec(updateSQL, m)
+		res, err = dao.GetMasterDB().NamedExec(updateSQL, m)
 	} else {
 		res, err = tx.NamedExec(updateSQL, m)
 	}
@@ -458,7 +499,7 @@ func (dao *Dao) deleteByCondTx(tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (
 	}
 	var res sql.Result
 	if tx == nil {
-		res, err = dao.DBMaster.Exec(deleteSQL, args...)
+		res, err = dao.GetMasterDB().Exec(deleteSQL, args...)
 	} else {
 		res, err = tx.Exec(deleteSQL, args...)
 	}
@@ -540,8 +581,8 @@ func (dao *Dao) checkTxNil(tx *sqlx.Tx) error {
 // With 使用新的数据库连接创建 Dao
 func (dao *Dao) With(master, read *sqlx.DB, opts ...Option) *Dao {
 	newDao := &Dao{
-		DBMaster:  NewDB(master),
-		DBRead:    NewDB(read),
+		masterDB:  NewDB(master),
+		ReadDB:    NewDB(read),
 		TableMeta: dao.TableMeta,
 	}
 	for _, opt := range opts {
@@ -554,5 +595,25 @@ func (dao *Dao) getMapper() *reflectx.Mapper {
 	if dao.Mapper != nil {
 		return dao.Mapper
 	}
-	return dao.DBMaster.Mapper
+	return dao.GetMasterDB().Mapper
+}
+
+func (dao *Dao) GetMasterDB() *DB {
+	if dao.masterDB != nil {
+		return dao.masterDB
+	}
+	return defaultMasterDB
+}
+
+func (dao *Dao) GetReadDB() *DB {
+	if dao.ReadDB != nil {
+		return dao.ReadDB
+	}
+	if dao.masterDB != nil {
+		return dao.masterDB
+	}
+	if defaultReadDB != nil {
+		return defaultReadDB
+	}
+	return defaultMasterDB
 }
