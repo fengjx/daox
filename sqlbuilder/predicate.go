@@ -93,7 +93,8 @@ func (e *Condition) Or(c Column) *Condition {
 }
 
 // C 创建 Condition 条件构造器
-func C() *Condition {
+func C(cols ...Column) *Condition {
 	ec := &Condition{}
+	ec.And(cols...)
 	return ec
 }

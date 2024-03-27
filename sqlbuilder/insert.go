@@ -4,17 +4,26 @@ import (
 	"strings"
 )
 
+type intoType string
+
+const (
+	intoTypeDefault intoType = "default"
+	intoTypeReplace intoType = "replace"
+	intoTypeIgnore  intoType = "ignore"
+)
+
 type Inserter struct {
 	sqlBuilder
 	tableName                  string
 	columns                    []string
-	replaceInto                bool
 	onDuplicateKeyUpdateString string
+	intoType                   intoType
 }
 
 func NewInserter(tableName string) *Inserter {
 	inserter := &Inserter{
 		tableName: tableName,
+		intoType:  intoTypeDefault,
 	}
 	return inserter
 }
@@ -30,7 +39,16 @@ func (ins *Inserter) Columns(columns ...string) *Inserter {
 }
 
 func (ins *Inserter) IsReplaceInto(replaceInto bool) *Inserter {
-	ins.replaceInto = replaceInto
+	if replaceInto {
+		ins.intoType = intoTypeReplace
+	}
+	return ins
+}
+
+func (ins *Inserter) IsIgnoreInto(ignoreInto bool) *Inserter {
+	if ignoreInto {
+		ins.intoType = intoTypeIgnore
+	}
 	return ins
 }
 
@@ -44,10 +62,13 @@ func (ins *Inserter) NameSQL() (string, error) {
 		return "", ErrColumnsRequire
 	}
 	ins.reset()
-	if ins.replaceInto {
-		ins.writeString("REPLACE INTO ")
-	} else {
+	switch ins.intoType {
+	case intoTypeDefault:
 		ins.writeString("INSERT INTO ")
+	case intoTypeReplace:
+		ins.writeString("REPLACE INTO ")
+	case intoTypeIgnore:
+		ins.writeString("INSERT IGNORE INTO ")
 	}
 	ins.quote(strings.TrimSpace(ins.tableName))
 	ins.writeByte('(')
@@ -80,10 +101,13 @@ func (ins *Inserter) SQL() (string, error) {
 		return "", ErrColumnsRequire
 	}
 	ins.reset()
-	if ins.replaceInto {
-		ins.writeString("REPLACE INTO ")
-	} else {
+	switch ins.intoType {
+	case intoTypeDefault:
 		ins.writeString("INSERT INTO ")
+	case intoTypeReplace:
+		ins.writeString("REPLACE INTO ")
+	case intoTypeIgnore:
+		ins.writeString("INSERT IGNORE INTO ")
 	}
 	ins.quote(ins.tableName)
 	ins.writeByte('(')
