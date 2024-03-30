@@ -12,14 +12,14 @@ type Option func(*Dao)
 // WithDBMaster 设置主库
 func WithDBMaster(master *sqlx.DB) Option {
 	return func(p *Dao) {
-		p.masterDB = NewDB(master)
+		p.masterDB = master
 	}
 }
 
 // WithDBRead 设置从库
 func WithDBRead(read *sqlx.DB) Option {
 	return func(p *Dao) {
-		p.ReadDB = NewDB(read)
+		p.readDB = read
 	}
 }
 

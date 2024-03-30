@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
@@ -45,6 +46,16 @@ func newSqliteDb() *sqlx.DB {
 
 func newDb() *sqlx.DB {
 	return newSqliteDb()
+}
+
+func newMockDB() (dbx *sqlx.DB, mock sqlmock.Sqlmock, err error) {
+	var db *sql.DB
+	db, mock, err = sqlmock.New()
+	if err != nil {
+		return
+	}
+	dbx = sqlx.NewDb(db, "mysql")
+	return
 }
 
 func before(t *testing.T, tableName string) {
@@ -121,7 +132,7 @@ func testCrud(t *testing.T) {
 	assert.Equal(t, u1.UID, u2.UID)
 
 	updateName := "fengjx_2023"
-	ok, err = dao.UpdateField(id, map[string]interface{}{
+	ok, err = dao.UpdateField(id, map[string]any{
 		"name": updateName,
 	})
 	if err != nil {
@@ -274,7 +285,7 @@ func testUpdateByCond(t *testing.T) {
 	DBMaster := newDb()
 	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
 	rows, err := dao.UpdateByCond(
-		map[string]interface{}{
+		map[string]any{
 			DemoInfoMeta.Sex: "female",
 		},
 		ql.C().And(DemoInfoMeta.UidGT(105)),

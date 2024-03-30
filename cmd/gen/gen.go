@@ -78,7 +78,7 @@ func run(ctx *cli.Context) error {
 }
 
 func loadTableMeta(db *sqlx.DB, dbName, tableName string) *Table {
-	args := []interface{}{dbName, tableName}
+	args := []any{dbName, tableName}
 	querySQL := "SELECT `TABLE_NAME`, `ENGINE`, `AUTO_INCREMENT`, `TABLE_COMMENT` from" +
 		" `INFORMATION_SCHEMA`.`TABLES` WHERE `TABLE_SCHEMA`=? AND TABLE_NAME = ?" +
 		" AND (`ENGINE`='MyISAM' OR `ENGINE` = 'InnoDB' OR `ENGINE` = 'TokuDB')"
@@ -121,7 +121,7 @@ func loadTableMeta(db *sqlx.DB, dbName, tableName string) *Table {
 // []*Column table column meta
 // *Column PrimaryKey column
 func loadColumnMeta(db *sqlx.DB, dbName, tableName string) ([]Column, Column) {
-	args := []interface{}{dbName, tableName}
+	args := []any{dbName, tableName}
 	querySQL := "SELECT column_name, column_type, column_comment, column_key FROM information_schema.columns " +
 		"WHERE table_schema = ? AND table_name = ? ORDER BY ORDINAL_POSITION"
 	rows, err := db.Query(querySQL, args...)
@@ -173,7 +173,7 @@ func gen(config *Config, table *Table) {
 		fmt.Println(err.Error())
 		return
 	}
-	attr := map[string]interface{}{
+	attr := map[string]any{
 		"Var":      config.Target.Custom.Var,
 		"TagName":  config.Target.Custom.TagName,
 		"Table":    table,
@@ -184,7 +184,7 @@ func gen(config *Config, table *Table) {
 }
 
 // render 递归生成文件
-func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry, outDir string, attr map[string]interface{}) {
+func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry, outDir string, attr map[string]any) {
 	if parent == "" {
 		parent = basePath
 	}
@@ -261,7 +261,7 @@ func render(isEmbed bool, basePath string, parent string, entries []os.DirEntry,
 	}
 }
 
-func parse(text string, attr map[string]interface{}) ([]byte, error) {
+func parse(text string, attr map[string]any) ([]byte, error) {
 	funcMap := template.FuncMap{
 		"FirstUpper":           utils.FirstUpper,
 		"FirstLower":           utils.FirstLower,

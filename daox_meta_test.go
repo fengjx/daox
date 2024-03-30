@@ -46,7 +46,7 @@ type DemoInfo struct {
 	Ctime     int64  `json:"ctime"`      // -
 }
 
-func (m *DemoInfo) GetID() interface{} {
+func (m *DemoInfo) GetID() any {
 	return m.ID
 }
 

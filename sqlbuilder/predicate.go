@@ -4,7 +4,7 @@ package sqlbuilder
 type Predicate struct {
 	Op       Op
 	Express  string
-	Args     []interface{}
+	Args     []any
 	HasInSQL bool
 }
 
@@ -29,7 +29,7 @@ func (c *SimpleCondition) Predicates() []Predicate {
 
 // And and 语句
 // express where 表达式
-func (c *SimpleCondition) And(express string, args ...interface{}) *SimpleCondition {
+func (c *SimpleCondition) And(express string, args ...any) *SimpleCondition {
 	c.predicates = append(c.predicates, Predicate{
 		Op:      OpAnd,
 		Express: express,
@@ -40,7 +40,7 @@ func (c *SimpleCondition) And(express string, args ...interface{}) *SimpleCondit
 
 // Or or 语句
 // express where 表达式
-func (c *SimpleCondition) Or(express string, args ...interface{}) *SimpleCondition {
+func (c *SimpleCondition) Or(express string, args ...any) *SimpleCondition {
 	c.predicates = append(c.predicates, Predicate{
 		Op:      OpOr,
 		Express: express,
@@ -71,7 +71,7 @@ func (e *Condition) And(cols ...Column) *Condition {
 		e.predicates = append(e.predicates, Predicate{
 			Op:       OpAnd,
 			Express:  c.Express(),
-			Args:     []interface{}{c.arg},
+			Args:     []any{c.arg},
 			HasInSQL: c.HasInSQL(),
 		})
 	}
@@ -86,7 +86,7 @@ func (e *Condition) Or(c Column) *Condition {
 	e.predicates = append(e.predicates, Predicate{
 		Op:       OpOr,
 		Express:  c.Express(),
-		Args:     []interface{}{c.arg},
+		Args:     []any{c.arg},
 		HasInSQL: c.HasInSQL(),
 	})
 	return e

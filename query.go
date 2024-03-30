@@ -219,7 +219,7 @@ func FindListMap(ctx context.Context, dbx *sqlx.DB, query QueryRecord, opts ...S
 		if err != nil {
 			return nil, query.Page, err
 		}
-		values := make([]interface{}, len(colTypes))
+		values := make([]any, len(colTypes))
 		for i, typ := range colTypes {
 			t := types.SQLType2GolangType(typ.DatabaseTypeName())
 			values[i] = reflect.New(t).Interface()

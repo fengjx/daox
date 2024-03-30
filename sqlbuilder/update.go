@@ -6,7 +6,7 @@ type Updater struct {
 	sqlBuilder
 	tableName string
 	columns   []string
-	vals      []interface{}
+	vals      []any
 	where     ConditionBuilder
 }
 
@@ -17,7 +17,7 @@ func NewUpdater(tableName string) *Updater {
 }
 
 // Set 设置字段值
-func (u *Updater) Set(column string, val interface{}) *Updater {
+func (u *Updater) Set(column string, val any) *Updater {
 	u.columns = append(u.columns, column)
 	u.vals = append(u.vals, val)
 	return u
@@ -58,7 +58,7 @@ func (u *Updater) SQL() (string, error) {
 }
 
 // SQLArgs 构造 sql 并返回对应参数
-func (u *Updater) SQLArgs() (string, []interface{}, error) {
+func (u *Updater) SQLArgs() (string, []any, error) {
 	sql, err := u.SQL()
 	args := u.vals
 	wargs, hasInSQL := u.whereArgs(u.where)

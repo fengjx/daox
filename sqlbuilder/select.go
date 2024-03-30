@@ -36,7 +36,7 @@ func (s *Selector) QueryString(queryString string) *Selector {
 // StructColumns 通过任意model解析出表字段
 // tagName 解析数据库字段的 tag-name
 // omitColumns 排除哪些字段
-func (s *Selector) StructColumns(model interface{}, tagName string, omitColumns ...string) *Selector {
+func (s *Selector) StructColumns(model any, tagName string, omitColumns ...string) *Selector {
 	columns := GetColumnsByModel(GetMapperByTagName(tagName), model, omitColumns...)
 	return s.Columns(columns...)
 }
@@ -181,7 +181,7 @@ func (s *Selector) CountSQL() (string, error) {
 }
 
 // SQLArgs 构造 sql 并返回对应参数
-func (s *Selector) SQLArgs() (string, []interface{}, error) {
+func (s *Selector) SQLArgs() (string, []any, error) {
 	sql, err := s.SQL()
 	args, hasInSQL := s.whereArgs(s.where)
 	if !hasInSQL {
@@ -191,7 +191,7 @@ func (s *Selector) SQLArgs() (string, []interface{}, error) {
 }
 
 // CountSQLArgs 构造 count 查询 sql 并返回对应参数
-func (s *Selector) CountSQLArgs() (string, []interface{}, error) {
+func (s *Selector) CountSQLArgs() (string, []any, error) {
 	sql, err := s.CountSQL()
 	args, hasInSQL := s.whereArgs(s.where)
 	if !hasInSQL {

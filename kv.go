@@ -2,10 +2,10 @@ package daox
 
 type KV struct {
 	Key   string
-	Value interface{}
+	Value any
 }
 
-func OfKv(key string, value interface{}) *KV {
+func OfKv(key string, value any) *KV {
 	return &KV{
 		Key:   key,
 		Value: value,
@@ -14,10 +14,10 @@ func OfKv(key string, value interface{}) *KV {
 
 type MultiKV struct {
 	Key    string
-	Values []interface{}
+	Values []any
 }
 
-func OfMultiKv(key string, values ...interface{}) *MultiKV {
+func OfMultiKv(key string, values ...any) *MultiKV {
 	return &MultiKV{
 		Key:    key,
 		Values: values,

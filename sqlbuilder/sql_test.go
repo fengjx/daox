@@ -22,7 +22,7 @@ func TestSelect(t *testing.T) {
 		selector *sqlbuilder.Selector
 		wantSQL  string
 		wantErr  error
-		wantArgs []interface{}
+		wantArgs []any
 	}{
 		{
 			name:     "select *",
@@ -48,7 +48,7 @@ func TestSelect(t *testing.T) {
 				Columns("id", "username").
 				Where(ql.C().And(ql.Col("id").EQ(1000))),
 			wantSQL:  "SELECT `id`, `username` FROM `user` WHERE `id` = ?;",
-			wantArgs: []interface{}{1000},
+			wantArgs: []any{1000},
 		},
 		{
 			name: "select where",
@@ -71,7 +71,7 @@ func TestSelect(t *testing.T) {
 					),
 				),
 			wantSQL:  "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `age` > ? AND `sex` = ?;",
-			wantArgs: []interface{}{20, "male"},
+			wantArgs: []any{20, "male"},
 		},
 		{
 			name: "select where use ExpressCondition with use check",
@@ -84,7 +84,7 @@ func TestSelect(t *testing.T) {
 					),
 				),
 			wantSQL:  "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `age` > ?;",
-			wantArgs: []interface{}{20},
+			wantArgs: []any{20},
 		},
 		{
 			name: "select where use ExpressCondition with no use",
@@ -172,14 +172,14 @@ func TestSelect(t *testing.T) {
 			selector: sqlbuilder.New("user").Select().
 				Where(ql.SC().And("`id` = ?", 100)),
 			wantSQL:  "SELECT * FROM `user` WHERE `id` = ?;",
-			wantArgs: []interface{}{100},
+			wantArgs: []any{100},
 		},
 		{
 			name: "select * with multiple args",
 			selector: sqlbuilder.New("user").Select().
 				Where(ql.SC().And("`id` IN (?, ?)", 100, 101)),
 			wantSQL:  "SELECT * FROM `user` WHERE `id` IN (?, ?);",
-			wantArgs: []interface{}{100, 101},
+			wantArgs: []any{100, 101},
 		},
 		{
 			name: "select * with multiple args use ExpressCondition",
@@ -191,7 +191,7 @@ func TestSelect(t *testing.T) {
 					),
 				),
 			wantSQL:  "SELECT * FROM `user` WHERE `id` IN (?, ?) AND `age` > ?;",
-			wantArgs: []interface{}{100, 101, 20},
+			wantArgs: []any{100, 101, 20},
 		},
 		{
 			name: "select * with not in args use ExpressCondition",
@@ -202,7 +202,7 @@ func TestSelect(t *testing.T) {
 					),
 				),
 			wantSQL:  "SELECT * FROM `user` WHERE `id` NOT IN (?, ?);",
-			wantArgs: []interface{}{100, 101},
+			wantArgs: []any{100, 101},
 		},
 	}
 
@@ -210,7 +210,7 @@ func TestSelect(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var sql string
 			var err error
-			var args []interface{}
+			var args []any
 			if tc.wantArgs != nil {
 				sql, args, err = tc.selector.SQLArgs()
 				EqualArgs(t, tc.wantArgs, args)
@@ -292,7 +292,7 @@ func TestUpdate(t *testing.T) {
 		wantSQL     string
 		wantNameSQL string
 		wantErr     error
-		wantArgs    []interface{}
+		wantArgs    []any
 	}{
 		{
 			name:        "update",
@@ -315,7 +315,7 @@ func TestUpdate(t *testing.T) {
 				Columns("username", "age").
 				Where(ql.C().And(ql.Col("id").EQ(100))),
 			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE `id` = ?;",
-			wantArgs: []interface{}{100},
+			wantArgs: []any{100},
 		},
 		{
 			name: "update where with args",
@@ -324,7 +324,7 @@ func TestUpdate(t *testing.T) {
 				Columns("username", "age").
 				Where(ql.SC().And("`id` = ?", 100)),
 			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE `id` = ?;",
-			wantArgs: []interface{}{100},
+			wantArgs: []any{100},
 		},
 		{
 			name: "update where with multiple args",
@@ -333,7 +333,7 @@ func TestUpdate(t *testing.T) {
 				Columns("username", "age").
 				Where(ql.SC().And("`id` in (?, ?)", 100, 101)),
 			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE `id` in (?, ?);",
-			wantArgs: []interface{}{100, 101},
+			wantArgs: []any{100, 101},
 		},
 		{
 			name: "update name where",
@@ -351,7 +351,7 @@ func TestUpdate(t *testing.T) {
 				Set("age", 20).
 				Where(ql.C().And(ql.Col("id").EQ(1000))),
 			wantSQL:  "UPDATE `user` SET `name` = ?, `age` = ? WHERE `id` = ?;",
-			wantArgs: []interface{}{"fengjx", 20, 1000},
+			wantArgs: []any{"fengjx", 20, 1000},
 		},
 	}
 
@@ -359,7 +359,7 @@ func TestUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var sql string
 			var err error
-			var args []interface{}
+			var args []any
 			if tc.wantArgs != nil {
 				sql, args, err = tc.updater.SQLArgs()
 				EqualArgs(t, tc.wantArgs, args)
@@ -391,7 +391,7 @@ func TestDelete(t *testing.T) {
 		deleter  *sqlbuilder.Deleter
 		wantSQL  string
 		wantErr  error
-		wantArgs []interface{}
+		wantArgs []any
 	}{
 		{
 			name:    "delete",
@@ -412,7 +412,7 @@ func TestDelete(t *testing.T) {
 				ql.SC().And("`id` = ?", 100),
 			),
 			wantSQL:  "DELETE FROM `user` WHERE `id` = ?;",
-			wantArgs: []interface{}{100},
+			wantArgs: []any{100},
 		},
 		{
 			name: "delete by where not meet with args",
@@ -423,7 +423,7 @@ func TestDelete(t *testing.T) {
 				),
 			),
 			wantSQL:  "DELETE FROM `user` WHERE `id` = ?;",
-			wantArgs: []interface{}{1000},
+			wantArgs: []any{1000},
 		},
 		{
 			name: "delete by id with multiple args",
@@ -431,7 +431,7 @@ func TestDelete(t *testing.T) {
 				ql.SC().And("`id` in (?, ?)", 100, 101),
 			),
 			wantSQL:  "DELETE FROM `user` WHERE `id` in (?, ?);",
-			wantArgs: []interface{}{100, 101},
+			wantArgs: []any{100, 101},
 		},
 		{
 			name: "delete with limit",
@@ -446,7 +446,7 @@ func TestDelete(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var sql string
 			var err error
-			var args []interface{}
+			var args []any
 			if tc.wantArgs != nil {
 				sql, args, err = tc.deleter.SQLArgs()
 				EqualArgs(t, tc.wantArgs, args)
@@ -462,7 +462,7 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-func EqualArgs(t *testing.T, wantArgs []interface{}, args []interface{}) {
+func EqualArgs(t *testing.T, wantArgs []any, args []any) {
 	for i, wantArg := range wantArgs {
 		assert.Equal(t, wantArg, args[i])
 	}

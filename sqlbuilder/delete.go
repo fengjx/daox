@@ -52,7 +52,7 @@ func (d *Deleter) SQL() (string, error) {
 }
 
 // SQLArgs 构造 sql 并返回对应参数
-func (d *Deleter) SQLArgs() (string, []interface{}, error) {
+func (d *Deleter) SQLArgs() (string, []any, error) {
 	sql, err := d.SQL()
 	if err != nil {
 		return "", nil, err

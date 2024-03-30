@@ -91,7 +91,7 @@ ok, err := dao.Update(user)
 log.Printf("update res - %v", ok)
 
 // 部分字段更新
-ok, err = dao.UpdateField(11, map[string]interface{}{
+ok, err = dao.UpdateField(11, map[string]any{
     "nickname": "update-name-11",
 })
 log.Printf("update res - %v", ok)
@@ -227,7 +227,7 @@ target:
 
 模板中可以使用的变量，详细可以查看源码[cmd/gen/gen.go](/cmd/gen/gen.go#L172)
 ```go
-attr := map[string]interface{}{
+attr := map[string]any{
     "Var":     config.Target.Custom.Var,
     "TagName": config.Target.Custom.TagName,
     "Table":   table,

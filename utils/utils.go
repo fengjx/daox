@@ -6,12 +6,12 @@ import (
 	"reflect"
 )
 
-func IsIDEmpty(id interface{}) bool {
+func IsIDEmpty(id any) bool {
 	idStr := ToString(id)
 	return idStr == "" || idStr == "0"
 }
 
-func ToString(src interface{}) string {
+func ToString(src any) string {
 	if src == nil {
 		return ""
 	}

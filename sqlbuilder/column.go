@@ -7,7 +7,7 @@ import (
 type Column struct {
 	name  string
 	op    Op
-	arg   interface{}
+	arg   any
 	isUse bool
 }
 

@@ -32,7 +32,7 @@ func GetMapperByTagName(tagName string) *reflectx.Mapper {
 }
 
 // GetColumnsByModel 解析 model 所有字段名
-func GetColumnsByModel(mapper *reflectx.Mapper, model interface{}, omitColumns ...string) []string {
+func GetColumnsByModel(mapper *reflectx.Mapper, model any, omitColumns ...string) []string {
 	return GetColumnsByType(mapper, reflect.TypeOf(model), omitColumns...)
 }
 
@@ -124,7 +124,7 @@ func (b *sqlBuilder) whereSQL(where ConditionBuilder) {
 }
 
 // whereArgs where 条件中的参数
-func (b *sqlBuilder) whereArgs(where ConditionBuilder) (args []interface{}, hasInSQL bool) {
+func (b *sqlBuilder) whereArgs(where ConditionBuilder) (args []any, hasInSQL bool) {
 	if where != nil && len(where.getPredicates()) > 0 {
 		b.writeString(" WHERE ")
 		for _, predicate := range where.getPredicates() {

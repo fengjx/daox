@@ -28,7 +28,7 @@ func NewInserter(tableName string) *Inserter {
 	return inserter
 }
 
-func (ins *Inserter) StructColumns(m interface{}, tagName string, omitColumns ...string) *Inserter {
+func (ins *Inserter) StructColumns(m any, tagName string, omitColumns ...string) *Inserter {
 	columns := GetColumnsByModel(GetMapperByTagName(tagName), m, omitColumns...)
 	return ins.Columns(columns...)
 }
