@@ -493,7 +493,7 @@ func (dao *Dao) listContext(ctx context.Context, tx *sqlx.Tx, kv *KV, dest any) 
 	selector := dao.Selector().
 		Columns(dao.DBColumns()...).
 		Where(ql.C().And(ql.Col(kv.Key).EQ(kv.Value)))
-	return dao.SelectTxContext(ctx, tx, dest, selector)
+	return dao.selectContext(ctx, tx, dest, selector)
 }
 
 // GetByID 根据 id 查询单条数据
