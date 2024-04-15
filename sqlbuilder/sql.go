@@ -1,20 +1,13 @@
 package sqlbuilder
 
 import (
-	"errors"
 	"reflect"
 	"strings"
 	"sync"
 
-	"github.com/fengjx/daox/utils"
-
 	"github.com/jmoiron/sqlx/reflectx"
-)
 
-var (
-	SQLErrTableNameRequire = errors.New("[sqlbuilder] tableName requires")
-	SQLErrColumnsRequire   = errors.New("[sqlbuilder] columns requires")
-	SQLErrDeleteMissWhere  = errors.New("[sqlbuilder] delete sql miss where")
+	"github.com/fengjx/daox/utils"
 )
 
 var mapperMap = map[string]*reflectx.Mapper{}
@@ -26,6 +19,7 @@ func init() {
 
 var createMapperLock sync.Mutex
 
+// GetMapperByTagName 根据 tag name 返回对应 mapper
 func GetMapperByTagName(tagName string) *reflectx.Mapper {
 	if mapper, ok := mapperMap[tagName]; ok {
 		return mapper
@@ -37,7 +31,8 @@ func GetMapperByTagName(tagName string) *reflectx.Mapper {
 	return mapper
 }
 
-func GetColumnsByModel(mapper *reflectx.Mapper, model interface{}, omitColumns ...string) []string {
+// GetColumnsByModel 解析 model 所有字段名
+func GetColumnsByModel(mapper *reflectx.Mapper, model any, omitColumns ...string) []string {
 	return GetColumnsByType(mapper, reflect.TypeOf(model), omitColumns...)
 }
 
@@ -115,14 +110,29 @@ func (b *sqlBuilder) comma() {
 	b.writeByte(',')
 }
 
-func (b *sqlBuilder) whereSQL(condition *condition) {
-	if condition != nil && len(condition.predicates) > 0 {
+// whereSQL 拼接 where 条件
+func (b *sqlBuilder) whereSQL(where ConditionBuilder) {
+	if where != nil && len(where.getPredicates()) > 0 {
 		b.writeString(" WHERE ")
-		for _, predicate := range condition.predicates {
-			if predicate.op != nil {
-				b.writeString(predicate.op.text)
+		for i, predicate := range where.getPredicates() {
+			if i > 0 {
+				b.writeString(predicate.Op.Text)
 			}
-			b.writeString(predicate.express)
+			b.writeString(predicate.Express)
 		}
 	}
+}
+
+// whereArgs where 条件中的参数
+func (b *sqlBuilder) whereArgs(where ConditionBuilder) (args []any, hasInSQL bool) {
+	if where != nil && len(where.getPredicates()) > 0 {
+		b.writeString(" WHERE ")
+		for _, predicate := range where.getPredicates() {
+			args = append(args, predicate.Args...)
+			if predicate.HasInSQL {
+				hasInSQL = true
+			}
+		}
+	}
+	return
 }

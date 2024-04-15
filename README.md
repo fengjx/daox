@@ -91,7 +91,7 @@ ok, err := dao.Update(user)
 log.Printf("update res - %v", ok)
 
 // 部分字段更新
-ok, err = dao.UpdateField(11, map[string]interface{}{
+ok, err = dao.UpdateField(11, map[string]any{
     "nickname": "update-name-11",
 })
 log.Printf("update res - %v", ok)
@@ -114,23 +114,6 @@ log.Printf("delete by column res - %v", affected)
 // 按字段删除多条记录
 affected, err = dao.DeleteByColumns(daox.OfMultiKv("uid", 102, 103))
 log.Printf("multiple delete by column res - %v", affected)
-```
-
-
-缓存
-```go
-user := new(User)
-// 按id查询并缓存
-err := dao.GetByIDCache(10, user)
-log.Printf("get by id with cache - %v", user)
-
-// 删除缓存
-err = dao.DeleteCache("id", 10)
-
-// 按指定字段查询并缓存
-cacheUser := new(User)
-err = dao.GetByColumnCache(daox.OfKv("uid", 10001), cacheUser)
-log.Printf("get by uid with cache - %v", cacheUser)
 ```
 
 ## sqlbuilder
@@ -244,7 +227,7 @@ target:
 
 模板中可以使用的变量，详细可以查看源码[cmd/gen/gen.go](/cmd/gen/gen.go#L172)
 ```go
-attr := map[string]interface{}{
+attr := map[string]any{
     "Var":     config.Target.Custom.Var,
     "TagName": config.Target.Custom.TagName,
     "Table":   table,

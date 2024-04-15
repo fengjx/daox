@@ -2,19 +2,21 @@ package sqlbuilder
 
 import (
 	"strconv"
+
+	"github.com/jmoiron/sqlx"
 )
 
 type Selector struct {
 	sqlBuilder
 	tableName   string
+	queryString string
 	distinct    bool
 	columns     []string
-	queryString string
-	where       *condition
+	where       ConditionBuilder
 	orderBy     []OrderBy
 	groupBy     []string
-	limit       *int
-	offset      *int
+	limit       *int64
+	offset      *int64
 	IsForUpdate bool
 }
 
@@ -25,56 +27,71 @@ func NewSelector(tableName string) *Selector {
 	return selector
 }
 
-func (s *Selector) StructColumns(m interface{}, tagName string, omitColumns ...string) *Selector {
-	columns := GetColumnsByModel(GetMapperByTagName(tagName), m, omitColumns...)
-	return s.Columns(columns...)
-}
-
+// QueryString 自定义select字段，sql原样输出
 func (s *Selector) QueryString(queryString string) *Selector {
 	s.queryString = queryString
 	return s
 }
 
+// StructColumns 通过任意model解析出表字段
+// tagName 解析数据库字段的 tag-name
+// omitColumns 排除哪些字段
+func (s *Selector) StructColumns(model any, tagName string, omitColumns ...string) *Selector {
+	columns := GetColumnsByModel(GetMapperByTagName(tagName), model, omitColumns...)
+	return s.Columns(columns...)
+}
+
+// Columns select 的数据库字段
 func (s *Selector) Columns(columns ...string) *Selector {
 	s.columns = columns
 	return s
 }
 
+// Distinct select distinct
 func (s *Selector) Distinct() *Selector {
 	s.distinct = true
 	return s
 }
 
-func (s *Selector) Where(condition *condition) *Selector {
-	s.where = condition
+// Where 条件
+// condition 可以通过 sqlbuilder.C() 方法创建
+func (s *Selector) Where(where ConditionBuilder) *Selector {
+	s.where = where
 	return s
 }
 
+// ForUpdate select for update
 func (s *Selector) ForUpdate(isForUpdate bool) *Selector {
 	s.IsForUpdate = isForUpdate
 	return s
 }
 
+// GroupBy group by
 func (s *Selector) GroupBy(columns ...string) *Selector {
 	s.groupBy = columns
 	return s
 }
 
+// OrderBy order by
+// orderBy sqlbuilder.Desc("col")
 func (s *Selector) OrderBy(orderBy ...OrderBy) *Selector {
 	s.orderBy = orderBy
 	return s
 }
 
-func (s *Selector) Limit(limit int) *Selector {
+// Limit 分页 limit
+func (s *Selector) Limit(limit int64) *Selector {
 	s.limit = &limit
 	return s
 }
 
-func (s *Selector) Offset(offset int) *Selector {
+// Offset 分页 offset
+func (s *Selector) Offset(offset int64) *Selector {
 	s.offset = &offset
 	return s
 }
 
+// SQL 输出sql语句
 func (s *Selector) SQL() (string, error) {
 	s.reset()
 	s.writeString("SELECT ")
@@ -128,17 +145,59 @@ func (s *Selector) SQL() (string, error) {
 
 	if s.limit != nil {
 		s.writeString(" LIMIT ")
-		s.writeString(strconv.Itoa(*s.limit))
+		s.writeString(strconv.FormatInt(*s.limit, 10))
 	}
 	if s.offset != nil {
 		s.writeString(" OFFSET ")
-		s.writeString(strconv.Itoa(*s.offset))
+		s.writeString(strconv.FormatInt(*s.offset, 10))
 	}
 	if s.IsForUpdate {
 		s.writeString(" FOR UPDATE ")
 	}
 	s.end()
 	return s.sb.String(), nil
+}
+
+// CountSQL 构造 count 查询 sql
+func (s *Selector) CountSQL() (string, error) {
+	s.reset()
+	s.writeString("SELECT COUNT(*)")
+	s.writeString(" FROM ")
+	s.quote(s.tableName)
+	s.whereSQL(s.where)
+
+	if len(s.groupBy) > 0 {
+		s.writeString(" GROUP BY ")
+		for i, column := range s.groupBy {
+			if i > 0 {
+				s.comma()
+				s.space()
+			}
+			s.quote(column)
+		}
+	}
+	s.end()
+	return s.sb.String(), nil
+}
+
+// SQLArgs 构造 sql 并返回对应参数
+func (s *Selector) SQLArgs() (string, []any, error) {
+	sql, err := s.SQL()
+	args, hasInSQL := s.whereArgs(s.where)
+	if !hasInSQL {
+		return sql, args, err
+	}
+	return sqlx.In(sql, args...)
+}
+
+// CountSQLArgs 构造 count 查询 sql 并返回对应参数
+func (s *Selector) CountSQLArgs() (string, []any, error) {
+	sql, err := s.CountSQL()
+	args, hasInSQL := s.whereArgs(s.where)
+	if !hasInSQL {
+		return sql, args, err
+	}
+	return sqlx.In(sql, args...)
 }
 
 type OrderType string

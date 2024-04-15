@@ -3,14 +3,15 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 )
 
-func IsIDEmpty(id interface{}) bool {
+func IsIDEmpty(id any) bool {
 	idStr := ToString(id)
 	return idStr == "" || idStr == "0"
 }
 
-func ToString(src interface{}) string {
+func ToString(src any) string {
 	if src == nil {
 		return ""
 	}
@@ -41,4 +42,16 @@ func ContainsString(collection []string, element string) bool {
 		}
 	}
 	return false
+}
+
+func IsLastIndex(idx int, s any) bool {
+	return idx == reflect.ValueOf(s).Len()-1
+}
+
+func Add(y, x int) int {
+	return x + y
+}
+
+func Sub(y, x int) int {
+	return x - y
 }

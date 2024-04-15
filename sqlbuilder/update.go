@@ -1,10 +1,13 @@
 package sqlbuilder
 
+import "github.com/jmoiron/sqlx"
+
 type Updater struct {
 	sqlBuilder
 	tableName string
 	columns   []string
-	where     *condition
+	vals      []any
+	where     ConditionBuilder
 }
 
 func NewUpdater(tableName string) *Updater {
@@ -13,24 +16,30 @@ func NewUpdater(tableName string) *Updater {
 	}
 }
 
-func (u *Updater) StructColumns(m interface{}, tagName string, omitColumns ...string) *Updater {
-	columns := GetColumnsByModel(GetMapperByTagName(tagName), m, omitColumns...)
-	return u.Columns(columns...)
+// Set 设置字段值
+func (u *Updater) Set(column string, val any) *Updater {
+	u.columns = append(u.columns, column)
+	u.vals = append(u.vals, val)
+	return u
 }
 
+// Columns update 的数据库字段
 func (u *Updater) Columns(columns ...string) *Updater {
 	u.columns = columns
 	return u
 }
 
-func (u *Updater) Where(condition *condition) *Updater {
-	u.where = condition
+// Where 条件
+// condition 可以通过 sqlbuilder.C() 方法创建
+func (u *Updater) Where(where ConditionBuilder) *Updater {
+	u.where = where
 	return u
 }
 
+// SQL 输出sql语句
 func (u *Updater) SQL() (string, error) {
 	if len(u.columns) == 0 {
-		return "", SQLErrColumnsRequire
+		return "", ErrColumnsRequire
 	}
 	u.reset()
 	u.writeString("UPDATE ")
@@ -48,9 +57,23 @@ func (u *Updater) SQL() (string, error) {
 	return u.sb.String(), nil
 }
 
+// SQLArgs 构造 sql 并返回对应参数
+func (u *Updater) SQLArgs() (string, []any, error) {
+	sql, err := u.SQL()
+	args := u.vals
+	wargs, hasInSQL := u.whereArgs(u.where)
+	if len(wargs) > 0 {
+		args = append(args, wargs...)
+	}
+	if !hasInSQL {
+		return sql, args, err
+	}
+	return sqlx.In(sql, args...)
+}
+
 func (u *Updater) NameSQL() (string, error) {
 	if len(u.columns) == 0 {
-		return "", SQLErrColumnsRequire
+		return "", ErrColumnsRequire
 	}
 	u.reset()
 	u.writeString("UPDATE ")

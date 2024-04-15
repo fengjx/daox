@@ -4,22 +4,31 @@ import (
 	"strings"
 )
 
+type intoType string
+
+const (
+	intoTypeDefault intoType = "default"
+	intoTypeReplace intoType = "replace"
+	intoTypeIgnore  intoType = "ignore"
+)
+
 type Inserter struct {
 	sqlBuilder
 	tableName                  string
 	columns                    []string
-	replaceInto                bool
 	onDuplicateKeyUpdateString string
+	intoType                   intoType
 }
 
 func NewInserter(tableName string) *Inserter {
 	inserter := &Inserter{
 		tableName: tableName,
+		intoType:  intoTypeDefault,
 	}
 	return inserter
 }
 
-func (ins *Inserter) StructColumns(m interface{}, tagName string, omitColumns ...string) *Inserter {
+func (ins *Inserter) StructColumns(m any, tagName string, omitColumns ...string) *Inserter {
 	columns := GetColumnsByModel(GetMapperByTagName(tagName), m, omitColumns...)
 	return ins.Columns(columns...)
 }
@@ -30,7 +39,16 @@ func (ins *Inserter) Columns(columns ...string) *Inserter {
 }
 
 func (ins *Inserter) IsReplaceInto(replaceInto bool) *Inserter {
-	ins.replaceInto = replaceInto
+	if replaceInto {
+		ins.intoType = intoTypeReplace
+	}
+	return ins
+}
+
+func (ins *Inserter) IsIgnoreInto(ignoreInto bool) *Inserter {
+	if ignoreInto {
+		ins.intoType = intoTypeIgnore
+	}
 	return ins
 }
 
@@ -41,13 +59,16 @@ func (ins *Inserter) OnDuplicateKeyUpdateString(updateString string) *Inserter {
 
 func (ins *Inserter) NameSQL() (string, error) {
 	if len(ins.columns) == 0 {
-		return "", SQLErrColumnsRequire
+		return "", ErrColumnsRequire
 	}
 	ins.reset()
-	if ins.replaceInto {
-		ins.writeString("REPLACE INTO ")
-	} else {
+	switch ins.intoType {
+	case intoTypeDefault:
 		ins.writeString("INSERT INTO ")
+	case intoTypeReplace:
+		ins.writeString("REPLACE INTO ")
+	case intoTypeIgnore:
+		ins.writeString("INSERT IGNORE INTO ")
 	}
 	ins.quote(strings.TrimSpace(ins.tableName))
 	ins.writeByte('(')
@@ -77,13 +98,16 @@ func (ins *Inserter) NameSQL() (string, error) {
 
 func (ins *Inserter) SQL() (string, error) {
 	if len(ins.columns) == 0 {
-		return "", SQLErrColumnsRequire
+		return "", ErrColumnsRequire
 	}
 	ins.reset()
-	if ins.replaceInto {
-		ins.writeString("REPLACE INTO ")
-	} else {
+	switch ins.intoType {
+	case intoTypeDefault:
 		ins.writeString("INSERT INTO ")
+	case intoTypeReplace:
+		ins.writeString("REPLACE INTO ")
+	case intoTypeIgnore:
+		ins.writeString("INSERT IGNORE INTO ")
 	}
 	ins.quote(ins.tableName)
 	ins.writeByte('(')

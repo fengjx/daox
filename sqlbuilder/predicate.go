@@ -1,60 +1,100 @@
 package sqlbuilder
 
-type op struct {
-	symbol string
-	text   string
-}
-
-var (
-	opAnd = &op{symbol: "AND", text: " AND "}
-	opOr  = &op{symbol: "OR", text: " OR "}
-)
-
+// Predicate where 断言
 type Predicate struct {
-	op      *op
-	express string
+	Op       Op
+	Express  string
+	Args     []any
+	HasInSQL bool
 }
 
-type condition struct {
-	predicates []*Predicate
+// ConditionBuilder 条件构造器
+type ConditionBuilder interface {
+	getPredicates() []Predicate
 }
 
-func C() *condition {
-	return new(condition)
+// SimpleCondition 简单 where 条件构造
+type SimpleCondition struct {
+	predicates []Predicate
 }
 
-func (c *condition) Predicates() []*Predicate {
+// SC 简单 where 条件
+func SC() *SimpleCondition {
+	return new(SimpleCondition)
+}
+
+func (c *SimpleCondition) Predicates() []Predicate {
 	return c.predicates
 }
 
-func (c *condition) Where(meet bool, express string) *condition {
-	if !meet {
-		return c
-	}
-	c.predicates = append(c.predicates, &Predicate{
-		express: express,
+// And and 语句
+// express where 表达式
+func (c *SimpleCondition) And(express string, args ...any) *SimpleCondition {
+	c.predicates = append(c.predicates, Predicate{
+		Op:      OpAnd,
+		Express: express,
+		Args:    args,
 	})
 	return c
 }
 
-func (c *condition) And(meet bool, express string) *condition {
-	if !meet {
-		return c
-	}
-	c.predicates = append(c.predicates, &Predicate{
-		op:      opAnd,
-		express: express,
+// Or or 语句
+// express where 表达式
+func (c *SimpleCondition) Or(express string, args ...any) *SimpleCondition {
+	c.predicates = append(c.predicates, Predicate{
+		Op:      OpOr,
+		Express: express,
+		Args:    args,
 	})
 	return c
 }
 
-func (c *condition) Or(meet bool, express string) *condition {
-	if !meet {
-		return c
+func (c *SimpleCondition) getPredicates() []Predicate {
+	return c.predicates
+}
+
+// Condition 条件构造器实现
+type Condition struct {
+	predicates []Predicate
+}
+
+func (e *Condition) getPredicates() []Predicate {
+	return e.predicates
+}
+
+// And 增加 and 条件
+func (e *Condition) And(cols ...Column) *Condition {
+	for _, c := range cols {
+		if !c.isUse {
+			continue
+		}
+		e.predicates = append(e.predicates, Predicate{
+			Op:       OpAnd,
+			Express:  c.Express(),
+			Args:     []any{c.arg},
+			HasInSQL: c.HasInSQL(),
+		})
 	}
-	c.predicates = append(c.predicates, &Predicate{
-		op:      opOr,
-		express: express,
+	return e
+}
+
+// Or 增加 and 条件
+func (e *Condition) Or(c Column) *Condition {
+	if !c.isUse {
+		return e
+	}
+	e.predicates = append(e.predicates, Predicate{
+		Op:       OpOr,
+		Express:  c.Express(),
+		Args:     []any{c.arg},
+		HasInSQL: c.HasInSQL(),
 	})
-	return c
+	return e
+}
+
+// C 创建 Condition 条件构造器
+func C(cols ...Column) *Condition {
+	ec := &Condition{}
+	ec.And(cols...)
+	return ec
 }

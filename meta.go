@@ -27,5 +27,5 @@ func (meta *TableMeta) OmitColumns(omit ...string) []string {
 }
 
 type Model interface {
-	GetID() interface{}
+	GetID() any
 }
