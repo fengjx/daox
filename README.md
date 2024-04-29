@@ -1,11 +1,10 @@
 # daox
 
-基于 sqlx + go-redis 的轻量级数据库访问辅助工具，daox 的定位是 sqlx 的功能增强，不是一个 orm。
+基于 sqlx 的轻量级数据库访问辅助工具，daox 的定位是 sqlx 的功能增强，不是一个 orm。
 
 封装了基础 crud api，实现了`sqlbuilder`，通过 api 生成 sql，无需手动拼接。
 
 实现了代码生成器，有内置生成文件模板，也可以自定义模板。
-
 
 ## 安装
 
@@ -13,7 +12,11 @@
 go get github.com/fengjx/daox
 ```
 
-## CRUD
+## 文档&示例
+
+[GoDoc](https://pkg.go.dev/github.com/fengjx/daox)
+
+### CRUD
 
 在MySQL创建测试表
 ```sql
@@ -116,7 +119,7 @@ affected, err = dao.DeleteByColumns(daox.OfMultiKv("uid", 102, 103))
 log.Printf("multiple delete by column res - %v", affected)
 ```
 
-## sqlbuilder
+### sqlbuilder
 
 创建Builder对象
 ```go
