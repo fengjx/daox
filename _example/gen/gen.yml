@@ -9,5 +9,7 @@ target:
     var:
       a: aa
   tables:
-    user: { module: sys }
-    blog: { module: core }
+    user:
+      module: sys
+    blog:
+      module: core

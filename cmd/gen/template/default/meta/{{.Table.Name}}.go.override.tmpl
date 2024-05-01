@@ -12,10 +12,6 @@ import (
 {{$TagName := .TagName}}
 {{$ObjName := GonicCase .Table.Name}}
 
-var {{$ObjName}}Columns = []string{
-{{range .Table.Columns}}    "{{.Name}}",
-{{end}}}
-
 // {{$ObjName}}M {{.Table.Comment}}
 type {{$ObjName}}M struct {
 {{range .Table.Columns}}    {{GonicCase .Name}} string
@@ -27,6 +23,10 @@ func (m {{$ObjName}}M) TableName() string {
 
 func (m {{$ObjName}}M) PrimaryKey() string {
     return "{{.Table.PrimaryKey.Name}}"
+}
+
+func (m {{$ObjName}}M) IsAutoIncrement() bool {
+    return {{if .Table.AutoIncrement}}true{{else}}false{{end}}
 }
 
 func (m {{$ObjName}}M) Columns() []string {

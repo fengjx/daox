@@ -1,14 +1,12 @@
 package daox
 
 import (
-	"reflect"
-
 	"github.com/fengjx/daox/utils"
 )
 
+// TableMeta 数据库表元信息
 type TableMeta struct {
 	TableName       string
-	StructType      reflect.Type
 	Columns         []string
 	PrimaryKey      string
 	IsAutoIncrement bool
@@ -26,6 +24,15 @@ func (meta *TableMeta) OmitColumns(omit ...string) []string {
 	return columnArr
 }
 
+// Model 数据库 model 定义
 type Model interface {
 	GetID() any
+}
+
+// Meta 数据库表元信息定义接口
+type Meta interface {
+	TableName() string
+	PrimaryKey() string
+	IsAutoIncrement() bool
+	Columns() []string
 }

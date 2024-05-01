@@ -1,6 +1,6 @@
 ## 版本记录
 
-### v1.0.0 - 开发中
+### v1.0.0
 
 - [完成基础crud和缓存实现](https://github.com/fengjx/daox/pull/1)
 - [dao - 支持根据Model更新](https://github.com/fengjx/daox/pull/4)
@@ -17,3 +17,8 @@
 - [where 条件支持参数拼接](https://github.com/fengjx/daox/pull/29)
 - [sqlbuilder 条件构造器支持表达式方法](https://github.com/fengjx/daox/pull/32)
 - [修复 not in 语句错误](https://github.com/fengjx/daox/pull/34)
+
+
+### 1.0.3
+
+- [通过meta接口创建dao](https://github.com/fengjx/daox/pull/37)

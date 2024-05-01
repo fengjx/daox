@@ -26,7 +26,7 @@ var (
 	defaultReadDB *sqlx.DB
 
 	metaMap     = map[string]TableMeta{}
-	metaMapLock sync.Mutex
+	metaMapLock sync.RWMutex
 )
 
 func UseDefaultMasterDB(master *sqlx.DB) {
@@ -44,18 +44,18 @@ type Dao struct {
 	TableMeta TableMeta
 }
 
-// CreateDAO 函数用于创建一个新的Dao对象
+// NewDao 创建一个新的 dao 对象
 // tableName 参数表示表名
 // primaryKey 参数表示主键
 // structType 参数表示数据结构类型
 // opts 参数表示可选的选项
 // 返回值为创建的Dao对象指针
-func CreateDAO(tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
+func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 	dao := &Dao{}
+	structType := reflect.TypeFor[T]()
 	columns := dao.GetColumnsByType(structType)
 	dao.TableMeta = TableMeta{
 		TableName:  tableName,
-		StructType: structType,
 		PrimaryKey: primaryKey,
 		Columns:    columns,
 	}
@@ -66,23 +66,14 @@ func CreateDAO(tableName string, primaryKey string, structType reflect.Type, opt
 	return dao
 }
 
-// NewDAO 函数用于创建一个新的Dao对象
-// master 参数用于连接数据库
-// tableName 参数表示表名
-// primaryKey 参数表示主键
-// structType 参数表示数据结构类型
-// opts 参数表示可选的选项
-// 返回值为创建的Dao对象指针
-func NewDAO(master *sqlx.DB, tableName string, primaryKey string, structType reflect.Type, opts ...Option) *Dao {
-	dao := &Dao{
-		masterDB: master,
-	}
-	columns := dao.GetColumnsByType(structType)
+// NewDaoByMeta 根据 meta 接口创建 dao 对象
+func NewDaoByMeta(m Meta, opts ...Option) *Dao {
+	dao := &Dao{}
 	dao.TableMeta = TableMeta{
-		TableName:  tableName,
-		StructType: structType,
-		PrimaryKey: primaryKey,
-		Columns:    columns,
+		TableName:       m.TableName(),
+		PrimaryKey:      m.PrimaryKey(),
+		Columns:         m.Columns(),
+		IsAutoIncrement: m.IsAutoIncrement(),
 	}
 	for _, opt := range opts {
 		opt(dao)
@@ -97,8 +88,8 @@ func registerMeta(meta TableMeta) {
 	metaMap[meta.TableName] = meta
 }
 
-// GetMeta 根据表名获得元信息
-func GetMeta(tableName string) (meta TableMeta, ok bool) {
+// GetMetaInfo 根据表名获得元信息
+func GetMetaInfo(tableName string) (meta TableMeta, ok bool) {
 	meta, ok = metaMap[tableName]
 	return
 }

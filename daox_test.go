@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -68,7 +67,7 @@ func before(t *testing.T, tableName string) {
 	}
 	t.Log("create table success", tableName)
 	daox.UseDefaultMasterDB(db)
-	dao := daox.CreateDAO(tableName, "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	dao := daox.NewDao[*DemoInfo](tableName, "id", daox.IsAutoIncrement())
 	for i := 0; i < 10; i++ {
 		nowSec := time.Now().Unix()
 		id, err := dao.Save(&DemoInfo{
@@ -97,7 +96,7 @@ func after(t *testing.T, tableName string) {
 
 func testCreate(t *testing.T) {
 	DBMaster := newDb()
-	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	assert.Equal(t, len(dao.TableMeta.Columns), 7)
 	assert.Equal(t, dao.TableMeta.PrimaryKey, "id")
 	for _, column := range dao.TableMeta.Columns {
@@ -107,7 +106,7 @@ func testCreate(t *testing.T) {
 
 func testCrud(t *testing.T) {
 	DBMaster := newDb()
-	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	u1 := &DemoInfo{
 		UID:       10000,
 		Name:      "fengjx",
@@ -169,7 +168,7 @@ func testCrud(t *testing.T) {
 func testSelect(t *testing.T) {
 	//before(t)
 	DBMaster := newDb()
-	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	var list []*DemoInfo
 	selector := dao.Selector().Where(
 		ql.C().And(
@@ -187,9 +186,8 @@ func testSelect(t *testing.T) {
 }
 
 func testGet(t *testing.T) {
-	//before(t)
 	DBMaster := newDb()
-	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	demoInfo := &DemoInfo{}
 	selector := dao.Selector().
 		Where(
@@ -208,7 +206,7 @@ func testGet(t *testing.T) {
 
 func testBatchSave(t *testing.T) {
 	DBMaster := newDb()
-	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	nowUnix := time.Now().Unix()
 	users := []*DemoInfo{
 		{
@@ -246,7 +244,7 @@ func testBatchSave(t *testing.T) {
 
 func testUpdate(t *testing.T) {
 	DBMaster := newDb()
-	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	u1 := &DemoInfo{
 		UID:       20000,
 		Name:      "fengjx",
@@ -283,7 +281,7 @@ func testUpdate(t *testing.T) {
 
 func testUpdateByCond(t *testing.T) {
 	DBMaster := newDb()
-	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	rows, err := dao.UpdateByCond(
 		map[string]any{
 			DemoInfoMeta.Sex: "female",
@@ -298,7 +296,7 @@ func testUpdateByCond(t *testing.T) {
 
 func testDeleteByColumns(t *testing.T) {
 	DBMaster := newDb()
-	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	num, err := dao.DeleteByColumns(daox.OfMultiKv(DemoInfoMeta.UID, 100, 101))
 	if err != nil {
 		t.Error(err)
@@ -316,16 +314,22 @@ type blog struct {
 	Utime      *time.Time `json:"-"`
 }
 
-func testIgnoreField(t *testing.T) {
+func (b blog) GetID() any {
+	return b.Id
+}
+
+func TestIgnoreField(t *testing.T) {
+	tableName := "TestIgnoreField"
+	before(t, tableName)
 	DBMaster := newDb()
-	dao := daox.NewDAO(DBMaster, "blog", "id", reflect.TypeOf(&blog{}), daox.IsAutoIncrement())
+	dao := daox.NewDao[*blog](tableName, "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	t.Log(strings.Join(dao.TableMeta.Columns, ","))
 	assert.Equal(t, "id,uid,title,content,create_time", strings.Join(dao.TableMeta.Columns, ","))
 }
 
 func testPage(t *testing.T) {
 	DBMaster := newDb()
-	dao := daox.NewDAO(DBMaster, "demo_info", "id", reflect.TypeOf(&DemoInfo{}), daox.IsAutoIncrement())
+	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	querySQL, err := dao.SQLBuilder().Select().Limit(10).Offset(5).SQL()
 	if err != nil {
 		t.Fatal(err)
@@ -340,6 +344,11 @@ func testPage(t *testing.T) {
 	}
 }
 
+func TestGetDaoByMeta(t *testing.T) {
+	dao := daox.NewDaoByMeta(DemoInfoMeta)
+	assert.Equal(t, DemoInfoMeta.TableName(), dao.TableName())
+}
+
 func TestDaox(t *testing.T) {
 	before(t, "demo_info")
 	t.Run("testCreate", testCreate)
@@ -348,7 +357,6 @@ func TestDaox(t *testing.T) {
 	t.Run("testGet", testGet)
 	t.Run("testBatchSave", testBatchSave)
 	t.Run("testUpdate", testUpdate)
-	t.Run("testIgnoreField", testIgnoreField)
 	t.Run("testPage", testPage)
 	t.Run("testUpdateByCond", testUpdateByCond)
 	t.Run("testDeleteByColumns", testDeleteByColumns)

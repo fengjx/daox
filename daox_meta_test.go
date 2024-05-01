@@ -35,7 +35,6 @@ CREATE TABLE %s (
 `
 
 // DemoInfo
-// auto generate by gen cmd tool
 type DemoInfo struct {
 	ID        int64  `json:"id"`         // -
 	UID       int64  `json:"uid"`        // -
@@ -51,7 +50,6 @@ func (m *DemoInfo) GetID() any {
 }
 
 // DemoInfoM
-// auto generate by gen cmd tool
 type DemoInfoM struct {
 	ID        string
 	UID       string
@@ -60,6 +58,30 @@ type DemoInfoM struct {
 	LoginTime string
 	Utime     string
 	Ctime     string
+}
+
+func (m DemoInfoM) TableName() string {
+	return "demo_info"
+}
+
+func (m DemoInfoM) PrimaryKey() string {
+	return "id"
+}
+
+func (m DemoInfoM) IsAutoIncrement() bool {
+	return false
+}
+
+func (m DemoInfoM) Columns() []string {
+	return []string{
+		"id",
+		"uid",
+		"name",
+		"sex",
+		"login_time",
+		"utime",
+		"ctime",
+	}
 }
 
 var DemoInfoMeta = DemoInfoM{
