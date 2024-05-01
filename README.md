@@ -34,10 +34,28 @@ create table user_info
 ```
 
 创建 dao 对象
+
 ```go
+// 使用全局默认DB
 db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
 db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
-dao := daox.NewDAO(db, "user_info", "id", reflect.TypeOf(&User{}), daox.IsAutoIncrement())
+// 注册全局DB
+daox.UseDefaultMasterDB(db)
+dao := daox.NewDao[*User](tableName, "id", daox.IsAutoIncrement())
+```
+
+```go
+// 使用 NewDao 创建
+db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
+db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
+dao := daox.NewDao[*User](tableName, "id", daox.IsAutoIncrement(), daox.WithDBMaster(db))
+```
+
+```go
+// 使用 meta 接口创建
+db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
+db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
+dao := daox.NewDaoByMeta(UserMeta)
 ```
 
 新增
@@ -209,8 +227,11 @@ target:
     var:
       a: aa
       b: bb
-  tables:
-    - user_info
+    tables:
+      user:
+        module: sys
+      blog:
+        module: core
 ```
 
 | 参数                         | 必须 | 说明                     |
