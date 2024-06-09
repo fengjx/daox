@@ -98,6 +98,15 @@ func (b *sqlBuilder) quote(val string) {
 	b.writeByte('`')
 }
 
+func (b *sqlBuilder) ifNullCol(col string, val string) {
+	b.writeString("IFNULL(")
+	b.quote(col)
+	b.writeString(", ")
+	b.writeString(val)
+	b.writeString(") as ")
+	b.quote(col)
+}
+
 func (b *sqlBuilder) space() {
 	b.writeByte(' ')
 }

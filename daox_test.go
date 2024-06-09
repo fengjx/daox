@@ -349,6 +349,36 @@ func TestGetDaoByMeta(t *testing.T) {
 	assert.Equal(t, DemoInfoMeta.TableName(), dao.TableName())
 }
 
+func TestSelectIfNull(t *testing.T) {
+	tb := "demo_info_if_null"
+	before(t, tb)
+	DBMaster := newDb()
+	dao := daox.NewDao[*DemoInfo](
+		"demo_info",
+		"id",
+		daox.IsAutoIncrement(),
+		daox.WithDBMaster(DBMaster),
+		daox.WithIfNullVals(map[string]string{
+			"name": "''",
+		}),
+	)
+	var list []*DemoInfo
+	selector := dao.Selector().Where(
+		ql.C(
+			DemoInfoMeta.UidIn(101, 102),
+			DemoInfoMeta.SexEQ("male"),
+		),
+	)
+	err := dao.Select(&list, selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range list {
+		t.Log(item.UID)
+	}
+	after(t, tb)
+}
+
 func TestDaox(t *testing.T) {
 	before(t, "demo_info")
 	t.Run("testCreate", testCreate)
