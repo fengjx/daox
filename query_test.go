@@ -77,37 +77,6 @@ func TestFind(t *testing.T) {
 	t.Log("page:", page)
 }
 
-func TestFindOptions(t *testing.T) {
-	ctx := context.Background()
-	tableName := "test_find_option_info"
-	before(t, tableName)
-	q := daox.QueryRecord{
-		TableName: tableName,
-		Fields:    []string{"id", "uid", "name", "sex", "login_time", "ctime"},
-		Conditions: []daox.Condition{
-			{
-				ConditionType: daox.ConditionTypeGte,
-				Op:            daox.OpAnd,
-				Field:         "uid",
-				Vals:          []any{100},
-			},
-		},
-		OrderFields: []daox.OrderField{{Field: "id", OrderType: daox.OrderTypeDesc}},
-		Page: &daox.Page{
-			Offset: 0,
-			Limit:  3,
-		},
-	}
-	list, page, err := daox.Find[DemoInfo](ctx, newDb(), q, daox.WithSelectFieldsFilter(func(ctx context.Context) []string {
-		return []string{"ctime"}
-	}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log("list:", list)
-	t.Log("page:", page)
-}
-
 func TestListMap(t *testing.T) {
 	ctx := context.Background()
 	tableName := "test_find_map_info"

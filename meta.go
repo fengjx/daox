@@ -15,6 +15,9 @@ type TableMeta struct {
 // OmitColumns 数据库表字段
 // omit 包含的字段
 func (meta *TableMeta) OmitColumns(omit ...string) []string {
+	if len(omit) == 0 {
+		return meta.Columns
+	}
 	columnArr := make([]string, 0, len(meta.Columns))
 	for _, column := range meta.Columns {
 		if !utils.ContainsString(omit, column) {
