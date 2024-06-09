@@ -17,7 +17,8 @@ type Selector struct {
 	groupBy     []string
 	limit       *int64
 	offset      *int64
-	IsForUpdate bool
+	isForUpdate bool
+	ifNullVals  map[string]string
 }
 
 func NewSelector(tableName string) *Selector {
@@ -47,6 +48,30 @@ func (s *Selector) Columns(columns ...string) *Selector {
 	return s
 }
 
+// IfNullVal 设置字段为空时，返回的值
+func (s *Selector) IfNullVal(col string, val string) *Selector {
+	s.initIfNullVal()
+	s.ifNullVals[col] = val
+	return s
+}
+
+// IfNullVals 设置字段为空时，返回的值
+// key 为数据库表字段名
+// value 为默认值表达式，如：空字符串为 "”"
+func (s *Selector) IfNullVals(vals map[string]string) *Selector {
+	s.initIfNullVal()
+	for col, val := range vals {
+		s.ifNullVals[col] = val
+	}
+	return s
+}
+
+func (s *Selector) initIfNullVal() {
+	if s.ifNullVals == nil {
+		s.ifNullVals = make(map[string]string)
+	}
+}
+
 // Distinct select distinct
 func (s *Selector) Distinct() *Selector {
 	s.distinct = true
@@ -62,7 +87,7 @@ func (s *Selector) Where(where ConditionBuilder) *Selector {
 
 // ForUpdate select for update
 func (s *Selector) ForUpdate(isForUpdate bool) *Selector {
-	s.IsForUpdate = isForUpdate
+	s.isForUpdate = isForUpdate
 	return s
 }
 
@@ -106,7 +131,11 @@ func (s *Selector) SQL() (string, error) {
 			s.writeByte('*')
 		} else {
 			for i, column := range s.columns {
-				s.quote(column)
+				if defVal, ok := s.ifNullVals[column]; ok {
+					s.ifNullCol(column, defVal)
+				} else {
+					s.quote(column)
+				}
 				if i != len(s.columns)-1 {
 					s.writeString(", ")
 				}
@@ -151,7 +180,7 @@ func (s *Selector) SQL() (string, error) {
 		s.writeString(" OFFSET ")
 		s.writeString(strconv.FormatInt(*s.offset, 10))
 	}
-	if s.IsForUpdate {
+	if s.isForUpdate {
 		s.writeString(" FOR UPDATE ")
 	}
 	s.end()

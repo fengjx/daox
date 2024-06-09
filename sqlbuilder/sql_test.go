@@ -36,6 +36,22 @@ func TestSelect(t *testing.T) {
 			wantSQL: "SELECT `id`, `username` FROM `user`;",
 		},
 		{
+			name: "select columns if null",
+			selector: sqlbuilder.New("user").Select().
+				Columns("id", "username", "email").
+				IfNullVal("email", "''"),
+			wantSQL: "SELECT `id`, `username`, IFNULL(`email`, '') as `email` FROM `user`;",
+		},
+		{
+			name: "select columns if null use map",
+			selector: sqlbuilder.New("user").Select().
+				Columns("id", "username", "email").
+				IfNullVals(map[string]string{
+					"email": "''",
+				}),
+			wantSQL: "SELECT `id`, `username`, IFNULL(`email`, '') as `email` FROM `user`;",
+		},
+		{
 			name: "select by id",
 			selector: sqlbuilder.New("user").Select().
 				Columns("id", "username").

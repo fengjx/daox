@@ -22,3 +22,5 @@
 ### 1.0.3
 
 - [通过meta接口创建dao](https://github.com/fengjx/daox/pull/37)
+- [支持IFNULL查询](https://github.com/fengjx/daox/pull/42)
+

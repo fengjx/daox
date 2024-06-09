@@ -108,3 +108,21 @@ func WithUpdateDataWrapper(dataWrapper DataWrapper[map[string]any, map[string]an
 		o.DataWrapper = dataWrapper
 	}
 }
+
+// WithIfNullVal 设置字段为null时的默认值
+func WithIfNullVal(col string, val string) Option {
+	return func(d *Dao) {
+		d.initIfNullVal()
+		d.ifNullVals[col] = val
+	}
+}
+
+// WithIfNullVals 设置字段（多个）为null时的默认值
+func WithIfNullVals(vals map[string]string) Option {
+	return func(d *Dao) {
+		d.initIfNullVal()
+		for col, val := range vals {
+			d.ifNullVals[col] = val
+		}
+	}
+}
