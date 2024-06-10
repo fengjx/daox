@@ -65,16 +65,16 @@ type InsertOptions struct {
 
 type InsertOption func(*InsertOptions)
 
-// DisableGlobalOmitColumns insert 数据时，禁用全局忽略字段
-func DisableGlobalOmitColumns(disable bool) InsertOption {
+// DisableGlobalInsertOmits insert 数据时，禁用全局忽略字段
+func DisableGlobalInsertOmits(disable bool) InsertOption {
 	return func(o *InsertOptions) {
 		o.disableGlobalOmitColumns = disable
 	}
 }
 
-// WithOmitColumns 当前 insert 时，忽略的字段
-func WithOmitColumns(disable bool) InsertOption {
+// WithInsertOmits 当前 insert 时，忽略的字段
+func WithInsertOmits(omits ...string) InsertOption {
 	return func(o *InsertOptions) {
-		o.disableGlobalOmitColumns = disable
+		o.omitColumns = append(o.omitColumns, omits...)
 	}
 }

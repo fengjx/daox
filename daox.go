@@ -279,6 +279,9 @@ func (d *Dao) getSaveColumns(opt *InsertOptions) []string {
 	if meta.IsAutoIncrement {
 		omits = append(omits, meta.PrimaryKey)
 	}
+	if len(opt.omitColumns) > 0 {
+		omits = append(omits, opt.omitColumns...)
+	}
 	if !opt.disableGlobalOmitColumns && len(global.saveOmitColumns) > 0 {
 		omits = append(omits, global.saveOmitColumns...)
 	}
