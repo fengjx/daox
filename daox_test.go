@@ -77,7 +77,7 @@ func before(t *testing.T, tableName string) {
 			LoginTime: nowSec,
 			Utime:     nowSec,
 			Ctime:     nowSec,
-		})
+		}, daox.DisableGlobalInsertOmits(true))
 		if err != nil {
 			panic(err)
 		}
@@ -354,7 +354,7 @@ func TestSelectIfNull(t *testing.T) {
 	before(t, tb)
 	DBMaster := newDb()
 	dao := daox.NewDao[*DemoInfo](
-		"demo_info",
+		tb,
 		"id",
 		daox.IsAutoIncrement(),
 		daox.WithDBMaster(DBMaster),
@@ -390,4 +390,40 @@ func TestDaox(t *testing.T) {
 	t.Run("testPage", testPage)
 	t.Run("testUpdateByCond", testUpdateByCond)
 	t.Run("testDeleteByColumns", testDeleteByColumns)
+}
+
+func TestDisableGlobalOmitColumns(t *testing.T) {
+	daox.UseSaveOmits("ctime", "utime")
+	tb := "demo_info_global_disable_omit"
+	before(t, tb)
+	DBMaster := newDb()
+	dao := daox.NewDao[*DemoInfo](
+		tb,
+		"id",
+		daox.IsAutoIncrement(),
+		daox.WithDBMaster(DBMaster),
+		daox.WithIfNullVals(map[string]string{
+			"utime": "0",
+		}),
+	)
+	nowSec := time.Now().Unix()
+	u1 := &DemoInfo{
+		UID:       10000,
+		Name:      "fengjx",
+		Sex:       "1",
+		LoginTime: nowSec,
+		Utime:     nowSec,
+		Ctime:     nowSec,
+	}
+	id, err := dao.Save(u1,
+		daox.DisableGlobalInsertOmits(true),
+		daox.WithInsertOmits("utime"),
+	)
+	assert.NoError(t, err)
+	t.Log("info id", id)
+	u := &DemoInfo{}
+	ok, err := dao.GetByID(id, u)
+	assert.Equal(t, true, ok)
+	assert.Equal(t, nowSec, u.Ctime)
+	assert.Equal(t, int64(0), u.Utime)
 }

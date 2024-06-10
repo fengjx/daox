@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sync"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
@@ -19,24 +18,9 @@ import (
 var (
 	ErrUpdatePrimaryKeyRequire = errors.New("[daox] Primary key require for update")
 	ErrTxNil                   = errors.New("[daox] Tx is nil")
-
-	// defaultMasterDB 全局默认master数据库
-	defaultMasterDB *sqlx.DB
-	// defaultReadDB 全局默认read数据库
-	defaultReadDB *sqlx.DB
-
-	metaMap     = map[string]TableMeta{}
-	metaMapLock sync.RWMutex
 )
 
-func UseDefaultMasterDB(master *sqlx.DB) {
-	defaultMasterDB = master
-}
-
-func UseDefaultReadDB(read *sqlx.DB) {
-	defaultMasterDB = read
-}
-
+// Dao 数据访问
 type Dao struct {
 	masterDB   *sqlx.DB
 	readDB     *sqlx.DB
@@ -63,7 +47,7 @@ func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 	for _, opt := range opts {
 		opt(dao)
 	}
-	registerMeta(dao.TableMeta)
+	global.registerMeta(dao.TableMeta)
 	return dao
 }
 
@@ -79,20 +63,8 @@ func NewDaoByMeta(m Meta, opts ...Option) *Dao {
 	for _, opt := range opts {
 		opt(dao)
 	}
-	registerMeta(dao.TableMeta)
+	global.registerMeta(dao.TableMeta)
 	return dao
-}
-
-func registerMeta(meta TableMeta) {
-	metaMapLock.Lock()
-	defer metaMapLock.Unlock()
-	metaMap[meta.TableName] = meta
-}
-
-// GetMetaInfo 根据表名获得元信息
-func GetMetaInfo(tableName string) (meta TableMeta, ok bool) {
-	meta, ok = metaMap[tableName]
-	return
 }
 
 // SQLBuilder 创建当前表的 sqlbuilder
@@ -144,38 +116,39 @@ func (d *Dao) TableName() string {
 
 // Save 插入数据
 // omitColumns 不需要 insert 的字段
-func (d *Dao) Save(dest Model, omitColumns ...string) (int64, error) {
-	return d.SaveContext(context.Background(), dest, omitColumns...)
+func (d *Dao) Save(dest Model, opts ...InsertOption) (int64, error) {
+	return d.SaveContext(context.Background(), dest, opts...)
 }
 
 // SaveContext 插入数据，携带上下文
 // omitColumns 不需要 insert 的字段
-func (d *Dao) SaveContext(ctx context.Context, dest Model, omitColumns ...string) (int64, error) {
-	return d.saveContext(ctx, nil, dest, omitColumns...)
+func (d *Dao) SaveContext(ctx context.Context, dest Model, opts ...InsertOption) (int64, error) {
+	return d.saveContext(ctx, nil, dest, opts...)
 }
 
 // SaveTx 插入数据，支持事务
 // omitColumns 不需要 insert 的字段
-func (d *Dao) SaveTx(tx *sqlx.Tx, dest Model, omitColumns ...string) (int64, error) {
-	return d.SaveTxContext(context.Background(), tx, dest, omitColumns...)
+func (d *Dao) SaveTx(tx *sqlx.Tx, dest Model, opts ...InsertOption) (int64, error) {
+	return d.SaveTxContext(context.Background(), tx, dest, opts...)
 }
 
 // SaveTxContext 插入数据，支持事务，携带上下文
 // omitColumns 不需要 insert 的字段
-func (d *Dao) SaveTxContext(ctx context.Context, tx *sqlx.Tx, dest Model, omitColumns ...string) (int64, error) {
+func (d *Dao) SaveTxContext(ctx context.Context, tx *sqlx.Tx, dest Model, opts ...InsertOption) (int64, error) {
 	if err := d.checkTxNil(tx); err != nil {
 		return 0, err
 	}
-	return d.saveContext(ctx, tx, dest, omitColumns...)
+	return d.saveContext(ctx, tx, dest, opts...)
 }
 
-func (d *Dao) saveContext(ctx context.Context, tx *sqlx.Tx, dest Model, omitColumns ...string) (int64, error) {
-	tableMeta := d.TableMeta
-	if tableMeta.IsAutoIncrement {
-		omitColumns = append(omitColumns, tableMeta.PrimaryKey)
+func (d *Dao) saveContext(ctx context.Context, tx *sqlx.Tx, dest Model, opts ...InsertOption) (int64, error) {
+	opt := &InsertOptions{}
+	for _, o := range opts {
+		o(opt)
 	}
-	columns := tableMeta.OmitColumns(omitColumns...)
-	execSql, err := d.SQLBuilder().Insert().Columns(columns...).NameSQL()
+	execSql, err := d.SQLBuilder().Insert().
+		Columns(d.getSaveColumns(opt)...).
+		NameSQL()
 	if err != nil {
 		return 0, err
 	}
@@ -193,20 +166,19 @@ func (d *Dao) saveContext(ctx context.Context, tx *sqlx.Tx, dest Model, omitColu
 
 // ReplaceInto replace into table
 // omitColumns 不需要 insert 的字段
-func (d *Dao) ReplaceInto(dest Model, omitColumns ...string) (int64, error) {
-	return d.ReplaceIntoContext(context.Background(), dest, omitColumns...)
+func (d *Dao) ReplaceInto(dest Model, opts ...InsertOption) (int64, error) {
+	return d.ReplaceIntoContext(context.Background(), dest, opts...)
 }
 
 // ReplaceIntoContext replace into table，携带上下文
 // omitColumns 不需要 insert 的字段
-func (d *Dao) ReplaceIntoContext(ctx context.Context, dest Model, omitColumns ...string) (int64, error) {
-	tableMeta := d.TableMeta
-	if tableMeta.IsAutoIncrement {
-		omitColumns = append(omitColumns, tableMeta.PrimaryKey)
+func (d *Dao) ReplaceIntoContext(ctx context.Context, dest Model, opts ...InsertOption) (int64, error) {
+	opt := &InsertOptions{}
+	for _, o := range opts {
+		o(opt)
 	}
-	columns := tableMeta.OmitColumns(omitColumns...)
 	execSql, err := d.SQLBuilder().Insert().
-		Columns(columns...).
+		Columns(d.getSaveColumns(opt)...).
 		IsReplaceInto(true).
 		NameSQL()
 	if err != nil {
@@ -221,21 +193,20 @@ func (d *Dao) ReplaceIntoContext(ctx context.Context, dest Model, omitColumns ..
 
 // IgnoreInto 使用 INSERT IGNORE INTO 如果记录已存在则忽略
 // omitColumns 不需要 insert 的字段
-func (d *Dao) IgnoreInto(dest Model, omitColumns ...string) (int64, error) {
-	return d.IgnoreIntoContext(context.Background(), dest, omitColumns...)
+func (d *Dao) IgnoreInto(dest Model, opts ...InsertOption) (int64, error) {
+	return d.IgnoreIntoContext(context.Background(), dest, opts...)
 }
 
 // IgnoreIntoContext 使用 INSERT IGNORE INTO 如果记录已存在则忽略，携带上下文
 // omitColumns 不需要 insert 的字段
-func (d *Dao) IgnoreIntoContext(ctx context.Context, dest Model, omitColumns ...string) (int64, error) {
-	tableMeta := d.TableMeta
-	if tableMeta.IsAutoIncrement {
-		omitColumns = append(omitColumns, tableMeta.PrimaryKey)
+func (d *Dao) IgnoreIntoContext(ctx context.Context, dest Model, opts ...InsertOption) (int64, error) {
+	opt := &InsertOptions{}
+	for _, o := range opts {
+		o(opt)
 	}
-	columns := tableMeta.OmitColumns(omitColumns...)
 	execSql, err := d.SQLBuilder().Insert().
+		Columns(d.getSaveColumns(opt)...).
 		IsIgnoreInto(true).
-		Columns(columns...).
 		NameSQL()
 	if err != nil {
 		return 0, err
@@ -249,20 +220,20 @@ func (d *Dao) IgnoreIntoContext(ctx context.Context, dest Model, omitColumns ...
 
 // BatchSave 批量新增，携带上下文
 // omitColumns 不需要 insert 的字段
-func (d *Dao) BatchSave(models any, omitColumns ...string) (int64, error) {
-	return d.BatchSaveContext(context.Background(), models, omitColumns...)
+func (d *Dao) BatchSave(models any, opts ...InsertOption) (int64, error) {
+	return d.BatchSaveContext(context.Background(), models, opts...)
 }
 
 // BatchSaveContext 批量新增
 // omitColumns 不需要 insert 的字段
-func (d *Dao) BatchSaveContext(ctx context.Context, models any, omitColumns ...string) (int64, error) {
-	tableMeta := d.TableMeta
-	var columns []string
-	if tableMeta.IsAutoIncrement {
-		omitColumns = append(omitColumns, tableMeta.PrimaryKey)
+func (d *Dao) BatchSaveContext(ctx context.Context, models any, opts ...InsertOption) (int64, error) {
+	opt := &InsertOptions{}
+	for _, o := range opts {
+		o(opt)
 	}
-	columns = tableMeta.OmitColumns(omitColumns...)
-	execSQL, err := d.SQLBuilder().Insert().Columns(columns...).NameSQL()
+	execSQL, err := d.SQLBuilder().Insert().
+		Columns(d.getSaveColumns(opt)...).
+		NameSQL()
 	if err != nil {
 		return 0, err
 	}
@@ -276,22 +247,20 @@ func (d *Dao) BatchSaveContext(ctx context.Context, models any, omitColumns ...s
 // BatchReplaceInto 批量新增，使用 replace into 方式
 // models 是一个 slice
 // omitColumns 不需要 insert 的字段
-func (d *Dao) BatchReplaceInto(models any, omitColumns ...string) (int64, error) {
-	return d.BatchReplaceIntoContext(context.Background(), models, omitColumns...)
+func (d *Dao) BatchReplaceInto(models any, opts ...InsertOption) (int64, error) {
+	return d.BatchReplaceIntoContext(context.Background(), models, opts...)
 }
 
 // BatchReplaceIntoContext 批量新增，使用 replace into 方式，携带上下文
 // models 是一个 slice
 // omitColumns 不需要 insert 的字段
-func (d *Dao) BatchReplaceIntoContext(ctx context.Context, models any, omitColumns ...string) (int64, error) {
-	tableMeta := d.TableMeta
-	var columns []string
-	if tableMeta.IsAutoIncrement {
-		omitColumns = append(omitColumns, tableMeta.PrimaryKey)
+func (d *Dao) BatchReplaceIntoContext(ctx context.Context, models any, opts ...InsertOption) (int64, error) {
+	opt := &InsertOptions{}
+	for _, o := range opts {
+		o(opt)
 	}
-	columns = tableMeta.OmitColumns(omitColumns...)
 	execSQL, err := d.SQLBuilder().Insert().
-		Columns(columns...).
+		Columns(d.getSaveColumns(opt)...).
 		IsReplaceInto(true).
 		NameSQL()
 	if err != nil {
@@ -302,6 +271,21 @@ func (d *Dao) BatchReplaceIntoContext(ctx context.Context, models any, omitColum
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+func (d *Dao) getSaveColumns(opt *InsertOptions) []string {
+	meta := d.TableMeta
+	var omits []string
+	if meta.IsAutoIncrement {
+		omits = append(omits, meta.PrimaryKey)
+	}
+	if len(opt.omitColumns) > 0 {
+		omits = append(omits, opt.omitColumns...)
+	}
+	if !opt.disableGlobalOmitColumns && len(global.saveOmitColumns) > 0 {
+		omits = append(omits, global.saveOmitColumns...)
+	}
+	return meta.OmitColumns(omits...)
 }
 
 // Get 根据查询条件查询单条记录
@@ -825,7 +809,7 @@ func (d *Dao) GetMasterDB() *sqlx.DB {
 	if d.masterDB != nil {
 		return d.masterDB
 	}
-	return defaultMasterDB
+	return global.defaultMasterDB
 }
 
 func (d *Dao) GetReadDB() *sqlx.DB {
@@ -835,10 +819,10 @@ func (d *Dao) GetReadDB() *sqlx.DB {
 	if d.masterDB != nil {
 		return d.masterDB
 	}
-	if defaultReadDB != nil {
-		return defaultReadDB
+	if global.defaultReadDB != nil {
+		return global.defaultReadDB
 	}
-	return defaultMasterDB
+	return global.defaultMasterDB
 }
 
 func (d *Dao) initIfNullVal() {

@@ -9,7 +9,6 @@ import (
 	"github.com/fengjx/daox/sqlbuilder"
 	"github.com/fengjx/daox/sqlbuilder/ql"
 	"github.com/fengjx/daox/types"
-	"github.com/fengjx/daox/utils"
 )
 
 const (
@@ -158,14 +157,7 @@ func buildCondition(conditions []Condition) sqlbuilder.ConditionBuilder {
 }
 
 // Find 通用查询封装
-func Find[T any](ctx context.Context, dbx *sqlx.DB, query QueryRecord, opts ...SelectOption) (list []T, page *Page, err error) {
-	opt := &SelectOptions{}
-	for _, option := range opts {
-		option(opt)
-	}
-	if opt.FieldsFilter != nil {
-		query.Fields = filterSelectFields(ctx, opt.FieldsFilter, query.Fields)
-	}
+func Find[T any](ctx context.Context, dbx *sqlx.DB, query QueryRecord) (list []T, page *Page, err error) {
 	sql, args, err := query.ToSQLArgs()
 	if err != nil {
 		return nil, query.Page, err
@@ -173,11 +165,6 @@ func Find[T any](ctx context.Context, dbx *sqlx.DB, query QueryRecord, opts ...S
 	err = dbx.SelectContext(ctx, &list, sql, args...)
 	if err != nil {
 		return nil, query.Page, err
-	}
-	if opt.ResultWrapper != nil {
-		for i, item := range list {
-			list[i] = opt.ResultWrapper(ctx, item).(T)
-		}
 	}
 	page = query.Page
 	page.Offset += int64(len(list))
@@ -193,14 +180,7 @@ func Find[T any](ctx context.Context, dbx *sqlx.DB, query QueryRecord, opts ...S
 }
 
 // FindListMap 通用查询封装，返回 map 类型
-func FindListMap(ctx context.Context, dbx *sqlx.DB, query QueryRecord, opts ...SelectOption) (list []map[string]any, page *Page, err error) {
-	opt := &SelectOptions{}
-	for _, option := range opts {
-		option(opt)
-	}
-	if opt.FieldsFilter != nil {
-		query.Fields = filterSelectFields(ctx, opt.FieldsFilter, query.Fields)
-	}
+func FindListMap(ctx context.Context, dbx *sqlx.DB, query QueryRecord) (list []map[string]any, page *Page, err error) {
 	sql, args, err := query.ToSQLArgs()
 	if err != nil {
 		return nil, query.Page, err
@@ -231,9 +211,6 @@ func FindListMap(ctx context.Context, dbx *sqlx.DB, query QueryRecord, opts ...S
 		data := make(map[string]any)
 		for i, column := range columns {
 			data[column] = reflect.ValueOf(values[i]).Elem().Interface()
-		}
-		if opt.ResultWrapper != nil {
-			data = opt.ResultWrapper(ctx, data).(map[string]any)
 		}
 		list = append(list, data)
 	}
@@ -281,14 +258,7 @@ func (r GetRecord) ToSQLArgs() (sql string, args []any, err error) {
 }
 
 // Get 查询单条记录
-func Get[T any](ctx context.Context, dbx *sqlx.DB, record GetRecord, opts ...SelectOption) (*T, error) {
-	opt := &SelectOptions{}
-	for _, option := range opts {
-		option(opt)
-	}
-	if opt.FieldsFilter != nil {
-		record.Fields = filterSelectFields(ctx, opt.FieldsFilter, record.Fields)
-	}
+func Get[T any](ctx context.Context, dbx *sqlx.DB, record GetRecord) (*T, error) {
 	sql, args, err := record.ToSQLArgs()
 	if err != nil {
 		return nil, err
@@ -298,21 +268,11 @@ func Get[T any](ctx context.Context, dbx *sqlx.DB, record GetRecord, opts ...Sel
 	if err != nil {
 		return nil, err
 	}
-	if opt.ResultWrapper != nil {
-		data = opt.ResultWrapper(ctx, data).(*T)
-	}
 	return data, nil
 }
 
 // GetMap 查询单条记录，返回 map
-func GetMap(ctx context.Context, dbx *sqlx.DB, record GetRecord, opts ...SelectOption) (map[string]any, error) {
-	opt := &SelectOptions{}
-	for _, option := range opts {
-		option(opt)
-	}
-	if opt.FieldsFilter != nil {
-		record.Fields = filterSelectFields(ctx, opt.FieldsFilter, record.Fields)
-	}
+func GetMap(ctx context.Context, dbx *sqlx.DB, record GetRecord) (map[string]any, error) {
 	sql, args, err := record.ToSQLArgs()
 	if err != nil {
 		return nil, err
@@ -339,20 +299,5 @@ func GetMap(ctx context.Context, dbx *sqlx.DB, record GetRecord, opts ...SelectO
 	for i, column := range columns {
 		data[column] = reflect.ValueOf(values[i]).Elem().Interface()
 	}
-	if opt.ResultWrapper != nil {
-		data = opt.ResultWrapper(ctx, data).(map[string]any)
-	}
 	return data, nil
-}
-
-func filterSelectFields(ctx context.Context, filter FieldsFilter, src []string) []string {
-	disableFields := filter(ctx)
-	var fields []string
-	for _, field := range src {
-		if utils.ContainsString(disableFields, field) {
-			continue
-		}
-		fields = append(fields, field)
-	}
-	return fields
 }

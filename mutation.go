@@ -20,14 +20,6 @@ func Insert(ctx context.Context, dbx *sqlx.DB, record InsertRecord, opts ...Inse
 	for _, option := range opts {
 		option(opt)
 	}
-	if opt.DataWrapper != nil {
-		record.Row = opt.DataWrapper(ctx, record.Row)
-	}
-	if opt.FieldsFilter != nil {
-		for _, disableField := range opt.FieldsFilter(ctx) {
-			delete(record.Row, disableField)
-		}
-	}
 	inserter := sqlbuilder.NewInserter(record.TableName)
 	var columns []string
 	for col := range record.Row {
@@ -53,19 +45,7 @@ type UpdateRecord struct {
 }
 
 // Update 通用 update 操作
-func Update(ctx context.Context, dbx *sqlx.DB, record UpdateRecord, opts ...UpdateOption) (int64, error) {
-	opt := &UpdateOptions{}
-	for _, option := range opts {
-		option(opt)
-	}
-	if opt.DataWrapper != nil {
-		record.Row = opt.DataWrapper(ctx, record.Row)
-	}
-	if opt.FieldsFilter != nil {
-		for _, disableField := range opt.FieldsFilter(ctx) {
-			delete(record.Row, disableField)
-		}
-	}
+func Update(ctx context.Context, dbx *sqlx.DB, record UpdateRecord) (int64, error) {
 	updater := sqlbuilder.NewUpdater(record.TableName)
 	for col, val := range record.Row {
 		updater.Set(col, val)
