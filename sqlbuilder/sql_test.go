@@ -39,7 +39,7 @@ func TestSelect(t *testing.T) {
 			name: "select columns if null",
 			selector: sqlbuilder.New("user").Select().
 				Columns("id", "username", "email").
-				IfNullVal("email", "''"),
+				IfNullVal("email", ""),
 			wantSQL: "SELECT `id`, `username`, IFNULL(`email`, '') as `email` FROM `user`;",
 		},
 		{
@@ -47,7 +47,7 @@ func TestSelect(t *testing.T) {
 			selector: sqlbuilder.New("user").Select().
 				Columns("id", "username", "email").
 				IfNullVals(map[string]string{
-					"email": "''",
+					"email": "",
 				}),
 			wantSQL: "SELECT `id`, `username`, IFNULL(`email`, '') as `email` FROM `user`;",
 		},

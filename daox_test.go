@@ -403,7 +403,7 @@ func TestDisableGlobalOmitColumns(t *testing.T) {
 		daox.IsAutoIncrement(),
 		daox.WithDBMaster(DBMaster),
 		daox.WithIfNullVals(map[string]string{
-			"utime": "0",
+			"utime": "10",
 		}),
 	)
 	nowSec := time.Now().Unix()
@@ -425,5 +425,5 @@ func TestDisableGlobalOmitColumns(t *testing.T) {
 	ok, err := dao.GetByID(id, u)
 	assert.Equal(t, true, ok)
 	assert.Equal(t, nowSec, u.Ctime)
-	assert.Equal(t, int64(0), u.Utime)
+	assert.Equal(t, int64(10), u.Utime)
 }
