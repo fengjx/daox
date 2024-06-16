@@ -27,3 +27,4 @@
 ### 1.1.0
 
 - [支持全局配置](https://github.com/fengjx/daox/pull/44)
+- [ifnull 优化](https://github.com/fengjx/daox/pull/45)
