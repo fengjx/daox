@@ -427,3 +427,19 @@ func TestDisableGlobalOmitColumns(t *testing.T) {
 	assert.Equal(t, nowSec, u.Ctime)
 	assert.Equal(t, int64(10), u.Utime)
 }
+
+func TestWithTableName(t *testing.T) {
+	tb := "demo_info_with_table"
+	before(t, tb)
+	DBMaster := newDb()
+	dao := daox.NewDao[*DemoInfo](
+		tb,
+		"id",
+		daox.IsAutoIncrement(),
+		daox.WithDBMaster(DBMaster),
+	)
+	tb2 := "demo_info_with_table"
+	dao2 := dao.WithTableName(tb2)
+	assert.Equal(t, tb, dao.TableName())
+	assert.Equal(t, tb2, dao2.TableName())
+}

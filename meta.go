@@ -14,7 +14,7 @@ type TableMeta struct {
 
 // OmitColumns 数据库表字段
 // omit 包含的字段
-func (meta *TableMeta) OmitColumns(omit ...string) []string {
+func (meta TableMeta) OmitColumns(omit ...string) []string {
 	if len(omit) == 0 {
 		return meta.Columns
 	}
@@ -25,6 +25,16 @@ func (meta *TableMeta) OmitColumns(omit ...string) []string {
 		}
 	}
 	return columnArr
+}
+
+// WithTableName 设置表名，一般用在分表的场景，设置实际物理表名
+func (meta TableMeta) WithTableName(tableName string) TableMeta {
+	return TableMeta{
+		TableName:       tableName,
+		Columns:         meta.Columns,
+		PrimaryKey:      meta.PrimaryKey,
+		IsAutoIncrement: meta.IsAutoIncrement,
+	}
 }
 
 // Model 数据库 model 定义

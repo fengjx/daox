@@ -54,7 +54,7 @@ func (m *TxManager) ExecTx(ctx context.Context, fn TxFun) (err error) {
 			panic(perr)
 		}
 		if err != nil {
-			// 这里不给 err 复制，因为希望返回回滚前的原始 err
+			// 这里不给 err 赋值，因为希望返回回滚前的原始 err
 			_ = tx.Rollback()
 			return
 		}
