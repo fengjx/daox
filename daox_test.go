@@ -1,6 +1,7 @@
 package daox_test
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -279,21 +280,6 @@ func testUpdate(t *testing.T) {
 	assert.Equal(t, u1.Name, u2.Name)
 }
 
-func testUpdateByCond(t *testing.T) {
-	DBMaster := newDb()
-	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
-	rows, err := dao.UpdateByCond(
-		map[string]any{
-			DemoInfoMeta.Sex: "female",
-		},
-		ql.C().And(DemoInfoMeta.UidGT(105)),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log("update rows", rows)
-}
-
 func testDeleteByColumns(t *testing.T) {
 	DBMaster := newDb()
 	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
@@ -388,7 +374,6 @@ func TestDaox(t *testing.T) {
 	t.Run("testBatchSave", testBatchSave)
 	t.Run("testUpdate", testUpdate)
 	t.Run("testPage", testPage)
-	t.Run("testUpdateByCond", testUpdateByCond)
 	t.Run("testDeleteByColumns", testDeleteByColumns)
 }
 
@@ -442,4 +427,66 @@ func TestWithTableName(t *testing.T) {
 	dao2 := dao.WithTableName(tb2)
 	assert.Equal(t, tb, dao.TableName())
 	assert.Equal(t, tb2, dao2.TableName())
+}
+
+func TestUpdater_Exec(t *testing.T) {
+	tb := "demo_info_updater"
+	before(t, tb)
+	DBMaster := newDb()
+	dao := daox.NewDao[*DemoInfo](
+		tb,
+		"id",
+		daox.IsAutoIncrement(),
+		daox.WithDBMaster(DBMaster),
+	)
+	affected, err := dao.Updater().
+		Fields(
+			ql.F("name").Val("fengjx-1024"),
+			ql.F("login_time").Incr(60*60),
+		).
+		Where(ql.C(DemoInfoMeta.UidEQ(100))).
+		Exec(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(1), affected)
+	m1 := &DemoInfo{}
+	exist, err := dao.GetByColumn(daox.OfKv("uid", 100), m1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, true, exist)
+	assert.Equal(t, "fengjx-1024", m1.Name)
+}
+
+func TestUpdater_NamedExec(t *testing.T) {
+	tb := "demo_info_updater"
+	before(t, tb)
+	DBMaster := newDb()
+	dao := daox.NewDao[*DemoInfo](
+		tb,
+		"id",
+		daox.IsAutoIncrement(),
+		daox.WithDBMaster(DBMaster),
+	)
+	u := &DemoInfo{
+		UID:  100,
+		Name: "fengjx-1024",
+	}
+	affected, err := dao.Updater().
+		Columns("name").
+		Incr("login_time", 60*60).
+		Where(ql.SC().And("uid = :uid")).
+		NamedExec(context.Background(), u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(1), affected)
+	m1 := &DemoInfo{}
+	exist, err := dao.GetByColumn(daox.OfKv("uid", 100), m1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, true, exist)
+	assert.Equal(t, "fengjx-1024", m1.Name)
 }

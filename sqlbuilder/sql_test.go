@@ -369,6 +369,28 @@ func TestUpdate(t *testing.T) {
 			wantSQL:  "UPDATE `user` SET `name` = ?, `age` = ? WHERE `id` = ?;",
 			wantArgs: []any{"fengjx", 20, 1000},
 		},
+		{
+			name: "update use incr",
+			updater: sqlbuilder.New("user").
+				Update().
+				Columns("username", "sex").
+				Incr("age", 1).
+				Where(ql.SC().And("`id` = :id")),
+			wantNameSQL: "UPDATE `user` SET `username` = :username, `sex` = :sex, `age` = `age` + 1 WHERE `id` = :id;",
+		},
+		{
+			name: "update use fields",
+			updater: sqlbuilder.New("user").
+				Update().
+				Fields(
+					ql.F("username").Val("fengjx"),
+					ql.F("sex").Val("male"),
+					ql.F("age").Incr(1),
+				).
+				Where(ql.C(ql.Col("id").EQ(100))),
+			wantSQL:  "UPDATE `user` SET `username` = ?, `sex` = ?, `age` = `age` + 1 WHERE `id` = ?;",
+			wantArgs: []any{"fengjx", "male", 100},
+		},
 	}
 
 	for _, tc := range testCases {

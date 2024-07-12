@@ -4,6 +4,7 @@ import (
 	"strings"
 )
 
+// Column 表字段
 type Column struct {
 	name  string
 	op    Op
@@ -19,6 +20,7 @@ func Col(c string) Column {
 	}
 }
 
+// Use 是否使用
 func (c Column) Use(use bool) Column {
 	c.isUse = use
 	return c
@@ -94,6 +96,7 @@ func (c Column) NotIn(vals ...any) Column {
 	return c
 }
 
+// Express 输出 sql 表达式
 func (c Column) Express() string {
 	sb := strings.Builder{}
 	sb.WriteByte('`')
@@ -108,6 +111,41 @@ func (c Column) Express() string {
 	return sb.String()
 }
 
+// HasInSQL 是否有 in 语句
 func (c Column) HasInSQL() bool {
 	return c.op == OpIn || c.op == OpNotIN
+}
+
+// Field 表更新字段
+type Field struct {
+	isUse   bool   // 是否启用
+	col     string // 字段名
+	val     any    // 字段值
+	incrVal *int64 // 递增值，eg: set a = a + 1
+}
+
+// F 创建更新字段
+func F(col string) Field {
+	return Field{
+		isUse: true,
+		col:   col,
+	}
+}
+
+// Val 设置字段值
+func (f Field) Val(val any) Field {
+	f.val = val
+	return f
+}
+
+// Incr 设置字段增加值
+func (f Field) Incr(n int64) Field {
+	f.incrVal = &n
+	return f
+}
+
+// Use 是否启用
+func (f Field) Use(use bool) Field {
+	f.isUse = use
+	return f
 }

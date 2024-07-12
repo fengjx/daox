@@ -53,6 +53,7 @@ type Builder struct {
 	tableName string
 }
 
+// New 创建 sql builder
 func New(tableName string) *Builder {
 	builder := &Builder{
 		tableName: tableName,
@@ -60,18 +61,22 @@ func New(tableName string) *Builder {
 	return builder
 }
 
+// Select 创建 select 语句构造器
 func (b *Builder) Select(columns ...string) *Selector {
 	return NewSelector(b.tableName).Columns(columns...)
 }
 
+// Insert 创建 insert 语句构造器
 func (b *Builder) Insert(columns ...string) *Inserter {
 	return NewInserter(b.tableName).Columns(columns...)
 }
 
+// Update 创建 update 语句构造器
 func (b *Builder) Update(columns ...string) *Updater {
 	return NewUpdater(b.tableName).Columns(columns...)
 }
 
+// Delete 创建 delete 语句构造器
 func (b *Builder) Delete() *Deleter {
 	return NewDeleter(b.tableName)
 }
