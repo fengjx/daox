@@ -788,12 +788,26 @@ func (d *Dao) checkTxNil(tx *sqlx.Tx) error {
 // With 使用新的数据库连接创建 Dao
 func (d *Dao) With(master, read *sqlx.DB, opts ...Option) *Dao {
 	newDao := &Dao{
-		masterDB:  master,
-		readDB:    read,
-		TableMeta: d.TableMeta,
+		masterDB:   master,
+		readDB:     read,
+		TableMeta:  d.TableMeta,
+		Mapper:     d.Mapper,
+		ifNullVals: d.ifNullVals,
 	}
 	for _, opt := range opts {
 		opt(newDao)
+	}
+	return newDao
+}
+
+// WithTableName 使用新的数据库连接创建 Dao
+func (d *Dao) WithTableName(tableName string) *Dao {
+	newDao := &Dao{
+		masterDB:   d.masterDB,
+		readDB:     d.readDB,
+		TableMeta:  d.TableMeta.WithTableName(tableName),
+		Mapper:     d.Mapper,
+		ifNullVals: d.ifNullVals,
 	}
 	return newDao
 }

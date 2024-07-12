@@ -28,3 +28,4 @@
 
 - [支持全局配置](https://github.com/fengjx/daox/pull/44)
 - [ifnull 优化](https://github.com/fengjx/daox/pull/45)
+- [with 方法支持表路由](https://github.com/fengjx/daox/pull/48)
