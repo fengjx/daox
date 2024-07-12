@@ -85,6 +85,11 @@ func (d *Dao) Selector(columns ...string) *sqlbuilder.Selector {
 	return selector
 }
 
+// Updater 创建当前表的 updater
+func (d *Dao) Updater() *sqlbuilder.Updater {
+	return d.SQLBuilder().Update().DB(d.masterDB)
+}
+
 // GetColumnsByModel 根据 model 结构获取数据库字段
 // omitColumns 表示需要忽略的字段
 func (d *Dao) GetColumnsByModel(model any, omitColumns ...string) []string {
@@ -509,53 +514,6 @@ func (d *Dao) ListByIDsTxContext(ctx context.Context, tx *sqlx.Tx, dest any, ids
 	return d.ListByColumnsTxContext(ctx, tx, OfMultiKv(tableMeta.PrimaryKey, ids...), dest)
 }
 
-// UpdateByCond 根据条件更新字段
-// attr 字段更新值
-func (d *Dao) UpdateByCond(attr map[string]any, where sqlbuilder.ConditionBuilder) (int64, error) {
-	return d.UpdateByCondContext(context.Background(), attr, where)
-}
-
-// UpdateByCondContext 根据条件更新字段，携带上下文
-// attr 字段更新值
-func (d *Dao) UpdateByCondContext(ctx context.Context, attr map[string]any, where sqlbuilder.ConditionBuilder) (int64, error) {
-	return d.updateByCondContext(ctx, nil, attr, where)
-}
-
-// UpdateByCondTx 根据条件更新字段，支持事务
-func (d *Dao) UpdateByCondTx(tx *sqlx.Tx, attr map[string]any, where sqlbuilder.ConditionBuilder) (int64, error) {
-	return d.UpdateByCondTxContext(context.Background(), tx, attr, where)
-}
-
-// UpdateByCondTxContext 根据条件更新字段，支持事务，携带上下文
-func (d *Dao) UpdateByCondTxContext(ctx context.Context, tx *sqlx.Tx, attr map[string]any, where sqlbuilder.ConditionBuilder) (int64, error) {
-	if err := d.checkTxNil(tx); err != nil {
-		return 0, err
-	}
-	return d.updateByCondContext(ctx, tx, attr, where)
-}
-
-func (d *Dao) updateByCondContext(ctx context.Context, tx *sqlx.Tx, attr map[string]any, where sqlbuilder.ConditionBuilder) (int64, error) {
-	updater := d.SQLBuilder().Update()
-	for col, val := range attr {
-		updater.Set(col, val)
-	}
-	updater.Where(where)
-	updateSQL, args, err := updater.SQLArgs()
-	if err != nil {
-		return 0, err
-	}
-	var res sql.Result
-	if tx == nil {
-		res, err = d.GetMasterDB().ExecContext(ctx, updateSQL, args...)
-	} else {
-		res, err = tx.ExecContext(ctx, updateSQL, args...)
-	}
-	if err != nil {
-		return 0, err
-	}
-	return res.RowsAffected()
-}
-
 // UpdateField 部分字段更新
 func (d *Dao) UpdateField(idValue any, fieldMap map[string]any) (bool, error) {
 	return d.UpdateFieldContext(context.Background(), idValue, fieldMap)
@@ -591,6 +549,28 @@ func (d *Dao) updateFieldContext(ctx context.Context, tx *sqlx.Tx, idValue any, 
 		return false, err
 	}
 	return rows > 0, nil
+}
+
+func (d *Dao) updateByCondContext(ctx context.Context, tx *sqlx.Tx, attr map[string]any, where sqlbuilder.ConditionBuilder) (int64, error) {
+	updater := d.SQLBuilder().Update()
+	for col, val := range attr {
+		updater.Set(col, val)
+	}
+	updater.Where(where)
+	updateSQL, args, err := updater.SQLArgs()
+	if err != nil {
+		return 0, err
+	}
+	var res sql.Result
+	if tx == nil {
+		res, err = d.GetMasterDB().ExecContext(ctx, updateSQL, args...)
+	} else {
+		res, err = tx.ExecContext(ctx, updateSQL, args...)
+	}
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // Update 全字段更新
