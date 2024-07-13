@@ -2,6 +2,7 @@ package sqlbuilder
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -149,4 +150,43 @@ func (b *sqlBuilder) whereArgs(where ConditionBuilder) (args []any, hasInSQL boo
 		}
 	}
 	return
+}
+
+// setFields 字段赋值语句
+func (b *sqlBuilder) setFields(fields []Field) {
+	n := len(fields)
+	for i, f := range fields {
+		b.quote(f.col)
+		b.writeString(" = ")
+		if f.incrVal != nil {
+			b.quote(f.col)
+			b.writeString(" + ")
+			b.writeString(strconv.FormatInt(*f.incrVal, 10))
+		} else {
+			b.writeString("?")
+		}
+		if i != n-1 {
+			b.writeString(", ")
+		}
+	}
+}
+
+// setFields 字段赋值语句
+func (b *sqlBuilder) setNameFields(fields []Field) {
+	n := len(fields)
+	for i, f := range fields {
+		b.quote(f.col)
+		b.writeString(" = ")
+		if f.incrVal != nil {
+			b.quote(f.col)
+			b.writeString(" + ")
+			b.writeString(strconv.FormatInt(*f.incrVal, 10))
+		} else {
+			b.writeString(":")
+			b.writeString(f.col)
+		}
+		if i != n-1 {
+			b.writeString(", ")
+		}
+	}
 }

@@ -1,7 +1,6 @@
 package daox_test
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -171,13 +170,12 @@ func testSelect(t *testing.T) {
 	DBMaster := newDb()
 	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	var list []*DemoInfo
-	selector := dao.Selector().Where(
+	err := dao.Selector().Where(
 		ql.C().And(
 			DemoInfoMeta.UidIn(101, 102),
 			DemoInfoMeta.SexEQ("male"),
 		),
-	)
-	err := dao.Select(&list, selector)
+	).Select(&list)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,94 +188,19 @@ func testGet(t *testing.T) {
 	DBMaster := newDb()
 	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
 	demoInfo := &DemoInfo{}
-	selector := dao.Selector().
+	exist, err := dao.Selector().
 		Where(
-			ql.C().And(DemoInfoMeta.UidGT(100)),
+			ql.C(DemoInfoMeta.UidGT(100)),
 		).
 		Limit(1).
-		OrderBy(ql.Asc(DemoInfoMeta.UID))
-	exist, err := dao.Get(demoInfo, selector)
+		OrderBy(ql.Asc(DemoInfoMeta.UID)).
+		Get(demoInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, true, exist)
 	assert.Equal(t, int64(101), demoInfo.UID)
 	t.Log("demoInfo[uid]", demoInfo.UID)
-}
-
-func testBatchSave(t *testing.T) {
-	DBMaster := newDb()
-	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
-	nowUnix := time.Now().Unix()
-	users := []*DemoInfo{
-		{
-			UID:       1000,
-			Name:      "fengjx0",
-			Sex:       "1",
-			LoginTime: nowUnix,
-			Utime:     nowUnix,
-			Ctime:     nowUnix,
-		},
-		{
-			UID:       1001,
-			Name:      "fengjx1",
-			Sex:       "2",
-			LoginTime: nowUnix,
-			Utime:     nowUnix,
-			Ctime:     nowUnix,
-		},
-	}
-	affected, err := dao.BatchSave(users)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, int64(2), affected)
-	u := &DemoInfo{}
-	ok, err := dao.GetByColumn(daox.OfKv("uid", 1000), u)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ok {
-		t.Fatal("GetByColumn not exist")
-	}
-	assert.Equal(t, "fengjx0", u.Name)
-}
-
-func testUpdate(t *testing.T) {
-	DBMaster := newDb()
-	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
-	u1 := &DemoInfo{
-		UID:       20000,
-		Name:      "fengjx",
-		Sex:       "1",
-		LoginTime: time.Now().Unix(),
-		Utime:     time.Now().Unix(),
-		Ctime:     time.Now().Unix(),
-	}
-	id, err := dao.Save(u1)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	t.Logf("save id: %d", id)
-	u1.ID = id
-	u1.Name = "fjx"
-	u1.Utime = time.Now().Unix()
-	ok, err := dao.Update(u1, "ctime")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ok {
-		t.Fatal("dao update not success")
-	}
-	u2 := &DemoInfo{}
-	ok, err = dao.GetByID(id, u2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ok {
-		t.Fatal("GetByID not exist")
-	}
-	assert.Equal(t, u1.Name, u2.Name)
 }
 
 func testDeleteByColumns(t *testing.T) {
@@ -349,13 +272,11 @@ func TestSelectIfNull(t *testing.T) {
 		}),
 	)
 	var list []*DemoInfo
-	selector := dao.Selector().Where(
-		ql.C(
-			DemoInfoMeta.UidIn(101, 102),
-			DemoInfoMeta.SexEQ("male"),
-		),
-	)
-	err := dao.Select(&list, selector)
+	err := dao.Selector().Where(ql.C(
+		DemoInfoMeta.UidIn(101, 102),
+		DemoInfoMeta.SexEQ("male"),
+	)).Select(&list)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,10 +292,87 @@ func TestDaox(t *testing.T) {
 	t.Run("testCrud", testCrud)
 	t.Run("testSelect", testSelect)
 	t.Run("testGet", testGet)
-	t.Run("testBatchSave", testBatchSave)
-	t.Run("testUpdate", testUpdate)
 	t.Run("testPage", testPage)
 	t.Run("testDeleteByColumns", testDeleteByColumns)
+}
+
+func TestBatchSave(t *testing.T) {
+	tb := "demo_info_batch"
+	before(t, tb)
+	DBMaster := newDb()
+	dao := daox.NewDao[*DemoInfo](tb, "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
+	nowUnix := time.Now().Unix()
+	users := []*DemoInfo{
+		{
+			UID:       1000,
+			Name:      "fengjx0",
+			Sex:       "1",
+			LoginTime: nowUnix,
+			Utime:     nowUnix,
+			Ctime:     nowUnix,
+		},
+		{
+			UID:       1001,
+			Name:      "fengjx1",
+			Sex:       "2",
+			LoginTime: nowUnix,
+			Utime:     nowUnix,
+			Ctime:     nowUnix,
+		},
+	}
+	affected, err := dao.BatchSave(users)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(2), affected)
+	u := &DemoInfo{}
+	ok, err := dao.GetByColumn(daox.OfKv("uid", 1000), u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("GetByColumn not exist")
+	}
+	assert.Equal(t, "fengjx0", u.Name)
+}
+
+func TestDao_Update(t *testing.T) {
+	tb := "demo_info_update"
+	before(t, tb)
+	DBMaster := newDb()
+	dao := daox.NewDao[*DemoInfo](tb, "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
+	u1 := &DemoInfo{
+		UID:       20000,
+		Name:      "fengjx",
+		Sex:       "1",
+		LoginTime: time.Now().Unix(),
+		Utime:     time.Now().Unix(),
+		Ctime:     time.Now().Unix(),
+	}
+	id, err := dao.Save(u1)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	t.Logf("save id: %d", id)
+	u1.ID = id
+	u1.Name = "fjx"
+	u1.Utime = time.Now().Unix()
+	ok, err := dao.Update(u1, "ctime")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("dao update not success")
+	}
+	u2 := &DemoInfo{}
+	ok, err = dao.GetByID(id, u2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("GetByID not exist")
+	}
+	assert.Equal(t, u1.Name, u2.Name)
 }
 
 func TestDisableGlobalOmitColumns(t *testing.T) {
@@ -445,7 +443,7 @@ func TestUpdater_Exec(t *testing.T) {
 			ql.F("login_time").Incr(60*60),
 		).
 		Where(ql.C(DemoInfoMeta.UidEQ(100))).
-		Exec(context.Background())
+		Exec()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -477,7 +475,7 @@ func TestUpdater_NamedExec(t *testing.T) {
 		Columns("name").
 		Incr("login_time", 60*60).
 		Where(ql.SC().And("uid = :uid")).
-		NamedExec(context.Background(), u)
+		NamedExec(u)
 	if err != nil {
 		t.Fatal(err)
 	}

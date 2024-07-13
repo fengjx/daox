@@ -2,17 +2,16 @@ package sqlbuilder
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/fengjx/daox/internal/adapter"
+	"github.com/fengjx/daox/engine"
 )
 
-// Updater 语句构造器
+// Updater update 语句构造器
 type Updater struct {
-	execer adapter.Execer
 	sqlBuilder
+	execer    engine.Execer
 	tableName string
 	fields    []Field
 	where     ConditionBuilder
@@ -25,8 +24,8 @@ func NewUpdater(tableName string) *Updater {
 	}
 }
 
-// DB 设置数据库
-func (u *Updater) DB(execer adapter.Execer) *Updater {
+// Execer 设置Execer
+func (u *Updater) Execer(execer engine.Execer) *Updater {
 	u.execer = execer
 	return u
 }
@@ -78,20 +77,7 @@ func (u *Updater) SQL() (string, error) {
 	u.writeString("UPDATE ")
 	u.quote(u.tableName)
 	u.writeString(" SET ")
-	for i, f := range u.fields {
-		u.quote(f.col)
-		u.writeString(" = ")
-		if f.incrVal != nil {
-			u.quote(f.col)
-			u.writeString(" + ")
-			u.writeString(strconv.FormatInt(*f.incrVal, 10))
-		} else {
-			u.writeString("?")
-		}
-		if i != len(u.fields)-1 {
-			u.writeString(", ")
-		}
-	}
+	u.setFields(u.fields)
 	u.whereSQL(u.where)
 	u.end()
 	return u.sb.String(), nil
@@ -99,7 +85,13 @@ func (u *Updater) SQL() (string, error) {
 
 // SQLArgs 构造 sql 并返回对应参数
 func (u *Updater) SQLArgs() (string, []any, error) {
-	sql, err := u.SQL()
+	if len(u.fields) == 0 {
+		return "", nil, ErrColumnsRequire
+	}
+	if u.where != nil && len(u.where.getPredicates()) == 0 {
+		return "", nil, ErrUpdateMissWhere
+	}
+	execSQL, err := u.SQL()
 	var args []any
 	for _, f := range u.fields {
 		if f.val != nil {
@@ -111,49 +103,43 @@ func (u *Updater) SQLArgs() (string, []any, error) {
 		args = append(args, wargs...)
 	}
 	if !hasInSQL {
-		return sql, args, err
+		return execSQL, args, err
 	}
-	return sqlx.In(sql, args...)
+	return sqlx.In(execSQL, args...)
 }
 
 func (u *Updater) NameSQL() (string, error) {
 	if len(u.fields) == 0 {
 		return "", ErrColumnsRequire
 	}
+	if u.where != nil && len(u.where.getPredicates()) == 0 {
+		return "", ErrUpdateMissWhere
+	}
 	u.reset()
 	u.writeString("UPDATE ")
 	u.quote(u.tableName)
 	u.writeString(" SET ")
-	for i, f := range u.fields {
-		u.quote(f.col)
-		u.writeString(" = ")
-		if f.incrVal != nil {
-			u.quote(f.col)
-			u.writeString(" + ")
-			u.writeString(strconv.FormatInt(*f.incrVal, 10))
-		} else {
-			u.writeString(":")
-			u.writeString(f.col)
-		}
-		if i != len(u.fields)-1 {
-			u.writeString(", ")
-		}
-	}
+	u.setNameFields(u.fields)
 	u.whereSQL(u.where)
 	u.end()
 	return u.sb.String(), nil
 }
 
 // Exec 执行更新语句
-func (u *Updater) Exec(ctx context.Context) (int64, error) {
+func (u *Updater) Exec() (int64, error) {
+	return u.ExecContext(context.Background())
+}
+
+// ExecContext 执行更新语句
+func (u *Updater) ExecContext(ctx context.Context) (int64, error) {
 	if u.execer == nil {
 		return 0, ErrExecerNotSet
 	}
-	sql, args, err := u.SQLArgs()
+	execSQL, args, err := u.SQLArgs()
 	if err != nil {
 		return 0, err
 	}
-	result, err := u.execer.ExecContext(ctx, sql, args...)
+	result, err := u.execer.ExecContext(ctx, execSQL, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -161,15 +147,22 @@ func (u *Updater) Exec(ctx context.Context) (int64, error) {
 }
 
 // NamedExec 通过 NameSQL 执行更新语句，参数通过 data 填充
-func (u *Updater) NamedExec(ctx context.Context, data any) (int64, error) {
+// where 条件也必须是 name 风格
+func (u *Updater) NamedExec(data any) (int64, error) {
+	return u.NamedExecContext(context.Background(), data)
+}
+
+// NamedExecContext 通过 NameSQL 执行更新语句，参数通过 data 填充
+// where 条件也必须是 name 风格
+func (u *Updater) NamedExecContext(ctx context.Context, data any) (int64, error) {
 	if u.execer == nil {
 		return 0, ErrExecerNotSet
 	}
-	sql, err := u.NameSQL()
+	execSQL, err := u.NameSQL()
 	if err != nil {
 		return 0, err
 	}
-	result, err := u.execer.NamedExecContext(ctx, sql, data)
+	result, err := u.execer.NamedExecContext(ctx, execSQL, data)
 	if err != nil {
 		return 0, err
 	}
