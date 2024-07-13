@@ -249,6 +249,7 @@ func TestInsert(t *testing.T) {
 		wantSQL     string
 		wantNameSQL string
 		wantErr     error
+		wantArgs    []any
 	}{
 		{
 			name:        "insert",
@@ -264,9 +265,25 @@ func TestInsert(t *testing.T) {
 		},
 		{
 			name:        "insert on duplicate key update",
-			inserter:    sqlbuilder.New("user").Insert().Columns("username", "age", "sex", "version").OnDuplicateKeyUpdateString("version = version + 1"),
-			wantSQL:     "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE version = version + 1;",
-			wantNameSQL: "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (:username, :age, :sex, :version) ON DUPLICATE KEY UPDATE version = version + 1;",
+			inserter:    sqlbuilder.New("user").Insert().Columns("username", "age", "sex", "version").OnDuplicateKeyUpdateString("`version` = `version` + 1"),
+			wantSQL:     "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE `version` = `version` + 1;",
+			wantNameSQL: "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (:username, :age, :sex, :version) ON DUPLICATE KEY UPDATE `version` = `version` + 1;",
+		},
+		{
+			name:        "insert on duplicate key update nameSql",
+			inserter:    sqlbuilder.New("user").Insert().Columns("username", "age", "sex", "version").OnDuplicateKeyUpdate(ql.F("version").Incr(1), ql.F("sex").Val("male")),
+			wantNameSQL: "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (:username, :age, :sex, :version) ON DUPLICATE KEY UPDATE `version` = `version` + 1, `sex` = :sex;",
+		},
+		{
+			name: "insert on duplicate key update args sql",
+			inserter: sqlbuilder.New("user").Insert().Fields(
+				ql.F("username").Val("fengjx"),
+				ql.F("age").Val(int32(20)),
+				ql.F("sex").Val("male"),
+				ql.F("version").Val(int64(1)),
+			).OnDuplicateKeyUpdate(ql.F("version").Incr(1)),
+			wantSQL:  "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE `version` = `version` + 1;",
+			wantArgs: []any{"fengjx", int32(20), "male", int64(1)},
 		},
 		{
 			name: "replace into",
@@ -280,6 +297,16 @@ func TestInsert(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.wantArgs != nil {
+				sql, args, err := tc.inserter.SQLArgs()
+				assert.Equal(t, tc.wantErr, err)
+				if err != nil {
+					return
+				}
+				EqualArgs(t, tc.wantArgs, args)
+				assert.Equal(t, tc.wantSQL, sql)
+			}
+
 			if tc.wantSQL != "" {
 				sql, err := tc.inserter.SQL()
 				assert.Equal(t, tc.wantErr, err)

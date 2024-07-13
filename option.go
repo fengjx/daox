@@ -58,6 +58,14 @@ func WithIfNullVals(vals map[string]string) Option {
 	}
 }
 
+// WithOmitColumns 设置忽略字段
+func WithOmitColumns(omitColumns ...string) Option {
+	return func(d *Dao) {
+		d.omitColumns = omitColumns
+	}
+}
+
+// InsertOptions insert 选项
 type InsertOptions struct {
 	disableGlobalOmitColumns bool     // 禁用全局忽略字段
 	omitColumns              []string // 当前 insert 忽略的字段

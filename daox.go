@@ -2,7 +2,6 @@ package daox
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"reflect"
@@ -10,6 +9,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 
+	"github.com/fengjx/daox/engine"
 	"github.com/fengjx/daox/sqlbuilder"
 	"github.com/fengjx/daox/sqlbuilder/ql"
 	"github.com/fengjx/daox/utils"
@@ -22,11 +22,12 @@ var (
 
 // Dao 数据访问
 type Dao struct {
-	masterDB   *sqlx.DB
-	readDB     *sqlx.DB
-	Mapper     *reflectx.Mapper
-	TableMeta  TableMeta
-	ifNullVals map[string]string
+	masterDB    *sqlx.DB
+	readDB      *sqlx.DB
+	Mapper      *reflectx.Mapper
+	TableMeta   TableMeta
+	ifNullVals  map[string]string
+	omitColumns []string
 }
 
 // NewDao 创建一个新的 dao 对象
@@ -37,16 +38,16 @@ type Dao struct {
 // 返回值为创建的Dao对象指针
 func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 	dao := &Dao{}
-	structType := reflect.TypeFor[T]()
-	columns := dao.GetColumnsByType(structType)
 	dao.TableMeta = TableMeta{
 		TableName:  tableName,
 		PrimaryKey: primaryKey,
-		Columns:    columns,
 	}
 	for _, opt := range opts {
 		opt(dao)
 	}
+	structType := reflect.TypeFor[T]()
+	columns := dao.GetColumnsByType(structType, dao.omitColumns...)
+	dao.TableMeta.Columns = columns
 	global.registerMeta(dao.TableMeta)
 	return dao
 }
@@ -72,7 +73,7 @@ func (d *Dao) SQLBuilder() *sqlbuilder.Builder {
 	return sqlbuilder.New(d.TableMeta.TableName)
 }
 
-// Selector 创建当前表的 selector
+// Selector 创建当前表的 Selector
 // columns 是查询指定字段，为空则是全部字段
 func (d *Dao) Selector(columns ...string) *sqlbuilder.Selector {
 	if len(columns) == 0 {
@@ -82,12 +83,23 @@ func (d *Dao) Selector(columns ...string) *sqlbuilder.Selector {
 	if len(d.ifNullVals) > 0 {
 		selector.IfNullVals(d.ifNullVals)
 	}
+	selector.Queryer(d.GetReadDB())
 	return selector
 }
 
-// Updater 创建当前表的 updater
+// Updater 创建当前表的 Updater
 func (d *Dao) Updater() *sqlbuilder.Updater {
-	return d.SQLBuilder().Update().DB(d.masterDB)
+	return d.SQLBuilder().Update().Execer(d.GetMasterDB())
+}
+
+// Deleter 创建当前表的 Deleter
+func (d *Dao) Deleter() *sqlbuilder.Deleter {
+	return d.SQLBuilder().Delete().Execer(d.GetMasterDB())
+}
+
+// Inserter 创建当前表的 updater
+func (d *Dao) Inserter() *sqlbuilder.Inserter {
+	return d.SQLBuilder().Insert().Execer(d.GetMasterDB())
 }
 
 // GetColumnsByModel 根据 model 结构获取数据库字段
@@ -146,27 +158,20 @@ func (d *Dao) SaveTxContext(ctx context.Context, tx *sqlx.Tx, dest Model, opts .
 	return d.saveContext(ctx, tx, dest, opts...)
 }
 
-func (d *Dao) saveContext(ctx context.Context, tx *sqlx.Tx, dest Model, opts ...InsertOption) (int64, error) {
+func (d *Dao) saveContext(ctx context.Context, tx *sqlx.Tx, model Model, opts ...InsertOption) (int64, error) {
 	opt := &InsertOptions{}
 	for _, o := range opts {
 		o(opt)
 	}
-	execSql, err := d.SQLBuilder().Insert().
+
+	var execer engine.Execer = d.GetMasterDB()
+	if tx != nil {
+		execer = tx
+	}
+
+	return d.SQLBuilder().Insert().Execer(execer).
 		Columns(d.getSaveColumns(opt)...).
-		NameSQL()
-	if err != nil {
-		return 0, err
-	}
-	var res sql.Result
-	if tx == nil {
-		res, err = d.GetMasterDB().NamedExecContext(ctx, execSql, dest)
-	} else {
-		res, err = tx.NamedExecContext(ctx, execSql, dest)
-	}
-	if err != nil {
-		return 0, err
-	}
-	return res.LastInsertId()
+		NamedExecContext(ctx, model)
 }
 
 // ReplaceInto replace into table
@@ -177,50 +182,34 @@ func (d *Dao) ReplaceInto(dest Model, opts ...InsertOption) (int64, error) {
 
 // ReplaceIntoContext replace into table，携带上下文
 // omitColumns 不需要 insert 的字段
-func (d *Dao) ReplaceIntoContext(ctx context.Context, dest Model, opts ...InsertOption) (int64, error) {
+func (d *Dao) ReplaceIntoContext(ctx context.Context, model Model, opts ...InsertOption) (int64, error) {
 	opt := &InsertOptions{}
 	for _, o := range opts {
 		o(opt)
 	}
-	execSql, err := d.SQLBuilder().Insert().
+	return d.Inserter().
 		Columns(d.getSaveColumns(opt)...).
 		IsReplaceInto(true).
-		NameSQL()
-	if err != nil {
-		return 0, err
-	}
-	res, err := d.GetMasterDB().NamedExecContext(ctx, execSql, dest)
-	if err != nil {
-		return 0, err
-	}
-	return res.LastInsertId()
+		NamedExecContext(ctx, model)
 }
 
 // IgnoreInto 使用 INSERT IGNORE INTO 如果记录已存在则忽略
 // omitColumns 不需要 insert 的字段
-func (d *Dao) IgnoreInto(dest Model, opts ...InsertOption) (int64, error) {
-	return d.IgnoreIntoContext(context.Background(), dest, opts...)
+func (d *Dao) IgnoreInto(model Model, opts ...InsertOption) (int64, error) {
+	return d.IgnoreIntoContext(context.Background(), model, opts...)
 }
 
 // IgnoreIntoContext 使用 INSERT IGNORE INTO 如果记录已存在则忽略，携带上下文
 // omitColumns 不需要 insert 的字段
-func (d *Dao) IgnoreIntoContext(ctx context.Context, dest Model, opts ...InsertOption) (int64, error) {
+func (d *Dao) IgnoreIntoContext(ctx context.Context, model Model, opts ...InsertOption) (int64, error) {
 	opt := &InsertOptions{}
 	for _, o := range opts {
 		o(opt)
 	}
-	execSql, err := d.SQLBuilder().Insert().
+	return d.Inserter().
 		Columns(d.getSaveColumns(opt)...).
 		IsIgnoreInto(true).
-		NameSQL()
-	if err != nil {
-		return 0, err
-	}
-	res, err := d.GetMasterDB().NamedExecContext(ctx, execSql, dest)
-	if err != nil {
-		return 0, err
-	}
-	return res.LastInsertId()
+		NamedExecContext(ctx, model)
 }
 
 // BatchSave 批量新增，携带上下文
@@ -231,22 +220,23 @@ func (d *Dao) BatchSave(models any, opts ...InsertOption) (int64, error) {
 
 // BatchSaveContext 批量新增
 // omitColumns 不需要 insert 的字段
+// models 是一个批量 insert 的 slice
 func (d *Dao) BatchSaveContext(ctx context.Context, models any, opts ...InsertOption) (int64, error) {
 	opt := &InsertOptions{}
 	for _, o := range opts {
 		o(opt)
 	}
-	execSQL, err := d.SQLBuilder().Insert().
+	execSQL, err := d.Inserter().
 		Columns(d.getSaveColumns(opt)...).
 		NameSQL()
 	if err != nil {
 		return 0, err
 	}
-	res, err := d.GetMasterDB().NamedExecContext(ctx, execSQL, models)
+	result, err := d.GetMasterDB().NamedExecContext(ctx, execSQL, models)
 	if err != nil {
 		return 0, err
 	}
-	return res.RowsAffected()
+	return result.RowsAffected()
 }
 
 // BatchReplaceInto 批量新增，使用 replace into 方式
@@ -264,18 +254,10 @@ func (d *Dao) BatchReplaceIntoContext(ctx context.Context, models any, opts ...I
 	for _, o := range opts {
 		o(opt)
 	}
-	execSQL, err := d.SQLBuilder().Insert().
+	return d.Inserter().
 		Columns(d.getSaveColumns(opt)...).
 		IsReplaceInto(true).
-		NameSQL()
-	if err != nil {
-		return 0, err
-	}
-	res, err := d.GetMasterDB().NamedExecContext(ctx, execSQL, models)
-	if err != nil {
-		return 0, err
-	}
-	return res.RowsAffected()
+		NamedExecContext(ctx, models)
 }
 
 func (d *Dao) getSaveColumns(opt *InsertOptions) []string {
@@ -291,90 +273,6 @@ func (d *Dao) getSaveColumns(opt *InsertOptions) []string {
 		omits = append(omits, global.saveOmitColumns...)
 	}
 	return meta.OmitColumns(omits...)
-}
-
-// Get 根据查询条件查询单条记录
-// dest 必须是一个指针
-func (d *Dao) Get(dest any, selector *sqlbuilder.Selector) (bool, error) {
-	return d.GetContext(context.Background(), dest, selector)
-}
-
-func (d *Dao) GetContext(ctx context.Context, dest any, selector *sqlbuilder.Selector) (bool, error) {
-	return d.getContext(ctx, nil, dest, selector)
-}
-
-// GetTx 根据查询条件查询单条记录，支持事务
-// dest 必须是一个指针
-func (d *Dao) GetTx(tx *sqlx.Tx, dest any, selector *sqlbuilder.Selector) (bool, error) {
-	return d.GetTxContext(context.Background(), tx, dest, selector)
-}
-
-// GetTxContext 根据查询条件查询单条记录，支持事务，携带上下文
-// dest 必须是一个指针
-func (d *Dao) GetTxContext(ctx context.Context, tx *sqlx.Tx, dest any, selector *sqlbuilder.Selector) (bool, error) {
-	if err := d.checkTxNil(tx); err != nil {
-		return false, err
-	}
-	return d.getContext(ctx, tx, dest, selector)
-}
-
-func (d *Dao) getContext(ctx context.Context, tx *sqlx.Tx, dest any, selector *sqlbuilder.Selector) (bool, error) {
-	querySQL, args, err := selector.SQLArgs()
-	if err != nil {
-		return false, err
-	}
-	if tx == nil {
-		err = d.GetReadDB().GetContext(ctx, dest, querySQL, args...)
-	} else {
-		err = tx.GetContext(ctx, dest, querySQL, args...)
-	}
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// Select 根据查询条件查询列表
-// dest 必须是一个 slice 指针
-func (d *Dao) Select(dest any, selector *sqlbuilder.Selector) error {
-	return d.SelectContext(context.Background(), dest, selector)
-}
-
-// SelectContext 根据查询条件查询列表，携带上下文
-// dest 必须是一个 slice 指针
-func (d *Dao) SelectContext(ctx context.Context, dest any, selector *sqlbuilder.Selector) error {
-	return d.selectContext(ctx, nil, dest, selector)
-}
-
-// SelectTx 根据查询条件查询列表
-// dest 必须是一个 slice 指针
-func (d *Dao) SelectTx(tx *sqlx.Tx, dest any, selector *sqlbuilder.Selector) error {
-	return d.SelectTxContext(context.Background(), tx, dest, selector)
-}
-
-// SelectTxContext 根据查询条件查询列表，携带上下文
-// dest 必须是一个 slice 指针
-func (d *Dao) SelectTxContext(ctx context.Context, tx *sqlx.Tx, dest any, selector *sqlbuilder.Selector) error {
-	if err := d.checkTxNil(tx); err != nil {
-		return err
-	}
-	return d.selectContext(ctx, tx, dest, selector)
-}
-
-func (d *Dao) selectContext(ctx context.Context, tx *sqlx.Tx, dest any, selector *sqlbuilder.Selector) error {
-	querySQL, args, err := selector.SQLArgs()
-	if err != nil {
-		return err
-	}
-	if tx == nil {
-		err = d.GetReadDB().SelectContext(ctx, dest, querySQL, args...)
-	} else {
-		err = tx.SelectContext(ctx, dest, querySQL, args...)
-	}
-	return err
 }
 
 // GetByColumn 按指定字段查询单条数据
@@ -408,9 +306,16 @@ func (d *Dao) getByColumnContext(ctx context.Context, tx *sqlx.Tx, kv *KV, dest 
 	if kv == nil {
 		return false, nil
 	}
-	selector := d.Selector().
-		Where(ql.C().And(ql.Col(kv.Key).EQ(kv.Value)))
-	return d.getContext(ctx, tx, dest, selector)
+
+	var queryer engine.Queryer = d.GetReadDB()
+	if tx != nil {
+		queryer = tx
+	}
+
+	return d.Selector().Queryer(queryer).
+		Where(ql.C(ql.Col(kv.Key).EQ(kv.Value))).
+		GetContext(ctx, dest)
+
 }
 
 // ListByColumns 指定字段多个值查询多条数据
@@ -442,10 +347,16 @@ func (d *Dao) listByColumnsContext(ctx context.Context, tx *sqlx.Tx, kvs *MultiK
 	if kvs == nil || len(kvs.Values) == 0 {
 		return nil
 	}
-	selector := d.Selector().
+
+	var queryer engine.Queryer = d.GetReadDB()
+	if tx != nil {
+		queryer = tx
+	}
+
+	return d.Selector().Queryer(queryer).
 		Columns(d.DBColumns()...).
-		Where(ql.C().And(ql.Col(kvs.Key).In(kvs.Values...)))
-	return d.selectContext(ctx, tx, dest, selector)
+		Where(ql.C(ql.Col(kvs.Key).In(kvs.Values...))).
+		SelectContext(ctx, dest)
 }
 
 // List 指定字段查询多条数据
@@ -475,10 +386,16 @@ func (d *Dao) listContext(ctx context.Context, tx *sqlx.Tx, kv *KV, dest any) er
 	if kv == nil {
 		return nil
 	}
-	selector := d.Selector().
+
+	var queryer engine.Queryer = d.GetReadDB()
+	if tx != nil {
+		queryer = tx
+	}
+
+	return d.Selector().Queryer(queryer).
 		Columns(d.DBColumns()...).
-		Where(ql.C().And(ql.Col(kv.Key).EQ(kv.Value)))
-	return d.selectContext(ctx, tx, dest, selector)
+		Where(ql.C(ql.Col(kv.Key).EQ(kv.Value))).
+		SelectContext(ctx, dest)
 }
 
 // GetByID 根据 id 查询单条数据
@@ -541,10 +458,9 @@ func (d *Dao) updateFieldContext(ctx context.Context, tx *sqlx.Tx, idValue any, 
 	if utils.IsIDEmpty(idValue) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
+
 	tableMeta := d.TableMeta
-	rows, err := d.updateByCondContext(ctx, tx, fieldMap, ql.C().
-		And(ql.Col(tableMeta.PrimaryKey).EQ(idValue)),
-	)
+	rows, err := d.updateByCondContext(ctx, tx, fieldMap, ql.C(ql.Col(tableMeta.PrimaryKey).EQ(idValue)))
 	if err != nil {
 		return false, err
 	}
@@ -552,25 +468,17 @@ func (d *Dao) updateFieldContext(ctx context.Context, tx *sqlx.Tx, idValue any, 
 }
 
 func (d *Dao) updateByCondContext(ctx context.Context, tx *sqlx.Tx, attr map[string]any, where sqlbuilder.ConditionBuilder) (int64, error) {
-	updater := d.SQLBuilder().Update()
+	var execer engine.Execer = d.GetMasterDB()
+	if tx != nil {
+		execer = tx
+	}
+
+	updater := d.Updater().Execer(execer)
 	for col, val := range attr {
 		updater.Set(col, val)
 	}
 	updater.Where(where)
-	updateSQL, args, err := updater.SQLArgs()
-	if err != nil {
-		return 0, err
-	}
-	var res sql.Result
-	if tx == nil {
-		res, err = d.GetMasterDB().ExecContext(ctx, updateSQL, args...)
-	} else {
-		res, err = tx.ExecContext(ctx, updateSQL, args...)
-	}
-	if err != nil {
-		return 0, err
-	}
-	return res.RowsAffected()
+	return updater.ExecContext(ctx)
 }
 
 // Update 全字段更新
@@ -596,74 +504,37 @@ func (d *Dao) UpdateTxContext(ctx context.Context, tx *sqlx.Tx, m Model, omitCol
 	return d.updateContext(ctx, tx, m, omitColumns...)
 }
 
-func (d *Dao) updateContext(ctx context.Context, tx *sqlx.Tx, m Model, omitColumns ...string) (bool, error) {
-	if utils.IsIDEmpty(m.GetID()) {
+func (d *Dao) updateContext(ctx context.Context, tx *sqlx.Tx, model Model, omitColumns ...string) (bool, error) {
+	if utils.IsIDEmpty(model.GetID()) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
+
+	var execer engine.Execer = d.GetMasterDB()
+	if tx != nil {
+		execer = tx
+	}
+
 	tableMeta := d.TableMeta
 	omitColumns = append(omitColumns, tableMeta.PrimaryKey)
-	updateSQL, err := d.SQLBuilder().Update().
+	updater := d.Updater().Execer(execer).
 		Columns(d.DBColumns(omitColumns...)...).
 		Where(
 			ql.SC().And(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey)),
-		).NameSQL()
-	if err != nil {
-		return false, err
-	}
-	var res sql.Result
-	if tx == nil {
-		res, err = d.GetMasterDB().NamedExecContext(ctx, updateSQL, m)
-	} else {
-		res, err = tx.NamedExecContext(ctx, updateSQL, m)
-	}
-	if err != nil {
-		return false, err
-	}
-	affected, err := res.RowsAffected()
+		)
+	affected, err := updater.NamedExecContext(ctx, model)
 	if err != nil {
 		return false, err
 	}
 	return affected > 0, nil
 }
 
-// DeleteByCond 根据where条件删除
-func (d *Dao) DeleteByCond(where sqlbuilder.ConditionBuilder) (int64, error) {
-	return d.DeleteByCondContext(context.Background(), where)
-}
-
-// DeleteByCondContext 根据where条件删除，携带上下文
-func (d *Dao) DeleteByCondContext(ctx context.Context, where sqlbuilder.ConditionBuilder) (int64, error) {
-	return d.deleteByCondContext(ctx, nil, where)
-}
-
-// DeleteByCondTx 根据where条件删除，支持事务
-func (d *Dao) DeleteByCondTx(tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (int64, error) {
-	return d.DeleteByCondTxContext(context.Background(), tx, where)
-}
-
-// DeleteByCondTxContext 根据where条件删除，支持事务，携带上下文
-func (d *Dao) DeleteByCondTxContext(ctx context.Context, tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (int64, error) {
-	if err := d.checkTxNil(tx); err != nil {
-		return 0, err
-	}
-	return d.deleteByCondContext(ctx, tx, where)
-}
-
 func (d *Dao) deleteByCondContext(ctx context.Context, tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (int64, error) {
-	deleteSQL, args, err := d.SQLBuilder().Delete().Where(where).SQLArgs()
-	if err != nil {
-		return 0, err
+	var execer engine.Execer = d.GetMasterDB()
+	if tx != nil {
+		execer = tx
 	}
-	var res sql.Result
-	if tx == nil {
-		res, err = d.GetMasterDB().ExecContext(ctx, deleteSQL, args...)
-	} else {
-		res, err = tx.ExecContext(ctx, deleteSQL, args...)
-	}
-	if err != nil {
-		return 0, err
-	}
-	return res.RowsAffected()
+
+	return d.Deleter().Execer(execer).Where(where).ExecContext(ctx)
 }
 
 // DeleteByColumn 按字段名删除
@@ -693,7 +564,7 @@ func (d *Dao) deleteByColumnContext(ctx context.Context, tx *sqlx.Tx, kv *KV) (i
 	if kv == nil {
 		return 0, nil
 	}
-	return d.deleteByCondContext(ctx, tx, ql.C().And(ql.Col(kv.Key).EQ(kv.Value)))
+	return d.deleteByCondContext(ctx, tx, ql.C(ql.Col(kv.Key).EQ(kv.Value)))
 }
 
 // DeleteByColumns 指定字段删除多个值
@@ -723,7 +594,7 @@ func (d *Dao) deleteByColumnsContext(ctx context.Context, tx *sqlx.Tx, kvs *Mult
 	if kvs == nil || len(kvs.Values) == 0 {
 		return 0, nil
 	}
-	return d.deleteByCondContext(ctx, tx, ql.C().And(ql.Col(kvs.Key).In(kvs.Values...)))
+	return d.deleteByCondContext(ctx, tx, ql.C(ql.Col(kvs.Key).In(kvs.Values...)))
 }
 
 // DeleteByID 根据id删除数据

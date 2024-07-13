@@ -1,13 +1,20 @@
 package sqlbuilder
 
 import (
+	"context"
+	"database/sql"
+	"errors"
 	"strconv"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/fengjx/daox/engine"
 )
 
+// Selector select 语句构造器
 type Selector struct {
 	sqlBuilder
+	queryer     engine.Queryer
 	tableName   string
 	queryString string
 	distinct    bool
@@ -21,11 +28,18 @@ type Selector struct {
 	ifNullVals  map[string]string
 }
 
+// NewSelector 创建一个selector
 func NewSelector(tableName string) *Selector {
 	selector := &Selector{
 		tableName: tableName,
 	}
 	return selector
+}
+
+// Queryer 设置查询器
+func (s *Selector) Queryer(queryer engine.Queryer) *Selector {
+	s.queryer = queryer
+	return s
 }
 
 // QueryString 自定义select字段，sql原样输出
@@ -130,13 +144,14 @@ func (s *Selector) SQL() (string, error) {
 		if len(s.columns) == 0 {
 			s.writeByte('*')
 		} else {
+			n := len(s.columns)
 			for i, column := range s.columns {
 				if defVal, ok := s.ifNullVals[column]; ok {
 					s.ifNullCol(column, defVal)
 				} else {
 					s.quote(column)
 				}
-				if i != len(s.columns)-1 {
+				if i != n-1 {
 					s.writeString(", ")
 				}
 			}
@@ -211,22 +226,70 @@ func (s *Selector) CountSQL() (string, error) {
 
 // SQLArgs 构造 sql 并返回对应参数
 func (s *Selector) SQLArgs() (string, []any, error) {
-	sql, err := s.SQL()
+	querySQL, err := s.SQL()
+	if err != nil {
+		return "", nil, err
+	}
 	args, hasInSQL := s.whereArgs(s.where)
 	if !hasInSQL {
-		return sql, args, err
+		return querySQL, args, err
 	}
-	return sqlx.In(sql, args...)
+	return sqlx.In(querySQL, args...)
 }
 
 // CountSQLArgs 构造 count 查询 sql 并返回对应参数
 func (s *Selector) CountSQLArgs() (string, []any, error) {
-	sql, err := s.CountSQL()
+	querySQL, err := s.CountSQL()
 	args, hasInSQL := s.whereArgs(s.where)
 	if !hasInSQL {
-		return sql, args, err
+		return querySQL, args, err
 	}
-	return sqlx.In(sql, args...)
+	return sqlx.In(querySQL, args...)
+}
+
+// Select 查询多条数据
+func (s *Selector) Select(dest any) error {
+	return s.SelectContext(context.Background(), dest)
+}
+
+// SelectContext 查询多条数据
+func (s *Selector) SelectContext(ctx context.Context, dest any) error {
+	if s.queryer == nil {
+		return ErrQueryerNotSet
+	}
+	querySQL, args, err := s.SQLArgs()
+	if err != nil {
+		return err
+	}
+	err = s.queryer.SelectContext(ctx, dest, querySQL, args...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Get 查询单条数据
+func (s *Selector) Get(dest any) (exist bool, err error) {
+	return s.GetContext(context.Background(), dest)
+}
+
+// GetContext 查询单条数据
+func (s *Selector) GetContext(ctx context.Context, dest any) (exist bool, err error) {
+	if s.queryer == nil {
+		return false, ErrQueryerNotSet
+	}
+	querySQL, args, err := s.SQLArgs()
+	if err != nil {
+		return false, err
+	}
+	err = s.queryer.GetContext(ctx, dest, querySQL, args...)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 type OrderType string

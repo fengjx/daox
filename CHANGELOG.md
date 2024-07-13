@@ -30,3 +30,4 @@
 - [ifnull 优化](https://github.com/fengjx/daox/pull/45)
 - [with 方法支持表路由](https://github.com/fengjx/daox/pull/48)
 - [update 支持字段 incr](https://github.com/fengjx/daox/pull/50)
+- [sqlbuilder 支持db操作](https://github.com/fengjx/daox/pull/52)
