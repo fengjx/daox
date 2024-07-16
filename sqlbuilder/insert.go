@@ -206,44 +206,50 @@ func (ins *Inserter) SQLArgs() (string, []any, error) {
 
 // Exec 执行 insert 语句
 // 执行 Exec 方法，需要通过 Fields 方法赋值，否则使用 NamedExec
-func (ins *Inserter) Exec() (int64, error) {
+func (ins *Inserter) Exec() (lastID int64, affected int64, err error) {
 	return ins.ExecContext(context.Background())
 }
 
 // ExecContext 执行更新语句
 // 执行 Exec 方法，需要通过 Fields 方法赋值，否则使用 NamedExec
-func (ins *Inserter) ExecContext(ctx context.Context) (int64, error) {
+func (ins *Inserter) ExecContext(ctx context.Context) (lastID int64, affected int64, err error) {
 	if ins.execer == nil {
-		return 0, ErrExecerNotSet
+		return 0, 0, ErrExecerNotSet
 	}
 	execSQL, args, err := ins.SQLArgs()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	result, err := ins.execer.ExecContext(ctx, execSQL, args...)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return result.RowsAffected()
+	// 下面不会返回 error 的
+	lastID, _ = result.LastInsertId()
+	affected, _ = result.RowsAffected()
+	return lastID, affected, nil
 }
 
 // NamedExec 通过 NameSQL 执行更新语句，参数通过 data 填充
-func (ins *Inserter) NamedExec(model any) (int64, error) {
+func (ins *Inserter) NamedExec(model any) (lastID int64, affected int64, err error) {
 	return ins.NamedExecContext(context.Background(), model)
 }
 
 // NamedExecContext 通过 NameSQL 执行更新语句，参数通过 data 填充
-func (ins *Inserter) NamedExecContext(ctx context.Context, model any) (int64, error) {
+func (ins *Inserter) NamedExecContext(ctx context.Context, model any) (lastID int64, affected int64, err error) {
 	if ins.execer == nil {
-		return 0, ErrExecerNotSet
+		return 0, 0, ErrExecerNotSet
 	}
 	execSQL, err := ins.NameSQL()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	result, err := ins.execer.NamedExecContext(ctx, execSQL, model)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return result.LastInsertId()
+	// 下面不会返回 error 的
+	lastID, _ = result.LastInsertId()
+	affected, _ = result.RowsAffected()
+	return lastID, affected, nil
 }

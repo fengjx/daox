@@ -168,10 +168,10 @@ func (d *Dao) saveContext(ctx context.Context, tx *sqlx.Tx, model Model, opts ..
 	if tx != nil {
 		execer = tx
 	}
-
-	return d.SQLBuilder().Insert().Execer(execer).
+	id, _, err := d.SQLBuilder().Insert().Execer(execer).
 		Columns(d.getSaveColumns(opt)...).
 		NamedExecContext(ctx, model)
+	return id, err
 }
 
 // ReplaceInto replace into table
@@ -187,10 +187,11 @@ func (d *Dao) ReplaceIntoContext(ctx context.Context, model Model, opts ...Inser
 	for _, o := range opts {
 		o(opt)
 	}
-	return d.Inserter().
+	id, _, err := d.Inserter().
 		Columns(d.getSaveColumns(opt)...).
 		IsReplaceInto(true).
 		NamedExecContext(ctx, model)
+	return id, err
 }
 
 // IgnoreInto 使用 INSERT IGNORE INTO 如果记录已存在则忽略
@@ -206,10 +207,11 @@ func (d *Dao) IgnoreIntoContext(ctx context.Context, model Model, opts ...Insert
 	for _, o := range opts {
 		o(opt)
 	}
-	return d.Inserter().
+	id, _, err := d.Inserter().
 		Columns(d.getSaveColumns(opt)...).
 		IsIgnoreInto(true).
 		NamedExecContext(ctx, model)
+	return id, err
 }
 
 // BatchSave 批量新增，携带上下文
@@ -226,17 +228,10 @@ func (d *Dao) BatchSaveContext(ctx context.Context, models any, opts ...InsertOp
 	for _, o := range opts {
 		o(opt)
 	}
-	execSQL, err := d.Inserter().
+	_, affected, err := d.Inserter().
 		Columns(d.getSaveColumns(opt)...).
-		NameSQL()
-	if err != nil {
-		return 0, err
-	}
-	result, err := d.GetMasterDB().NamedExecContext(ctx, execSQL, models)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
+		NamedExecContext(ctx, models)
+	return affected, err
 }
 
 // BatchReplaceInto 批量新增，使用 replace into 方式
@@ -254,10 +249,11 @@ func (d *Dao) BatchReplaceIntoContext(ctx context.Context, models any, opts ...I
 	for _, o := range opts {
 		o(opt)
 	}
-	return d.Inserter().
+	_, affected, err := d.Inserter().
 		Columns(d.getSaveColumns(opt)...).
 		IsReplaceInto(true).
 		NamedExecContext(ctx, models)
+	return affected, err
 }
 
 func (d *Dao) getSaveColumns(opt *InsertOptions) []string {
