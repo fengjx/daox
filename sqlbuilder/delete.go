@@ -3,6 +3,7 @@ package sqlbuilder
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 
@@ -92,6 +93,14 @@ func (d *Deleter) ExecContext(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	ec := &engine.ExecutorContext{
+		Type:      engine.DELETE,
+		SQL:       execSQL,
+		TableName: d.tableName,
+		Start:     time.Now(),
+		Args:      args,
+	}
+	ctx = engine.WithExecutorCtx(ctx, ec)
 	result, err := d.execer.ExecContext(ctx, execSQL, args...)
 	if err != nil {
 		return 0, err

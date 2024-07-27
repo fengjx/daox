@@ -4,6 +4,8 @@ import (
 	"sync"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/fengjx/daox/engine"
 )
 
 var global *globalConfig
@@ -18,9 +20,9 @@ func init() {
 type globalConfig struct {
 	mux sync.Mutex
 	// defaultMasterDB 全局默认master数据库
-	defaultMasterDB *sqlx.DB
+	defaultMasterDB *DB
 	// defaultReadDB 全局默认read数据库
-	defaultReadDB *sqlx.DB
+	defaultReadDB *DB
 	// 所有表元信息
 	metaMap map[string]TableMeta
 	// 保存时默认忽略的字段，全局生效
@@ -28,16 +30,16 @@ type globalConfig struct {
 	saveOmitColumns []string
 }
 
-func (g *globalConfig) setDefaultMasterDB(db *sqlx.DB) {
+func (g *globalConfig) setDefaultMasterDB(db *sqlx.DB, middlewares ...engine.Middleware) {
 	g.mux.Lock()
 	defer g.mux.Unlock()
-	g.defaultMasterDB = db
+	g.defaultMasterDB = NewDb(db, middlewares...)
 }
 
-func (g *globalConfig) setDefaultReadDB(db *sqlx.DB) {
+func (g *globalConfig) setDefaultReadDB(db *sqlx.DB, middlewares ...engine.Middleware) {
 	g.mux.Lock()
 	defer g.mux.Unlock()
-	g.defaultReadDB = db
+	g.defaultReadDB = NewDb(db, middlewares...)
 }
 
 func (g *globalConfig) registerMeta(meta TableMeta) {
@@ -47,13 +49,13 @@ func (g *globalConfig) registerMeta(meta TableMeta) {
 }
 
 // UseDefaultMasterDB 默认主库
-func UseDefaultMasterDB(master *sqlx.DB) {
-	global.setDefaultMasterDB(master)
+func UseDefaultMasterDB(master *sqlx.DB, middlewares ...engine.Middleware) {
+	global.setDefaultMasterDB(master, middlewares...)
 }
 
 // UseDefaultReadDB 默认从库
-func UseDefaultReadDB(read *sqlx.DB) {
-	global.setDefaultReadDB(read)
+func UseDefaultReadDB(read *sqlx.DB, middlewares ...engine.Middleware) {
+	global.setDefaultReadDB(read, middlewares...)
 }
 
 // UseSaveOmits 设置保存时全局默认忽略的字段
