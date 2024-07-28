@@ -32,3 +32,4 @@
 - [update 支持字段 incr](https://github.com/fengjx/daox/pull/50)
 - [sqlbuilder 支持db操作](https://github.com/fengjx/daox/pull/52)
 - [insert 增加影响行数返回](https://github.com/fengjx/daox/pull/54)
+- [中间件支持](https://github.com/fengjx/daox/pull/56)
