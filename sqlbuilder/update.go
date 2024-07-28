@@ -147,7 +147,7 @@ func (u *Updater) ExecContext(ctx context.Context) (int64, error) {
 		Start:     time.Now(),
 		Args:      args,
 	}
-	ctx = engine.WithExecutorCtx(ctx, ec)
+	ctx = engine.SetExecutorContext(ctx, ec)
 	result, err := u.execer.ExecContext(ctx, execSQL, args...)
 	if err != nil {
 		return 0, err
@@ -178,7 +178,7 @@ func (u *Updater) NamedExecContext(ctx context.Context, data any) (int64, error)
 		Start:     time.Now(),
 		NameArgs:  data,
 	}
-	ctx = engine.WithExecutorCtx(ctx, ec)
+	ctx = engine.SetExecutorContext(ctx, ec)
 	result, err := u.execer.NamedExecContext(ctx, execSQL, data)
 	if err != nil {
 		return 0, err

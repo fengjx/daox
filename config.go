@@ -20,26 +20,30 @@ func init() {
 type globalConfig struct {
 	mux sync.Mutex
 	// defaultMasterDB 全局默认master数据库
-	defaultMasterDB *DB
+	defaultMasterDB *sqlx.DB
 	// defaultReadDB 全局默认read数据库
-	defaultReadDB *DB
+	defaultReadDB *sqlx.DB
 	// 所有表元信息
 	metaMap map[string]TableMeta
 	// 保存时默认忽略的字段，全局生效
 	// 一般用户统一的开发规范
 	saveOmitColumns []string
+	// 全局中间件
+	hooks []engine.Hook
+	// 打印sql
+	printSQL engine.AfterHandler
 }
 
-func (g *globalConfig) setDefaultMasterDB(db *sqlx.DB, middlewares ...engine.Middleware) {
+func (g *globalConfig) setDefaultMasterDB(db *sqlx.DB) {
 	g.mux.Lock()
 	defer g.mux.Unlock()
-	g.defaultMasterDB = NewDb(db, middlewares...)
+	g.defaultMasterDB = db
 }
 
-func (g *globalConfig) setDefaultReadDB(db *sqlx.DB, middlewares ...engine.Middleware) {
+func (g *globalConfig) setDefaultReadDB(db *sqlx.DB) {
 	g.mux.Lock()
 	defer g.mux.Unlock()
-	g.defaultReadDB = NewDb(db, middlewares...)
+	g.defaultReadDB = db
 }
 
 func (g *globalConfig) registerMeta(meta TableMeta) {
@@ -49,13 +53,13 @@ func (g *globalConfig) registerMeta(meta TableMeta) {
 }
 
 // UseDefaultMasterDB 默认主库
-func UseDefaultMasterDB(master *sqlx.DB, middlewares ...engine.Middleware) {
-	global.setDefaultMasterDB(master, middlewares...)
+func UseDefaultMasterDB(master *sqlx.DB) {
+	global.setDefaultMasterDB(master)
 }
 
 // UseDefaultReadDB 默认从库
-func UseDefaultReadDB(read *sqlx.DB, middlewares ...engine.Middleware) {
-	global.setDefaultReadDB(read, middlewares...)
+func UseDefaultReadDB(read *sqlx.DB) {
+	global.setDefaultReadDB(read)
 }
 
 // UseSaveOmits 设置保存时全局默认忽略的字段
@@ -67,4 +71,14 @@ func UseSaveOmits(omits ...string) {
 func GetMetaInfo(tableName string) (meta TableMeta, ok bool) {
 	meta, ok = global.metaMap[tableName]
 	return
+}
+
+// UseHooks 使用全局 hook
+func UseHooks(hooks ...engine.Hook) {
+	global.hooks = append(global.hooks, hooks...)
+}
+
+// PrintSQL 打印sql处理
+func PrintSQL(p engine.AfterHandler) {
+	global.printSQL = p
 }

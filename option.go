@@ -15,7 +15,8 @@ type Options struct {
 	autoIncrement bool
 	mapper        *reflectx.Mapper
 	ifNullVals    map[string]string
-	middlewares   []engine.Middleware
+	hooks         []engine.Hook
+	printSQL      engine.AfterHandler
 }
 
 type Option func(*Options)
@@ -84,10 +85,17 @@ func WithOmitColumns(omitColumns ...string) Option {
 	}
 }
 
-// WithMiddleware 设置中间件
-func WithMiddleware(middlewares ...engine.Middleware) Option {
+// WithHooks 设置中间件
+func WithHooks(hooks ...engine.Hook) Option {
 	return func(d *Options) {
-		d.middlewares = middlewares
+		d.hooks = hooks
+	}
+}
+
+// WithPrintSQL 打印 sql 回调
+func WithPrintSQL(printSQL engine.AfterHandler) Option {
+	return func(d *Options) {
+		d.printSQL = printSQL
 	}
 }
 

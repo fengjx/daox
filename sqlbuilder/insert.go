@@ -228,7 +228,7 @@ func (ins *Inserter) ExecContext(ctx context.Context) (lastID int64, affected in
 		Start:     time.Now(),
 		Args:      args,
 	}
-	ctx = engine.WithExecutorCtx(ctx, ec)
+	ctx = engine.SetExecutorContext(ctx, ec)
 	result, err := ins.execer.ExecContext(ctx, execSQL, args...)
 	if err != nil {
 		return 0, 0, err
@@ -260,7 +260,7 @@ func (ins *Inserter) NamedExecContext(ctx context.Context, model any) (lastID in
 		Start:     time.Now(),
 		NameArgs:  model,
 	}
-	ctx = engine.WithExecutorCtx(ctx, ec)
+	ctx = engine.SetExecutorContext(ctx, ec)
 	result, err := ins.execer.NamedExecContext(ctx, execSQL, model)
 	if err != nil {
 		return 0, 0, err

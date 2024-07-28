@@ -488,8 +488,8 @@ func TestUpdater_NamedExec(t *testing.T) {
 	assert.Equal(t, "fengjx-1024", m1.Name)
 }
 
-func TestDao_Middleware(t *testing.T) {
-	tb := "demo_info_middleware"
+func TestDao_Hook(t *testing.T) {
+	tb := "demo_info_hook"
 	before(t, tb)
 	DBMaster := newDb()
 	dao := daox.NewDao[*DemoInfo](
@@ -501,7 +501,7 @@ func TestDao_Middleware(t *testing.T) {
 			"utime": "10",
 			"ctime": "10",
 		}),
-		daox.WithMiddleware(engine.NewLogMiddleware(func(ctx context.Context, ec *engine.ExecutorContext, er *engine.ExecutorResult) {
+		daox.WithHooks(engine.NewLogHook(func(ctx context.Context, ec *engine.ExecutorContext, er *engine.ExecutorResult) {
 			t.Log("sql_type", ec.Type, "sql:", ec.SQL, "args:", ec.Args, "rows:", er.QueryRows, "duration:", er.Duration, "err:", er.Err)
 		})),
 	)

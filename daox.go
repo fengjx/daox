@@ -28,7 +28,7 @@ type Dao struct {
 	TableMeta   TableMeta
 	ifNullVals  map[string]string
 	omitColumns []string
-	middlewares []engine.Middleware
+	hooks       []engine.Hook
 }
 
 // NewDao 创建一个新的 dao 对象
@@ -61,29 +61,35 @@ func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 		IsAutoIncrement: options.autoIncrement,
 		Columns:         columns,
 	}
-	var masterDB *DB
-	if options.master != nil {
-		masterDB = NewDb(options.master, options.middlewares...)
-	} else if global.defaultMasterDB != nil {
-		masterDB = global.defaultMasterDB
+	hooks := global.hooks
+	if len(options.hooks) > 0 {
+		hooks = append(hooks, options.hooks...)
 	}
-
-	var readDB *DB
-	if options.read != nil {
-		readDB = NewDb(options.read, options.middlewares...)
-	} else if global.defaultReadDB != nil {
-		masterDB = global.defaultMasterDB
-	} else if options.master != nil {
-		readDB = NewDb(options.master, options.middlewares...)
+	if options.printSQL != nil {
+		hooks = append(hooks, engine.NewLogHook(options.printSQL))
+	} else if global.printSQL != nil {
+		hooks = append(hooks, engine.NewLogHook(global.printSQL))
+	}
+	master := options.master
+	if options.master == nil {
+		master = global.defaultMasterDB
+	}
+	read := options.read
+	if read == nil {
+		if global.defaultReadDB != nil {
+			read = global.defaultMasterDB
+		} else if options.master != nil {
+			read = master
+		}
 	}
 	dao := &Dao{
-		masterDB:    masterDB,
-		readDB:      readDB,
+		masterDB:    NewDb(master, hooks...),
+		readDB:      NewDb(read, hooks...),
 		mapper:      options.mapper,
 		TableMeta:   meta,
 		ifNullVals:  options.ifNullVals,
 		omitColumns: options.omitColumns,
-		middlewares: options.middlewares,
+		hooks:       hooks,
 	}
 	global.registerMeta(dao.TableMeta)
 	return dao
@@ -111,29 +117,35 @@ func NewDaoByMeta(m Meta, opts ...Option) *Dao {
 		Columns:         m.Columns(),
 		IsAutoIncrement: m.IsAutoIncrement(),
 	}
-	var masterDB *DB
-	if options.master != nil {
-		masterDB = NewDb(options.master, options.middlewares...)
-	} else if global.defaultMasterDB != nil {
-		masterDB = global.defaultMasterDB
+	hooks := global.hooks
+	if len(options.hooks) > 0 {
+		hooks = append(hooks, options.hooks...)
 	}
-
-	var readDB *DB
-	if options.read != nil {
-		readDB = NewDb(options.read, options.middlewares...)
-	} else if global.defaultReadDB != nil {
-		masterDB = global.defaultMasterDB
-	} else if options.master != nil {
-		readDB = NewDb(options.master, options.middlewares...)
+	if options.printSQL != nil {
+		hooks = append(hooks, engine.NewLogHook(options.printSQL))
+	} else if global.printSQL != nil {
+		hooks = append(hooks, engine.NewLogHook(global.printSQL))
+	}
+	master := options.master
+	if options.master == nil {
+		master = global.defaultMasterDB
+	}
+	read := options.read
+	if read == nil {
+		if global.defaultReadDB != nil {
+			read = global.defaultMasterDB
+		} else if options.master != nil {
+			read = master
+		}
 	}
 	dao := &Dao{
-		masterDB:    masterDB,
-		readDB:      readDB,
+		masterDB:    NewDb(master, hooks...),
+		readDB:      NewDb(read, hooks...),
 		mapper:      options.mapper,
 		TableMeta:   meta,
 		ifNullVals:  options.ifNullVals,
 		omitColumns: options.omitColumns,
-		middlewares: options.middlewares,
+		hooks:       hooks,
 	}
 	global.registerMeta(dao.TableMeta)
 	return dao
@@ -706,12 +718,12 @@ func (d *Dao) checkTxNil(tx *sqlx.Tx) error {
 // With 使用新的数据库连接创建 Dao
 func (d *Dao) With(master, read *sqlx.DB) *Dao {
 	newDao := &Dao{
-		masterDB:    NewDb(master, d.middlewares...),
-		readDB:      NewDb(read, d.middlewares...),
-		TableMeta:   d.TableMeta,
-		mapper:      d.mapper,
-		ifNullVals:  d.ifNullVals,
-		middlewares: d.middlewares,
+		masterDB:   NewDb(master, d.hooks...),
+		readDB:     NewDb(read, d.hooks...),
+		TableMeta:  d.TableMeta,
+		mapper:     d.mapper,
+		ifNullVals: d.ifNullVals,
+		hooks:      d.hooks,
 	}
 	return newDao
 }
@@ -719,12 +731,12 @@ func (d *Dao) With(master, read *sqlx.DB) *Dao {
 // WithTableName 使用新的数据库连接创建 Dao
 func (d *Dao) WithTableName(tableName string) *Dao {
 	newDao := &Dao{
-		masterDB:    d.masterDB,
-		readDB:      d.readDB,
-		TableMeta:   d.TableMeta.WithTableName(tableName),
-		mapper:      d.mapper,
-		ifNullVals:  d.ifNullVals,
-		middlewares: d.middlewares,
+		masterDB:   d.masterDB,
+		readDB:     d.readDB,
+		TableMeta:  d.TableMeta.WithTableName(tableName),
+		mapper:     d.mapper,
+		ifNullVals: d.ifNullVals,
+		hooks:      d.hooks,
 	}
 	return newDao
 }
