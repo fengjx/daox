@@ -37,3 +37,4 @@
 - [增加获取db方法](https://github.com/fengjx/daox/pull/59)
 - [适配 engine 接口](https://github.com/fengjx/daox/pull/60)
 - [dao 移除直接依赖 sqlx.Tx](https://github.com/fengjx/daox/pull/62)
+- [获取db方法优化](https://github.com/fengjx/daox/pull/64)
