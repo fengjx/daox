@@ -22,12 +22,13 @@ var (
 
 // Dao 数据访问
 type Dao struct {
-	masterDB    *sqlx.DB
-	readDB      *sqlx.DB
-	Mapper      *reflectx.Mapper
+	masterDB    *DB
+	readDB      *DB
+	mapper      *reflectx.Mapper
 	TableMeta   TableMeta
 	ifNullVals  map[string]string
 	omitColumns []string
+	middlewares []engine.Middleware
 }
 
 // NewDao 创建一个新的 dao 对象
@@ -37,32 +38,102 @@ type Dao struct {
 // opts 参数表示可选的选项
 // 返回值为创建的Dao对象指针
 func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
-	dao := &Dao{}
-	dao.TableMeta = TableMeta{
-		TableName:  tableName,
-		PrimaryKey: primaryKey,
-	}
+	options := &Options{}
 	for _, opt := range opts {
-		opt(dao)
+		opt(options)
 	}
+	if options.read == nil {
+		options.read = options.master
+	}
+	if options.mapper == nil {
+		if options.master != nil {
+			options.mapper = options.master.Mapper
+		} else {
+			options.mapper = sqlbuilder.GetMapperByTagName("json")
+		}
+	}
+	options.tableName = tableName
 	structType := reflect.TypeFor[T]()
-	columns := dao.GetColumnsByType(structType, dao.omitColumns...)
-	dao.TableMeta.Columns = columns
+	columns := sqlbuilder.GetColumnsByType(options.mapper, structType, options.omitColumns...)
+	meta := TableMeta{
+		TableName:       tableName,
+		PrimaryKey:      primaryKey,
+		IsAutoIncrement: options.autoIncrement,
+		Columns:         columns,
+	}
+	var masterDB *DB
+	if options.master != nil {
+		masterDB = NewDb(options.master, options.middlewares...)
+	} else if global.defaultMasterDB != nil {
+		masterDB = global.defaultMasterDB
+	}
+
+	var readDB *DB
+	if options.read != nil {
+		readDB = NewDb(options.read, options.middlewares...)
+	} else if global.defaultReadDB != nil {
+		masterDB = global.defaultMasterDB
+	} else if options.master != nil {
+		readDB = NewDb(options.master, options.middlewares...)
+	}
+	dao := &Dao{
+		masterDB:    masterDB,
+		readDB:      readDB,
+		mapper:      options.mapper,
+		TableMeta:   meta,
+		ifNullVals:  options.ifNullVals,
+		omitColumns: options.omitColumns,
+		middlewares: options.middlewares,
+	}
 	global.registerMeta(dao.TableMeta)
 	return dao
 }
 
 // NewDaoByMeta 根据 meta 接口创建 dao 对象
 func NewDaoByMeta(m Meta, opts ...Option) *Dao {
-	dao := &Dao{}
-	dao.TableMeta = TableMeta{
+	options := &Options{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	if options.read == nil {
+		options.read = options.master
+	}
+	if options.mapper == nil {
+		if options.master != nil {
+			options.mapper = options.master.Mapper
+		} else {
+			options.mapper = sqlbuilder.GetMapperByTagName("json")
+		}
+	}
+	meta := TableMeta{
 		TableName:       m.TableName(),
 		PrimaryKey:      m.PrimaryKey(),
 		Columns:         m.Columns(),
 		IsAutoIncrement: m.IsAutoIncrement(),
 	}
-	for _, opt := range opts {
-		opt(dao)
+	var masterDB *DB
+	if options.master != nil {
+		masterDB = NewDb(options.master, options.middlewares...)
+	} else if global.defaultMasterDB != nil {
+		masterDB = global.defaultMasterDB
+	}
+
+	var readDB *DB
+	if options.read != nil {
+		readDB = NewDb(options.read, options.middlewares...)
+	} else if global.defaultReadDB != nil {
+		masterDB = global.defaultMasterDB
+	} else if options.master != nil {
+		readDB = NewDb(options.master, options.middlewares...)
+	}
+	dao := &Dao{
+		masterDB:    masterDB,
+		readDB:      readDB,
+		mapper:      options.mapper,
+		TableMeta:   meta,
+		ifNullVals:  options.ifNullVals,
+		omitColumns: options.omitColumns,
+		middlewares: options.middlewares,
 	}
 	global.registerMeta(dao.TableMeta)
 	return dao
@@ -83,23 +154,23 @@ func (d *Dao) Selector(columns ...string) *sqlbuilder.Selector {
 	if len(d.ifNullVals) > 0 {
 		selector.IfNullVals(d.ifNullVals)
 	}
-	selector.Queryer(d.GetReadDB())
+	selector.Queryer(d.readDB)
 	return selector
 }
 
 // Updater 创建当前表的 Updater
 func (d *Dao) Updater() *sqlbuilder.Updater {
-	return d.SQLBuilder().Update().Execer(d.GetMasterDB())
+	return d.SQLBuilder().Update().Execer(d.masterDB)
 }
 
 // Deleter 创建当前表的 Deleter
 func (d *Dao) Deleter() *sqlbuilder.Deleter {
-	return d.SQLBuilder().Delete().Execer(d.GetMasterDB())
+	return d.SQLBuilder().Delete().Execer(d.masterDB)
 }
 
 // Inserter 创建当前表的 updater
 func (d *Dao) Inserter() *sqlbuilder.Inserter {
-	return d.SQLBuilder().Insert().Execer(d.GetMasterDB())
+	return d.SQLBuilder().Insert().Execer(d.masterDB)
 }
 
 // GetColumnsByModel 根据 model 结构获取数据库字段
@@ -110,7 +181,7 @@ func (d *Dao) GetColumnsByModel(model any, omitColumns ...string) []string {
 
 // GetColumnsByType 通过字段 tag 解析数据库字段
 func (d *Dao) GetColumnsByType(typ reflect.Type, omitColumns ...string) []string {
-	return sqlbuilder.GetColumnsByType(d.getMapper(), typ, omitColumns...)
+	return sqlbuilder.GetColumnsByType(d.mapper, typ, omitColumns...)
 }
 
 // DBColumns 获取当前表数据库字段
@@ -164,7 +235,7 @@ func (d *Dao) saveContext(ctx context.Context, tx *sqlx.Tx, model Model, opts ..
 		o(opt)
 	}
 
-	var execer engine.Execer = d.GetMasterDB()
+	var execer engine.Execer = d.masterDB
 	if tx != nil {
 		execer = tx
 	}
@@ -303,7 +374,7 @@ func (d *Dao) getByColumnContext(ctx context.Context, tx *sqlx.Tx, kv *KV, dest 
 		return false, nil
 	}
 
-	var queryer engine.Queryer = d.GetReadDB()
+	var queryer engine.Queryer = d.readDB
 	if tx != nil {
 		queryer = tx
 	}
@@ -344,7 +415,7 @@ func (d *Dao) listByColumnsContext(ctx context.Context, tx *sqlx.Tx, kvs *MultiK
 		return nil
 	}
 
-	var queryer engine.Queryer = d.GetReadDB()
+	var queryer engine.Queryer = d.readDB
 	if tx != nil {
 		queryer = tx
 	}
@@ -383,7 +454,7 @@ func (d *Dao) listContext(ctx context.Context, tx *sqlx.Tx, kv *KV, dest any) er
 		return nil
 	}
 
-	var queryer engine.Queryer = d.GetReadDB()
+	var queryer engine.Queryer = d.readDB
 	if tx != nil {
 		queryer = tx
 	}
@@ -464,7 +535,7 @@ func (d *Dao) updateFieldContext(ctx context.Context, tx *sqlx.Tx, idValue any, 
 }
 
 func (d *Dao) updateByCondContext(ctx context.Context, tx *sqlx.Tx, attr map[string]any, where sqlbuilder.ConditionBuilder) (int64, error) {
-	var execer engine.Execer = d.GetMasterDB()
+	var execer engine.Execer = d.masterDB
 	if tx != nil {
 		execer = tx
 	}
@@ -505,7 +576,7 @@ func (d *Dao) updateContext(ctx context.Context, tx *sqlx.Tx, model Model, omitC
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 
-	var execer engine.Execer = d.GetMasterDB()
+	var execer engine.Execer = d.masterDB
 	if tx != nil {
 		execer = tx
 	}
@@ -525,7 +596,7 @@ func (d *Dao) updateContext(ctx context.Context, tx *sqlx.Tx, model Model, omitC
 }
 
 func (d *Dao) deleteByCondContext(ctx context.Context, tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (int64, error) {
-	var execer engine.Execer = d.GetMasterDB()
+	var execer engine.Execer = d.masterDB
 	if tx != nil {
 		execer = tx
 	}
@@ -633,16 +704,14 @@ func (d *Dao) checkTxNil(tx *sqlx.Tx) error {
 }
 
 // With 使用新的数据库连接创建 Dao
-func (d *Dao) With(master, read *sqlx.DB, opts ...Option) *Dao {
+func (d *Dao) With(master, read *sqlx.DB) *Dao {
 	newDao := &Dao{
-		masterDB:   master,
-		readDB:     read,
-		TableMeta:  d.TableMeta,
-		Mapper:     d.Mapper,
-		ifNullVals: d.ifNullVals,
-	}
-	for _, opt := range opts {
-		opt(newDao)
+		masterDB:    NewDb(master, d.middlewares...),
+		readDB:      NewDb(read, d.middlewares...),
+		TableMeta:   d.TableMeta,
+		mapper:      d.mapper,
+		ifNullVals:  d.ifNullVals,
+		middlewares: d.middlewares,
 	}
 	return newDao
 }
@@ -650,40 +719,14 @@ func (d *Dao) With(master, read *sqlx.DB, opts ...Option) *Dao {
 // WithTableName 使用新的数据库连接创建 Dao
 func (d *Dao) WithTableName(tableName string) *Dao {
 	newDao := &Dao{
-		masterDB:   d.masterDB,
-		readDB:     d.readDB,
-		TableMeta:  d.TableMeta.WithTableName(tableName),
-		Mapper:     d.Mapper,
-		ifNullVals: d.ifNullVals,
+		masterDB:    d.masterDB,
+		readDB:      d.readDB,
+		TableMeta:   d.TableMeta.WithTableName(tableName),
+		mapper:      d.mapper,
+		ifNullVals:  d.ifNullVals,
+		middlewares: d.middlewares,
 	}
 	return newDao
-}
-
-func (d *Dao) getMapper() *reflectx.Mapper {
-	if d.Mapper != nil {
-		return d.Mapper
-	}
-	return d.GetMasterDB().Mapper
-}
-
-func (d *Dao) GetMasterDB() *sqlx.DB {
-	if d.masterDB != nil {
-		return d.masterDB
-	}
-	return global.defaultMasterDB
-}
-
-func (d *Dao) GetReadDB() *sqlx.DB {
-	if d.readDB != nil {
-		return d.readDB
-	}
-	if d.masterDB != nil {
-		return d.masterDB
-	}
-	if global.defaultReadDB != nil {
-		return global.defaultReadDB
-	}
-	return global.defaultMasterDB
 }
 
 func (d *Dao) initIfNullVal() {

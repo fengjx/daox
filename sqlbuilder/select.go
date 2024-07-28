@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 
@@ -261,6 +262,14 @@ func (s *Selector) SelectContext(ctx context.Context, dest any) error {
 	if err != nil {
 		return err
 	}
+	ec := &engine.ExecutorContext{
+		Type:      engine.SELECT,
+		SQL:       querySQL,
+		TableName: s.tableName,
+		Start:     time.Now(),
+		Args:      args,
+	}
+	ctx = engine.WithExecutorCtx(ctx, ec)
 	err = s.queryer.SelectContext(ctx, dest, querySQL, args...)
 	if err != nil {
 		return err
@@ -282,6 +291,14 @@ func (s *Selector) GetContext(ctx context.Context, dest any) (exist bool, err er
 	if err != nil {
 		return false, err
 	}
+	ec := &engine.ExecutorContext{
+		Type:      engine.SELECT,
+		SQL:       querySQL,
+		TableName: s.tableName,
+		Start:     time.Now(),
+		Args:      args,
+	}
+	ctx = engine.WithExecutorCtx(ctx, ec)
 	err = s.queryer.GetContext(ctx, dest, querySQL, args...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

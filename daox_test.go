@@ -1,6 +1,7 @@
 package daox_test
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/fengjx/daox"
+	"github.com/fengjx/daox/engine"
 	"github.com/fengjx/daox/sqlbuilder/ql"
 )
 
@@ -239,12 +241,9 @@ func TestIgnoreField(t *testing.T) {
 func testPage(t *testing.T) {
 	DBMaster := newDb()
 	dao := daox.NewDao[*DemoInfo]("demo_info", "id", daox.IsAutoIncrement(), daox.WithDBMaster(DBMaster))
-	querySQL, err := dao.SQLBuilder().Select().Limit(10).Offset(5).SQL()
-	if err != nil {
-		t.Fatal(err)
-	}
 	var list []*DemoInfo
-	err = dao.GetReadDB().Select(&list, querySQL)
+	err := dao.Selector().Limit(10).Offset(5).
+		Select(&list)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -487,4 +486,46 @@ func TestUpdater_NamedExec(t *testing.T) {
 	}
 	assert.Equal(t, true, exist)
 	assert.Equal(t, "fengjx-1024", m1.Name)
+}
+
+func TestDao_Middleware(t *testing.T) {
+	tb := "demo_info_middleware"
+	before(t, tb)
+	DBMaster := newDb()
+	dao := daox.NewDao[*DemoInfo](
+		tb,
+		"id",
+		daox.IsAutoIncrement(),
+		daox.WithDBMaster(DBMaster),
+		daox.WithIfNullVals(map[string]string{
+			"utime": "10",
+			"ctime": "10",
+		}),
+		daox.WithMiddleware(engine.NewLogMiddleware(func(ctx context.Context, ec *engine.ExecutorContext, er *engine.ExecutorResult) {
+			t.Log("sql_type", ec.Type, "sql:", ec.SQL, "args:", ec.Args, "rows:", er.QueryRows, "duration:", er.Duration, "err:", er.Err)
+		})),
+	)
+	nowSec := time.Now().Unix()
+	u1 := &DemoInfo{
+		UID:       10000,
+		Name:      "fengjx",
+		Sex:       "1",
+		LoginTime: nowSec,
+		Utime:     nowSec,
+		Ctime:     nowSec,
+	}
+	id, err := dao.Save(u1)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	t.Logf("id: %d", id)
+	u2 := &DemoInfo{}
+	ok, err := dao.GetByID(id, u2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("GetByID not exist")
+	}
+	assert.Equal(t, u1.UID, u2.UID)
 }

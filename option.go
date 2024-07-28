@@ -3,55 +3,74 @@ package daox
 import (
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
+
+	"github.com/fengjx/daox/engine"
 )
 
-type Option func(*Dao)
+type Options struct {
+	tableName     string
+	master        *sqlx.DB
+	read          *sqlx.DB
+	omitColumns   []string
+	autoIncrement bool
+	mapper        *reflectx.Mapper
+	ifNullVals    map[string]string
+	middlewares   []engine.Middleware
+}
+
+type Option func(*Options)
 
 // WithDBMaster 设置主库
 func WithDBMaster(master *sqlx.DB) Option {
-	return func(p *Dao) {
-		p.masterDB = master
+	return func(p *Options) {
+		p.master = master
 	}
 }
 
 // WithDBRead 设置从库
 func WithDBRead(read *sqlx.DB) Option {
-	return func(p *Dao) {
-		p.readDB = read
+	return func(p *Options) {
+		p.read = read
 	}
 }
 
 // IsAutoIncrement 是否自增主键
 func IsAutoIncrement() Option {
-	return func(dao *Dao) {
-		dao.TableMeta.IsAutoIncrement = true
+	return func(dao *Options) {
+		dao.autoIncrement = true
 	}
 }
 
-func WithMapper(Mapper *reflectx.Mapper) Option {
-	return func(d *Dao) {
-		d.Mapper = Mapper
+// WithMapper 设置字段映射
+func WithMapper(mapper *reflectx.Mapper) Option {
+	return func(d *Options) {
+		d.mapper = mapper
 	}
 }
 
+// WithTableName 设置表名
 func WithTableName(tableName string) Option {
-	return func(d *Dao) {
-		d.TableMeta.TableName = tableName
+	return func(d *Options) {
+		d.tableName = tableName
 	}
 }
 
 // WithIfNullVal 设置字段为null时的默认值
 func WithIfNullVal(col string, val string) Option {
-	return func(d *Dao) {
-		d.initIfNullVal()
+	return func(d *Options) {
+		if d.ifNullVals == nil {
+			d.ifNullVals = make(map[string]string)
+		}
 		d.ifNullVals[col] = val
 	}
 }
 
 // WithIfNullVals 设置字段（多个）为null时的默认值
 func WithIfNullVals(vals map[string]string) Option {
-	return func(d *Dao) {
-		d.initIfNullVal()
+	return func(d *Options) {
+		if d.ifNullVals == nil {
+			d.ifNullVals = make(map[string]string)
+		}
 		for col, val := range vals {
 			d.ifNullVals[col] = val
 		}
@@ -60,8 +79,15 @@ func WithIfNullVals(vals map[string]string) Option {
 
 // WithOmitColumns 设置忽略字段
 func WithOmitColumns(omitColumns ...string) Option {
-	return func(d *Dao) {
+	return func(d *Options) {
 		d.omitColumns = omitColumns
+	}
+}
+
+// WithMiddleware 设置中间件
+func WithMiddleware(middlewares ...engine.Middleware) Option {
+	return func(d *Options) {
+		d.middlewares = middlewares
 	}
 }
 

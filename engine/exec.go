@@ -9,11 +9,7 @@ import (
 type Execer interface {
 	// NamedExecContext 使用命名参数执行sql
 	NamedExecContext(ctx context.Context, execSQL string, arg any) (sql.Result, error)
-	// NamedExec 使用命名参数执行sql
-	NamedExec(query string, arg any) (sql.Result, error)
 
 	// ExecContext 使用数组参数执行sql
 	ExecContext(ctx context.Context, execSQL string, args ...any) (sql.Result, error)
-	// Exec 使用数组参数执行sql
-	Exec(query string, args ...any) (sql.Result, error)
 }

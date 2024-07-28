@@ -3,6 +3,7 @@ package sqlbuilder
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/fengjx/daox/engine"
 )
@@ -220,6 +221,14 @@ func (ins *Inserter) ExecContext(ctx context.Context) (lastID int64, affected in
 	if err != nil {
 		return 0, 0, err
 	}
+	ec := &engine.ExecutorContext{
+		Type:      engine.INSERT,
+		SQL:       execSQL,
+		TableName: ins.tableName,
+		Start:     time.Now(),
+		Args:      args,
+	}
+	ctx = engine.WithExecutorCtx(ctx, ec)
 	result, err := ins.execer.ExecContext(ctx, execSQL, args...)
 	if err != nil {
 		return 0, 0, err
@@ -244,6 +253,14 @@ func (ins *Inserter) NamedExecContext(ctx context.Context, model any) (lastID in
 	if err != nil {
 		return 0, 0, err
 	}
+	ec := &engine.ExecutorContext{
+		Type:      engine.INSERT,
+		SQL:       execSQL,
+		TableName: ins.tableName,
+		Start:     time.Now(),
+		NameArgs:  model,
+	}
+	ctx = engine.WithExecutorCtx(ctx, ec)
 	result, err := ins.execer.NamedExecContext(ctx, execSQL, model)
 	if err != nil {
 		return 0, 0, err
