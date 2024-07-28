@@ -34,3 +34,4 @@
 - [insert 增加影响行数返回](https://github.com/fengjx/daox/pull/54)
 - [中间件支持](https://github.com/fengjx/daox/pull/56)
 - [middleware 重命名 hook](https://github.com/fengjx/daox/pull/58)
+- [增加获取db方法](https://github.com/fengjx/daox/pull/59)
