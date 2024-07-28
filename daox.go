@@ -24,13 +24,13 @@ var (
 // Dao 数据访问
 type Dao struct {
 	sync.Mutex
+	options     *Options
 	masterDB    *DB
 	readDB      *DB
 	mapper      *reflectx.Mapper
 	TableMeta   *TableMeta
 	ifNullVals  map[string]string
 	omitColumns []string
-	hooks       []engine.Hook
 	executor    engine.Executor
 }
 
@@ -81,7 +81,7 @@ func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 		TableMeta:   meta,
 		ifNullVals:  options.ifNullVals,
 		omitColumns: options.omitColumns,
-		hooks:       hooks,
+		options:     options,
 	}
 	global.registerMeta(dao.TableMeta)
 	return dao
@@ -126,7 +126,7 @@ func NewDaoByMeta(m Meta, opts ...Option) *Dao {
 		TableMeta:   meta,
 		ifNullVals:  options.ifNullVals,
 		omitColumns: options.omitColumns,
-		hooks:       hooks,
+		options:     options,
 	}
 	global.registerMeta(dao.TableMeta)
 	return dao
@@ -476,13 +476,14 @@ func (d *Dao) DeleteByIDContext(ctx context.Context, id any) (bool, error) {
 
 // With 使用新的数据库连接创建 Dao
 func (d *Dao) With(master, read *sqlx.DB) *Dao {
+	hooks := mergeHooks(d.options)
 	newDao := &Dao{
-		masterDB:   NewDb(master, d.hooks...),
-		readDB:     NewDb(read, d.hooks...),
+		masterDB:   NewDb(master, hooks...),
+		readDB:     NewDb(read, hooks...),
 		TableMeta:  d.TableMeta,
 		mapper:     d.mapper,
 		ifNullVals: d.ifNullVals,
-		hooks:      d.hooks,
+		options:    d.options,
 	}
 	return newDao
 }
@@ -495,7 +496,7 @@ func (d *Dao) WithTableName(tableName string) *Dao {
 		TableMeta:  d.TableMeta.WithTableName(tableName),
 		mapper:     d.mapper,
 		ifNullVals: d.ifNullVals,
-		hooks:      d.hooks,
+		options:    d.options,
 	}
 	return newDao
 }
@@ -507,7 +508,7 @@ func (d *Dao) WithExecutor(executor engine.Executor) *Dao {
 		TableMeta:  d.TableMeta,
 		mapper:     d.mapper,
 		ifNullVals: d.ifNullVals,
-		hooks:      d.hooks,
+		options:    d.options,
 		executor:   executor,
 	}
 	return newDao
@@ -533,7 +534,8 @@ func (d *Dao) GetMasterDB() *DB {
 	if d.masterDB != nil {
 		return d.masterDB
 	}
-	d.masterDB = NewDb(global.defaultMasterDB, d.hooks...)
+	hooks := mergeHooks(d.options)
+	d.masterDB = NewDb(global.defaultMasterDB, hooks...)
 	return d.masterDB
 }
 
@@ -551,12 +553,13 @@ func (d *Dao) GetReadDB() *DB {
 	if d.readDB != nil {
 		return d.readDB
 	}
+	hooks := mergeHooks(d.options)
 	if global.defaultReadDB != nil {
-		d.readDB = NewDb(global.defaultReadDB, d.hooks...)
+		d.readDB = NewDb(global.defaultReadDB, hooks...)
 	} else if d.masterDB != nil {
 		d.readDB = d.masterDB
 	} else if global.defaultMasterDB == nil {
-		d.readDB = NewDb(global.defaultMasterDB, d.hooks...)
+		d.readDB = NewDb(global.defaultMasterDB, hooks...)
 	}
 	return d.masterDB
 }
