@@ -28,8 +28,8 @@ func (meta TableMeta) OmitColumns(omit ...string) []string {
 }
 
 // WithTableName 设置表名，一般用在分表的场景，设置实际物理表名
-func (meta TableMeta) WithTableName(tableName string) TableMeta {
-	return TableMeta{
+func (meta TableMeta) WithTableName(tableName string) *TableMeta {
+	return &TableMeta{
 		TableName:       tableName,
 		Columns:         meta.Columns,
 		PrimaryKey:      meta.PrimaryKey,
