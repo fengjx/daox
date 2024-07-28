@@ -14,37 +14,40 @@ import (
 // DB 包装 sqlx.DB
 type DB struct {
 	*sqlx.DB
-	middleware engine.Middleware
+	hook engine.Hook
 }
 
 // NewDb 创建 DB
-func NewDb(db *sqlx.DB, middlewares ...engine.Middleware) *DB {
-	m := engine.NewChain(middlewares...)
+func NewDb(db *sqlx.DB, hooks ...engine.Hook) *DB {
+	if db == nil {
+		return nil
+	}
+	hook := engine.NewHookChain(hooks...)
 	ndb := &DB{
-		DB:         db,
-		middleware: m,
+		DB:   db,
+		hook: hook,
 	}
 	return ndb
 }
 
 // NamedExecContext 使用命名参数执行sql
 func (d *DB) NamedExecContext(ctx context.Context, execSQL string, arg any) (sql.Result, error) {
-	return doNamedExec(ctx, d.DB, execSQL, arg, d.middleware)
+	return doNamedExec(ctx, d.DB, execSQL, arg, d.hook)
 }
 
 // ExecContext 使用数组参数执行sql
 func (d *DB) ExecContext(ctx context.Context, execSQL string, args ...any) (sql.Result, error) {
-	return doExec(ctx, d.DB, execSQL, args, d.middleware)
+	return doExec(ctx, d.DB, execSQL, args, d.hook)
 }
 
 // SelectContext 查询多条数据
 func (d *DB) SelectContext(ctx context.Context, dest any, query string, args ...any) error {
-	return doSelect(ctx, d.DB, dest, query, args, d.middleware)
+	return doSelect(ctx, d.DB, dest, query, args, d.hook)
 }
 
 // GetContext 查询单条数据
 func (d *DB) GetContext(ctx context.Context, dest any, query string, args ...any) error {
-	return doGet(ctx, d.DB, dest, query, args, d.middleware)
+	return doGet(ctx, d.DB, dest, query, args, d.hook)
 }
 
 // Beginx 打开一个事务
@@ -54,16 +57,16 @@ func (d *DB) Beginx() (*Tx, error) {
 		return nil, err
 	}
 	return &Tx{
-		Tx:         tx,
-		middleware: d.middleware,
+		Tx:   tx,
+		hook: d.hook,
 	}, nil
 }
 
-func doNamedExec(ctx context.Context, execer engine.Execer, execSQL string, arg any, middleware engine.Middleware) (sql.Result, error) {
-	if middleware == nil {
+func doNamedExec(ctx context.Context, execer engine.Execer, execSQL string, arg any, hook engine.Hook) (sql.Result, error) {
+	if hook == nil {
 		return execer.NamedExecContext(ctx, execSQL, arg)
 	}
-	ec := engine.ExecutorCtx(ctx)
+	ec := engine.GetExecutorContext(ctx)
 	if ec == nil {
 		ec = &engine.ExecutorContext{
 			Type:      engine.ParseSQLType(execSQL),
@@ -73,7 +76,7 @@ func doNamedExec(ctx context.Context, execer engine.Execer, execSQL string, arg 
 			Start:     time.Now(),
 		}
 	}
-	err := middleware.Before(ctx, ec)
+	err := hook.Before(ctx, ec)
 	if err != nil {
 		return nil, err
 	}
@@ -86,18 +89,18 @@ func doNamedExec(ctx context.Context, execer engine.Execer, execSQL string, arg 
 		affected, _ := result.RowsAffected()
 		er.Affected = affected
 	}
-	middleware.After(ctx, ec, er)
+	hook.After(ctx, ec, er)
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func doExec(ctx context.Context, execer engine.Execer, execSQL string, args []any, middleware engine.Middleware) (sql.Result, error) {
-	if middleware == nil {
+func doExec(ctx context.Context, execer engine.Execer, execSQL string, args []any, hook engine.Hook) (sql.Result, error) {
+	if hook == nil {
 		return execer.ExecContext(ctx, execSQL, args...)
 	}
-	ec := engine.ExecutorCtx(ctx)
+	ec := engine.GetExecutorContext(ctx)
 	if ec == nil {
 		ec = &engine.ExecutorContext{
 			Type:      engine.ParseSQLType(execSQL),
@@ -107,7 +110,7 @@ func doExec(ctx context.Context, execer engine.Execer, execSQL string, args []an
 			Start:     time.Now(),
 		}
 	}
-	err := middleware.Before(ctx, ec)
+	err := hook.Before(ctx, ec)
 	if err != nil {
 		return nil, err
 	}
@@ -120,18 +123,18 @@ func doExec(ctx context.Context, execer engine.Execer, execSQL string, args []an
 		affected, _ := result.RowsAffected()
 		er.Affected = affected
 	}
-	middleware.After(ctx, ec, er)
+	hook.After(ctx, ec, er)
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func doSelect(ctx context.Context, queryer engine.Queryer, dest any, query string, args []any, middleware engine.Middleware) error {
-	if middleware == nil {
+func doSelect(ctx context.Context, queryer engine.Queryer, dest any, query string, args []any, hook engine.Hook) error {
+	if hook == nil {
 		return queryer.SelectContext(ctx, dest, query, args...)
 	}
-	ec := engine.ExecutorCtx(ctx)
+	ec := engine.GetExecutorContext(ctx)
 	if ec == nil {
 		ec = &engine.ExecutorContext{
 			Type:      engine.ParseSQLType(query),
@@ -141,7 +144,7 @@ func doSelect(ctx context.Context, queryer engine.Queryer, dest any, query strin
 			Start:     time.Now(),
 		}
 	}
-	err := middleware.Before(ctx, ec)
+	err := hook.Before(ctx, ec)
 	if err != nil {
 		return err
 	}
@@ -153,15 +156,15 @@ func doSelect(ctx context.Context, queryer engine.Queryer, dest any, query strin
 	if err == nil {
 		er.QueryRows = int64(utils.GetLength(dest))
 	}
-	middleware.After(ctx, ec, er)
+	hook.After(ctx, ec, er)
 	return err
 }
 
-func doGet(ctx context.Context, queryer engine.Queryer, dest any, query string, args []any, middleware engine.Middleware) error {
-	if middleware == nil {
+func doGet(ctx context.Context, queryer engine.Queryer, dest any, query string, args []any, hook engine.Hook) error {
+	if hook == nil {
 		return queryer.GetContext(ctx, dest, query, args...)
 	}
-	ec := engine.ExecutorCtx(ctx)
+	ec := engine.GetExecutorContext(ctx)
 	if ec == nil {
 		ec = &engine.ExecutorContext{
 			Type:      engine.ParseSQLType(query),
@@ -171,7 +174,7 @@ func doGet(ctx context.Context, queryer engine.Queryer, dest any, query string, 
 			Start:     time.Now(),
 		}
 	}
-	err := middleware.Before(ctx, ec)
+	err := hook.Before(ctx, ec)
 	if err != nil {
 		return err
 	}
@@ -183,6 +186,6 @@ func doGet(ctx context.Context, queryer engine.Queryer, dest any, query string, 
 	if err == nil {
 		er.QueryRows = 1
 	}
-	middleware.After(ctx, ec, er)
+	hook.After(ctx, ec, er)
 	return err
 }
