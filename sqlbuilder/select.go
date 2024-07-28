@@ -269,7 +269,7 @@ func (s *Selector) SelectContext(ctx context.Context, dest any) error {
 		Start:     time.Now(),
 		Args:      args,
 	}
-	ctx = engine.WithExecutorCtx(ctx, ec)
+	ctx = engine.SetExecutorContext(ctx, ec)
 	err = s.queryer.SelectContext(ctx, dest, querySQL, args...)
 	if err != nil {
 		return err
@@ -298,7 +298,7 @@ func (s *Selector) GetContext(ctx context.Context, dest any) (exist bool, err er
 		Start:     time.Now(),
 		Args:      args,
 	}
-	ctx = engine.WithExecutorCtx(ctx, ec)
+	ctx = engine.SetExecutorContext(ctx, ec)
 	err = s.queryer.GetContext(ctx, dest, querySQL, args...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

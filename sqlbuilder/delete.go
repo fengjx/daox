@@ -100,7 +100,7 @@ func (d *Deleter) ExecContext(ctx context.Context) (int64, error) {
 		Start:     time.Now(),
 		Args:      args,
 	}
-	ctx = engine.WithExecutorCtx(ctx, ec)
+	ctx = engine.SetExecutorContext(ctx, ec)
 	result, err := d.execer.ExecContext(ctx, execSQL, args...)
 	if err != nil {
 		return 0, err

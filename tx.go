@@ -11,27 +11,27 @@ import (
 
 type Tx struct {
 	*sqlx.Tx
-	middleware engine.Middleware
+	hook engine.Hook
 }
 
 // NamedExecContext 使用命名参数执行sql
 func (t *Tx) NamedExecContext(ctx context.Context, execSQL string, arg any) (sql.Result, error) {
-	return doNamedExec(ctx, t.Tx, execSQL, arg, t.middleware)
+	return doNamedExec(ctx, t.Tx, execSQL, arg, t.hook)
 }
 
 // ExecContext 使用数组参数执行sql
 func (t *Tx) ExecContext(ctx context.Context, execSQL string, args ...any) (sql.Result, error) {
-	return doExec(ctx, t.Tx, execSQL, args, t.middleware)
+	return doExec(ctx, t.Tx, execSQL, args, t.hook)
 }
 
 // SelectContext 查询多条数据
 func (t *Tx) SelectContext(ctx context.Context, dest any, query string, args ...any) error {
-	return doSelect(ctx, t.Tx, dest, query, args, t.middleware)
+	return doSelect(ctx, t.Tx, dest, query, args, t.hook)
 }
 
 // GetContext 查询单条数据
 func (t *Tx) GetContext(ctx context.Context, dest any, query string, args ...any) error {
-	return doGet(ctx, t.Tx, dest, query, args, t.middleware)
+	return doGet(ctx, t.Tx, dest, query, args, t.hook)
 }
 
 type txCtxKey struct{}
