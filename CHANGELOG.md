@@ -35,3 +35,4 @@
 - [中间件支持](https://github.com/fengjx/daox/pull/56)
 - [middleware 重命名 hook](https://github.com/fengjx/daox/pull/58)
 - [增加获取db方法](https://github.com/fengjx/daox/pull/59)
+- [适配 engine 接口](https://github.com/fengjx/daox/pull/60)
