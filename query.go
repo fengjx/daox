@@ -6,6 +6,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"github.com/fengjx/daox/engine"
 	"github.com/fengjx/daox/sqlbuilder"
 	"github.com/fengjx/daox/sqlbuilder/ql"
 	"github.com/fengjx/daox/types"
@@ -157,19 +158,19 @@ func buildCondition(conditions []Condition) sqlbuilder.ConditionBuilder {
 }
 
 // Find 通用查询封装
-func Find[T any](ctx context.Context, dbx *sqlx.DB, query QueryRecord) (list []T, page *Page, err error) {
+func Find[T any](ctx context.Context, queryer engine.Queryer, query QueryRecord) (list []T, page *Page, err error) {
 	sql, args, err := query.ToSQLArgs()
 	if err != nil {
 		return nil, query.Page, err
 	}
-	err = dbx.SelectContext(ctx, &list, sql, args...)
+	err = queryer.SelectContext(ctx, &list, sql, args...)
 	if err != nil {
 		return nil, query.Page, err
 	}
 	page = query.Page
 	page.Offset += int64(len(list))
 	if query.Page != nil && query.Page.QueryCount {
-		count, err := getCount(ctx, dbx, query)
+		count, err := getCount(ctx, queryer, query)
 		if err != nil {
 			return nil, query.Page, err
 		}
@@ -180,12 +181,12 @@ func Find[T any](ctx context.Context, dbx *sqlx.DB, query QueryRecord) (list []T
 }
 
 // FindListMap 通用查询封装，返回 map 类型
-func FindListMap(ctx context.Context, dbx *sqlx.DB, query QueryRecord) (list []map[string]any, page *Page, err error) {
+func FindListMap(ctx context.Context, queryer engine.Queryer, query QueryRecord) (list []map[string]any, page *Page, err error) {
 	sql, args, err := query.ToSQLArgs()
 	if err != nil {
 		return nil, query.Page, err
 	}
-	rows, err := dbx.QueryxContext(ctx, sql, args...)
+	rows, err := queryer.QueryContext(ctx, sql, args...)
 	if err != nil {
 		return nil, query.Page, err
 	}
@@ -217,7 +218,7 @@ func FindListMap(ctx context.Context, dbx *sqlx.DB, query QueryRecord) (list []m
 	page = query.Page
 	page.Offset += int64(len(list))
 	if query.Page != nil && query.Page.QueryCount {
-		count, err := getCount(ctx, dbx, query)
+		count, err := getCount(ctx, queryer, query)
 		if err != nil {
 			return nil, query.Page, err
 		}
@@ -227,14 +228,14 @@ func FindListMap(ctx context.Context, dbx *sqlx.DB, query QueryRecord) (list []m
 	return
 }
 
-func getCount(ctx context.Context, dbx *sqlx.DB, query QueryRecord) (int64, error) {
+func getCount(ctx context.Context, queryer engine.Queryer, query QueryRecord) (int64, error) {
 	var count int64
 	if query.Page != nil && query.Page.QueryCount {
 		countSQL, countArgs, err := query.ToCountSQLArgs()
 		if err != nil {
 			return 0, err
 		}
-		err = dbx.GetContext(ctx, &count, countSQL, countArgs...)
+		err = queryer.GetContext(ctx, &count, countSQL, countArgs...)
 		if err != nil {
 			return 0, err
 		}
