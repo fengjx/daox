@@ -36,3 +36,4 @@
 - [middleware 重命名 hook](https://github.com/fengjx/daox/pull/58)
 - [增加获取db方法](https://github.com/fengjx/daox/pull/59)
 - [适配 engine 接口](https://github.com/fengjx/daox/pull/60)
+- [dao 移除直接依赖 sqlx.Tx](https://github.com/fengjx/daox/pull/62)

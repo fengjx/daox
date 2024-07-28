@@ -25,10 +25,11 @@ type Dao struct {
 	masterDB    *DB
 	readDB      *DB
 	mapper      *reflectx.Mapper
-	TableMeta   TableMeta
+	TableMeta   *TableMeta
 	ifNullVals  map[string]string
 	omitColumns []string
 	hooks       []engine.Hook
+	executor    engine.Executor
 }
 
 // NewDao 创建一个新的 dao 对象
@@ -55,7 +56,7 @@ func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 	options.tableName = tableName
 	structType := reflect.TypeFor[T]()
 	columns := sqlbuilder.GetColumnsByType(options.mapper, structType, options.omitColumns...)
-	meta := TableMeta{
+	meta := &TableMeta{
 		TableName:       tableName,
 		PrimaryKey:      primaryKey,
 		IsAutoIncrement: options.autoIncrement,
@@ -111,7 +112,7 @@ func NewDaoByMeta(m Meta, opts ...Option) *Dao {
 			options.mapper = sqlbuilder.GetMapperByTagName("json")
 		}
 	}
-	meta := TableMeta{
+	meta := &TableMeta{
 		TableName:       m.TableName(),
 		PrimaryKey:      m.PrimaryKey(),
 		Columns:         m.Columns(),
@@ -166,23 +167,23 @@ func (d *Dao) Selector(columns ...string) *sqlbuilder.Selector {
 	if len(d.ifNullVals) > 0 {
 		selector.IfNullVals(d.ifNullVals)
 	}
-	selector.Queryer(d.GetReadDB())
+	selector.Queryer(d.getQueryer())
 	return selector
 }
 
 // Updater 创建当前表的 Updater
 func (d *Dao) Updater() *sqlbuilder.Updater {
-	return d.SQLBuilder().Update().Execer(d.GetMasterDB())
+	return d.SQLBuilder().Update().Execer(d.getExecer())
 }
 
 // Deleter 创建当前表的 Deleter
 func (d *Dao) Deleter() *sqlbuilder.Deleter {
-	return d.SQLBuilder().Delete().Execer(d.GetMasterDB())
+	return d.SQLBuilder().Delete().Execer(d.getExecer())
 }
 
 // Inserter 创建当前表的 updater
 func (d *Dao) Inserter() *sqlbuilder.Inserter {
-	return d.SQLBuilder().Insert().Execer(d.GetMasterDB())
+	return d.SQLBuilder().Insert().Execer(d.getExecer())
 }
 
 // GetColumnsByModel 根据 model 结构获取数据库字段
@@ -223,37 +224,13 @@ func (d *Dao) Save(dest Model, opts ...InsertOption) (int64, error) {
 // SaveContext 插入数据，携带上下文
 // omitColumns 不需要 insert 的字段
 func (d *Dao) SaveContext(ctx context.Context, dest Model, opts ...InsertOption) (int64, error) {
-	return d.saveContext(ctx, nil, dest, opts...)
-}
-
-// SaveTx 插入数据，支持事务
-// omitColumns 不需要 insert 的字段
-func (d *Dao) SaveTx(tx *sqlx.Tx, dest Model, opts ...InsertOption) (int64, error) {
-	return d.SaveTxContext(context.Background(), tx, dest, opts...)
-}
-
-// SaveTxContext 插入数据，支持事务，携带上下文
-// omitColumns 不需要 insert 的字段
-func (d *Dao) SaveTxContext(ctx context.Context, tx *sqlx.Tx, dest Model, opts ...InsertOption) (int64, error) {
-	if err := d.checkTxNil(tx); err != nil {
-		return 0, err
-	}
-	return d.saveContext(ctx, tx, dest, opts...)
-}
-
-func (d *Dao) saveContext(ctx context.Context, tx *sqlx.Tx, model Model, opts ...InsertOption) (int64, error) {
 	opt := &InsertOptions{}
 	for _, o := range opts {
 		o(opt)
 	}
-
-	var execer engine.Execer = d.GetMasterDB()
-	if tx != nil {
-		execer = tx
-	}
-	id, _, err := d.SQLBuilder().Insert().Execer(execer).
+	id, _, err := d.SQLBuilder().Insert().Execer(d.getExecer()).
 		Columns(d.getSaveColumns(opt)...).
-		NamedExecContext(ctx, model)
+		NamedExecContext(ctx, dest)
 	return id, err
 }
 
@@ -363,38 +340,12 @@ func (d *Dao) GetByColumn(kv *KV, dest Model) (bool, error) {
 // GetByColumnContext 按指定字段查询单条数据，携带上下文
 // bool 数据是否存在
 func (d *Dao) GetByColumnContext(ctx context.Context, kv *KV, dest Model) (bool, error) {
-	return d.getByColumnContext(ctx, nil, kv, dest)
-}
-
-// GetByColumnTx 按指定字段查询单条数据，支持事务
-// bool 数据是否存在
-func (d *Dao) GetByColumnTx(tx *sqlx.Tx, kv *KV, dest Model) (bool, error) {
-	return d.GetByColumnTxContext(context.Background(), tx, kv, dest)
-}
-
-// GetByColumnTxContext 按指定字段查询单条数据，支持事务，携带上下文
-// bool 数据是否存在
-func (d *Dao) GetByColumnTxContext(ctx context.Context, tx *sqlx.Tx, kv *KV, dest Model) (bool, error) {
-	if err := d.checkTxNil(tx); err != nil {
-		return false, err
-	}
-	return d.getByColumnContext(ctx, tx, kv, dest)
-}
-
-func (d *Dao) getByColumnContext(ctx context.Context, tx *sqlx.Tx, kv *KV, dest Model) (bool, error) {
 	if kv == nil {
 		return false, nil
 	}
-
-	var queryer engine.Queryer = d.GetReadDB()
-	if tx != nil {
-		queryer = tx
-	}
-
-	return d.Selector().Queryer(queryer).
+	return d.Selector().Queryer(d.getQueryer()).
 		Where(ql.C(ql.Col(kv.Key).EQ(kv.Value))).
 		GetContext(ctx, dest)
-
 }
 
 // ListByColumns 指定字段多个值查询多条数据
@@ -406,33 +357,10 @@ func (d *Dao) ListByColumns(kvs *MultiKV, dest any) error {
 // ListByColumnsContext 指定字段多个值查询多条数据，携带上下文
 // dest: slice pointer
 func (d *Dao) ListByColumnsContext(ctx context.Context, kvs *MultiKV, dest any) error {
-	return d.listByColumnsContext(ctx, nil, kvs, dest)
-}
-
-// ListByColumnsTx 指定字段多个值查询多条数据，支持事务
-func (d *Dao) ListByColumnsTx(tx *sqlx.Tx, kvs *MultiKV, dest any) error {
-	return d.ListByColumnsTxContext(context.Background(), tx, kvs, dest)
-}
-
-// ListByColumnsTxContext 指定字段多个值查询多条数据，支持事务，携带上下文
-func (d *Dao) ListByColumnsTxContext(ctx context.Context, tx *sqlx.Tx, kvs *MultiKV, dest any) error {
-	if err := d.checkTxNil(tx); err != nil {
-		return err
-	}
-	return d.listByColumnsContext(ctx, tx, kvs, dest)
-}
-
-func (d *Dao) listByColumnsContext(ctx context.Context, tx *sqlx.Tx, kvs *MultiKV, dest any) error {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return nil
 	}
-
-	var queryer engine.Queryer = d.GetReadDB()
-	if tx != nil {
-		queryer = tx
-	}
-
-	return d.Selector().Queryer(queryer).
+	return d.Selector().Queryer(d.getQueryer()).
 		Columns(d.DBColumns()...).
 		Where(ql.C(ql.Col(kvs.Key).In(kvs.Values...))).
 		SelectContext(ctx, dest)
@@ -445,33 +373,7 @@ func (d *Dao) List(kv *KV, dest any) error {
 
 // ListContext 指定字段查询多条数据，携带上下文
 func (d *Dao) ListContext(ctx context.Context, kv *KV, dest any) error {
-	return d.listContext(ctx, nil, kv, dest)
-}
-
-// ListTx 指定字段查询多条数据，支持事务
-func (d *Dao) ListTx(tx *sqlx.Tx, kv *KV, dest any) error {
-	return d.ListTxContext(context.Background(), tx, kv, dest)
-}
-
-// ListTxContext 指定字段查询多条数据，支持事务，携带上下文
-func (d *Dao) ListTxContext(ctx context.Context, tx *sqlx.Tx, kv *KV, dest any) error {
-	if err := d.checkTxNil(tx); err != nil {
-		return err
-	}
-	return d.listContext(ctx, tx, kv, dest)
-}
-
-func (d *Dao) listContext(ctx context.Context, tx *sqlx.Tx, kv *KV, dest any) error {
-	if kv == nil {
-		return nil
-	}
-
-	var queryer engine.Queryer = d.GetReadDB()
-	if tx != nil {
-		queryer = tx
-	}
-
-	return d.Selector().Queryer(queryer).
+	return d.Selector().Queryer(d.getQueryer()).
 		Columns(d.DBColumns()...).
 		Where(ql.C(ql.Col(kv.Key).EQ(kv.Value))).
 		SelectContext(ctx, dest)
@@ -499,17 +401,6 @@ func (d *Dao) ListByIDsContext(ctx context.Context, dest any, ids ...any) error 
 	return d.ListByColumnsContext(ctx, OfMultiKv(tableMeta.PrimaryKey, ids...), dest)
 }
 
-// ListByIDsTx 查询多个id值，支持事务
-func (d *Dao) ListByIDsTx(tx *sqlx.Tx, dest any, ids ...any) error {
-	return d.ListByIDsTxContext(context.Background(), tx, dest, ids...)
-}
-
-// ListByIDsTxContext 查询多个id值，支持事务，携带上下文
-func (d *Dao) ListByIDsTxContext(ctx context.Context, tx *sqlx.Tx, dest any, ids ...any) error {
-	tableMeta := d.TableMeta
-	return d.ListByColumnsTxContext(ctx, tx, OfMultiKv(tableMeta.PrimaryKey, ids...), dest)
-}
-
 // UpdateField 部分字段更新
 func (d *Dao) UpdateField(idValue any, fieldMap map[string]any) (bool, error) {
 	return d.UpdateFieldContext(context.Background(), idValue, fieldMap)
@@ -517,47 +408,20 @@ func (d *Dao) UpdateField(idValue any, fieldMap map[string]any) (bool, error) {
 
 // UpdateFieldContext 部分字段更新，携带上下文
 func (d *Dao) UpdateFieldContext(ctx context.Context, idValue any, fieldMap map[string]any) (bool, error) {
-	return d.updateFieldContext(ctx, nil, idValue, fieldMap)
-}
-
-// UpdateFieldTx 部分字段更新，支持事务
-func (d *Dao) UpdateFieldTx(tx *sqlx.Tx, idValue any, fieldMap map[string]any) (bool, error) {
-	return d.UpdateFieldTxContext(context.Background(), tx, idValue, fieldMap)
-}
-
-// UpdateFieldTxContext 部分字段更新，支持事务，携带上下文
-func (d *Dao) UpdateFieldTxContext(ctx context.Context, tx *sqlx.Tx, idValue any, fieldMap map[string]any) (bool, error) {
-	if err := d.checkTxNil(tx); err != nil {
-		return false, err
-	}
-	return d.updateFieldContext(ctx, tx, idValue, fieldMap)
-}
-
-func (d *Dao) updateFieldContext(ctx context.Context, tx *sqlx.Tx, idValue any, fieldMap map[string]any) (bool, error) {
 	if utils.IsIDEmpty(idValue) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 
-	tableMeta := d.TableMeta
-	rows, err := d.updateByCondContext(ctx, tx, fieldMap, ql.C(ql.Col(tableMeta.PrimaryKey).EQ(idValue)))
+	updater := d.Updater().Execer(d.getExecer())
+	for col, val := range fieldMap {
+		updater.Set(col, val)
+	}
+	updater.Where(ql.C(ql.Col(d.TableMeta.PrimaryKey).EQ(idValue)))
+	rows, err := updater.ExecContext(ctx)
 	if err != nil {
 		return false, err
 	}
 	return rows > 0, nil
-}
-
-func (d *Dao) updateByCondContext(ctx context.Context, tx *sqlx.Tx, attr map[string]any, where sqlbuilder.ConditionBuilder) (int64, error) {
-	var execer engine.Execer = d.GetMasterDB()
-	if tx != nil {
-		execer = tx
-	}
-
-	updater := d.Updater().Execer(execer)
-	for col, val := range attr {
-		updater.Set(col, val)
-	}
-	updater.Where(where)
-	return updater.ExecContext(ctx)
 }
 
 // Update 全字段更新
@@ -566,36 +430,14 @@ func (d *Dao) Update(m Model, omitColumns ...string) (bool, error) {
 }
 
 // UpdateContext 全字段更新，携带上下文
-func (d *Dao) UpdateContext(ctx context.Context, m Model, omitColumns ...string) (bool, error) {
-	return d.updateContext(ctx, nil, m, omitColumns...)
-}
-
-// UpdateTx 全字段更新，支持事务
-func (d *Dao) UpdateTx(tx *sqlx.Tx, m Model, omitColumns ...string) (bool, error) {
-	return d.UpdateTxContext(context.Background(), tx, m, omitColumns...)
-}
-
-// UpdateTxContext 全字段更新，支持事务，携带上下文
-func (d *Dao) UpdateTxContext(ctx context.Context, tx *sqlx.Tx, m Model, omitColumns ...string) (bool, error) {
-	if err := d.checkTxNil(tx); err != nil {
-		return false, err
-	}
-	return d.updateContext(ctx, tx, m, omitColumns...)
-}
-
-func (d *Dao) updateContext(ctx context.Context, tx *sqlx.Tx, model Model, omitColumns ...string) (bool, error) {
+func (d *Dao) UpdateContext(ctx context.Context, model Model, omitColumns ...string) (bool, error) {
 	if utils.IsIDEmpty(model.GetID()) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 
-	var execer engine.Execer = d.GetMasterDB()
-	if tx != nil {
-		execer = tx
-	}
-
 	tableMeta := d.TableMeta
 	omitColumns = append(omitColumns, tableMeta.PrimaryKey)
-	updater := d.Updater().Execer(execer).
+	updater := d.Updater().Execer(d.getExecer()).
 		Columns(d.DBColumns(omitColumns...)...).
 		Where(
 			ql.SC().And(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey)),
@@ -607,13 +449,8 @@ func (d *Dao) updateContext(ctx context.Context, tx *sqlx.Tx, model Model, omitC
 	return affected > 0, nil
 }
 
-func (d *Dao) deleteByCondContext(ctx context.Context, tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (int64, error) {
-	var execer engine.Execer = d.GetMasterDB()
-	if tx != nil {
-		execer = tx
-	}
-
-	return d.Deleter().Execer(execer).Where(where).ExecContext(ctx)
+func (d *Dao) deleteByCondContext(ctx context.Context, where sqlbuilder.ConditionBuilder) (int64, error) {
+	return d.Deleter().Execer(d.getExecer()).Where(where).ExecContext(ctx)
 }
 
 // DeleteByColumn 按字段名删除
@@ -623,27 +460,10 @@ func (d *Dao) DeleteByColumn(kv *KV) (int64, error) {
 
 // DeleteByColumnContext 按字段名删除，携带上下文
 func (d *Dao) DeleteByColumnContext(ctx context.Context, kv *KV) (int64, error) {
-	return d.deleteByColumnContext(ctx, nil, kv)
-}
-
-// DeleteByColumnTx 按字段名删除，支持事务
-func (d *Dao) DeleteByColumnTx(tx *sqlx.Tx, kv *KV) (int64, error) {
-	return d.DeleteByColumnTxContext(context.Background(), tx, kv)
-}
-
-// DeleteByColumnTxContext 按字段名删除，支持事务，携带上下文
-func (d *Dao) DeleteByColumnTxContext(ctx context.Context, tx *sqlx.Tx, kv *KV) (int64, error) {
-	if err := d.checkTxNil(tx); err != nil {
-		return 0, err
-	}
-	return d.deleteByColumnContext(ctx, tx, kv)
-}
-
-func (d *Dao) deleteByColumnContext(ctx context.Context, tx *sqlx.Tx, kv *KV) (int64, error) {
 	if kv == nil {
 		return 0, nil
 	}
-	return d.deleteByCondContext(ctx, tx, ql.C(ql.Col(kv.Key).EQ(kv.Value)))
+	return d.deleteByCondContext(ctx, ql.C(ql.Col(kv.Key).EQ(kv.Value)))
 }
 
 // DeleteByColumns 指定字段删除多个值
@@ -653,27 +473,10 @@ func (d *Dao) DeleteByColumns(kvs *MultiKV) (int64, error) {
 
 // DeleteByColumnsContext 指定字段删除多个值，携带上下文
 func (d *Dao) DeleteByColumnsContext(ctx context.Context, kvs *MultiKV) (int64, error) {
-	return d.deleteByColumnsContext(ctx, nil, kvs)
-}
-
-// DeleteByColumnsTx 指定字段多个值删除
-func (d *Dao) DeleteByColumnsTx(tx *sqlx.Tx, kvs *MultiKV) (int64, error) {
-	return d.DeleteByColumnsTxContext(context.Background(), tx, kvs)
-}
-
-// DeleteByColumnsTxContext 指定字段多个值删除，携带上下文
-func (d *Dao) DeleteByColumnsTxContext(ctx context.Context, tx *sqlx.Tx, kvs *MultiKV) (int64, error) {
-	if err := d.checkTxNil(tx); err != nil {
-		return 0, err
-	}
-	return d.deleteByColumnsContext(ctx, tx, kvs)
-}
-
-func (d *Dao) deleteByColumnsContext(ctx context.Context, tx *sqlx.Tx, kvs *MultiKV) (int64, error) {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return 0, nil
 	}
-	return d.deleteByCondContext(ctx, tx, ql.C(ql.Col(kvs.Key).In(kvs.Values...)))
+	return d.deleteByCondContext(ctx, ql.C(ql.Col(kvs.Key).In(kvs.Values...)))
 }
 
 // DeleteByID 根据id删除数据
@@ -683,36 +486,12 @@ func (d *Dao) DeleteByID(id any) (bool, error) {
 
 // DeleteByIDContext 根据id删除数据，携带上下文
 func (d *Dao) DeleteByIDContext(ctx context.Context, id any) (bool, error) {
-	return d.deleteByIDContext(ctx, nil, id)
-}
-
-// DeleteByIDTx 根据id删除数据，支持事务
-func (d *Dao) DeleteByIDTx(tx *sqlx.Tx, id any) (bool, error) {
-	return d.DeleteByIDTxContext(context.Background(), tx, id)
-}
-
-// DeleteByIDTxContext 根据id删除数据，支持事务，携带上下文
-func (d *Dao) DeleteByIDTxContext(ctx context.Context, tx *sqlx.Tx, id any) (bool, error) {
-	if err := d.checkTxNil(tx); err != nil {
-		return false, err
-	}
-	return d.deleteByIDContext(ctx, tx, id)
-}
-
-func (d *Dao) deleteByIDContext(ctx context.Context, tx *sqlx.Tx, id any) (bool, error) {
 	tableMeta := d.TableMeta
-	affected, err := d.deleteByColumnContext(ctx, tx, OfKv(tableMeta.PrimaryKey, id))
+	affected, err := d.DeleteByColumnContext(ctx, OfKv(tableMeta.PrimaryKey, id))
 	if err != nil {
 		return false, err
 	}
 	return affected == 1, nil
-}
-
-func (d *Dao) checkTxNil(tx *sqlx.Tx) error {
-	if tx == nil {
-		return ErrTxNil
-	}
-	return nil
 }
 
 // With 使用新的数据库连接创建 Dao
@@ -741,6 +520,19 @@ func (d *Dao) WithTableName(tableName string) *Dao {
 	return newDao
 }
 
+func (d *Dao) WithExecutor(executor engine.Executor) *Dao {
+	newDao := &Dao{
+		masterDB:   d.masterDB,
+		readDB:     d.readDB,
+		TableMeta:  d.TableMeta,
+		mapper:     d.mapper,
+		ifNullVals: d.ifNullVals,
+		hooks:      d.hooks,
+		executor:   executor,
+	}
+	return newDao
+}
+
 func (d *Dao) initIfNullVal() {
 	if d.ifNullVals == nil {
 		d.ifNullVals = make(map[string]string)
@@ -753,4 +545,18 @@ func (d *Dao) GetMasterDB() *DB {
 
 func (d *Dao) GetReadDB() *DB {
 	return d.readDB
+}
+
+func (d *Dao) getQueryer() engine.Queryer {
+	if d.executor != nil {
+		return d.executor
+	}
+	return d.GetReadDB()
+}
+
+func (d *Dao) getExecer() engine.Execer {
+	if d.executor != nil {
+		return d.executor
+	}
+	return d.GetMasterDB()
 }
