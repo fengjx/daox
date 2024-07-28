@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
@@ -22,6 +23,7 @@ var (
 
 // Dao 数据访问
 type Dao struct {
+	sync.Mutex
 	masterDB    *DB
 	readDB      *DB
 	mapper      *reflectx.Mapper
@@ -43,9 +45,6 @@ func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 	for _, opt := range opts {
 		opt(options)
 	}
-	if options.read == nil {
-		options.read = options.master
-	}
 	if options.mapper == nil {
 		if options.master != nil {
 			options.mapper = options.master.Mapper
@@ -62,15 +61,7 @@ func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 		IsAutoIncrement: options.autoIncrement,
 		Columns:         columns,
 	}
-	hooks := global.hooks
-	if len(options.hooks) > 0 {
-		hooks = append(hooks, options.hooks...)
-	}
-	if options.printSQL != nil {
-		hooks = append(hooks, engine.NewLogHook(options.printSQL))
-	} else if global.printSQL != nil {
-		hooks = append(hooks, engine.NewLogHook(global.printSQL))
-	}
+	hooks := mergeHooks(options)
 	master := options.master
 	if options.master == nil {
 		master = global.defaultMasterDB
@@ -102,9 +93,6 @@ func NewDaoByMeta(m Meta, opts ...Option) *Dao {
 	for _, opt := range opts {
 		opt(options)
 	}
-	if options.read == nil {
-		options.read = options.master
-	}
 	if options.mapper == nil {
 		if options.master != nil {
 			options.mapper = options.master.Mapper
@@ -118,15 +106,7 @@ func NewDaoByMeta(m Meta, opts ...Option) *Dao {
 		Columns:         m.Columns(),
 		IsAutoIncrement: m.IsAutoIncrement(),
 	}
-	hooks := global.hooks
-	if len(options.hooks) > 0 {
-		hooks = append(hooks, options.hooks...)
-	}
-	if options.printSQL != nil {
-		hooks = append(hooks, engine.NewLogHook(options.printSQL))
-	} else if global.printSQL != nil {
-		hooks = append(hooks, engine.NewLogHook(global.printSQL))
-	}
+	hooks := mergeHooks(options)
 	master := options.master
 	if options.master == nil {
 		master = global.defaultMasterDB
@@ -539,12 +519,46 @@ func (d *Dao) initIfNullVal() {
 	}
 }
 
+// GetMasterDB 返回主库
 func (d *Dao) GetMasterDB() *DB {
+	if d.masterDB != nil {
+		return d.masterDB
+	}
+	if global.defaultMasterDB == nil {
+		return nil
+	}
+	d.Lock()
+	defer d.Unlock()
+	// double check
+	if d.masterDB != nil {
+		return d.masterDB
+	}
+	d.masterDB = NewDb(global.defaultMasterDB, d.hooks...)
 	return d.masterDB
 }
 
+// GetReadDB 返回从库
 func (d *Dao) GetReadDB() *DB {
-	return d.readDB
+	if d.readDB != nil {
+		return d.readDB
+	}
+	if global.defaultReadDB == nil && d.GetMasterDB() == nil {
+		return nil
+	}
+	d.Lock()
+	defer d.Unlock()
+	// double check
+	if d.readDB != nil {
+		return d.readDB
+	}
+	if global.defaultReadDB != nil {
+		d.readDB = NewDb(global.defaultReadDB, d.hooks...)
+	} else if d.masterDB != nil {
+		d.readDB = d.masterDB
+	} else if global.defaultMasterDB == nil {
+		d.readDB = NewDb(global.defaultMasterDB, d.hooks...)
+	}
+	return d.masterDB
 }
 
 func (d *Dao) getQueryer() engine.Queryer {
@@ -559,4 +573,17 @@ func (d *Dao) getExecer() engine.Execer {
 		return d.executor
 	}
 	return d.GetMasterDB()
+}
+
+func mergeHooks(options *Options) []engine.Hook {
+	hooks := global.hooks
+	if len(options.hooks) > 0 {
+		hooks = append(hooks, options.hooks...)
+	}
+	if options.printSQL != nil {
+		hooks = append(hooks, engine.NewLogHook(options.printSQL))
+	} else if global.printSQL != nil {
+		hooks = append(hooks, engine.NewLogHook(global.printSQL))
+	}
+	return hooks
 }
