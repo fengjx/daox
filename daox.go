@@ -166,23 +166,23 @@ func (d *Dao) Selector(columns ...string) *sqlbuilder.Selector {
 	if len(d.ifNullVals) > 0 {
 		selector.IfNullVals(d.ifNullVals)
 	}
-	selector.Queryer(d.readDB)
+	selector.Queryer(d.GetReadDB())
 	return selector
 }
 
 // Updater 创建当前表的 Updater
 func (d *Dao) Updater() *sqlbuilder.Updater {
-	return d.SQLBuilder().Update().Execer(d.masterDB)
+	return d.SQLBuilder().Update().Execer(d.GetMasterDB())
 }
 
 // Deleter 创建当前表的 Deleter
 func (d *Dao) Deleter() *sqlbuilder.Deleter {
-	return d.SQLBuilder().Delete().Execer(d.masterDB)
+	return d.SQLBuilder().Delete().Execer(d.GetMasterDB())
 }
 
 // Inserter 创建当前表的 updater
 func (d *Dao) Inserter() *sqlbuilder.Inserter {
-	return d.SQLBuilder().Insert().Execer(d.masterDB)
+	return d.SQLBuilder().Insert().Execer(d.GetMasterDB())
 }
 
 // GetColumnsByModel 根据 model 结构获取数据库字段
@@ -247,7 +247,7 @@ func (d *Dao) saveContext(ctx context.Context, tx *sqlx.Tx, model Model, opts ..
 		o(opt)
 	}
 
-	var execer engine.Execer = d.masterDB
+	var execer engine.Execer = d.GetMasterDB()
 	if tx != nil {
 		execer = tx
 	}
@@ -386,7 +386,7 @@ func (d *Dao) getByColumnContext(ctx context.Context, tx *sqlx.Tx, kv *KV, dest 
 		return false, nil
 	}
 
-	var queryer engine.Queryer = d.readDB
+	var queryer engine.Queryer = d.GetReadDB()
 	if tx != nil {
 		queryer = tx
 	}
@@ -427,7 +427,7 @@ func (d *Dao) listByColumnsContext(ctx context.Context, tx *sqlx.Tx, kvs *MultiK
 		return nil
 	}
 
-	var queryer engine.Queryer = d.readDB
+	var queryer engine.Queryer = d.GetReadDB()
 	if tx != nil {
 		queryer = tx
 	}
@@ -466,7 +466,7 @@ func (d *Dao) listContext(ctx context.Context, tx *sqlx.Tx, kv *KV, dest any) er
 		return nil
 	}
 
-	var queryer engine.Queryer = d.readDB
+	var queryer engine.Queryer = d.GetReadDB()
 	if tx != nil {
 		queryer = tx
 	}
@@ -547,7 +547,7 @@ func (d *Dao) updateFieldContext(ctx context.Context, tx *sqlx.Tx, idValue any, 
 }
 
 func (d *Dao) updateByCondContext(ctx context.Context, tx *sqlx.Tx, attr map[string]any, where sqlbuilder.ConditionBuilder) (int64, error) {
-	var execer engine.Execer = d.masterDB
+	var execer engine.Execer = d.GetMasterDB()
 	if tx != nil {
 		execer = tx
 	}
@@ -588,7 +588,7 @@ func (d *Dao) updateContext(ctx context.Context, tx *sqlx.Tx, model Model, omitC
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 
-	var execer engine.Execer = d.masterDB
+	var execer engine.Execer = d.GetMasterDB()
 	if tx != nil {
 		execer = tx
 	}
@@ -608,7 +608,7 @@ func (d *Dao) updateContext(ctx context.Context, tx *sqlx.Tx, model Model, omitC
 }
 
 func (d *Dao) deleteByCondContext(ctx context.Context, tx *sqlx.Tx, where sqlbuilder.ConditionBuilder) (int64, error) {
-	var execer engine.Execer = d.masterDB
+	var execer engine.Execer = d.GetMasterDB()
 	if tx != nil {
 		execer = tx
 	}
@@ -745,4 +745,12 @@ func (d *Dao) initIfNullVal() {
 	if d.ifNullVals == nil {
 		d.ifNullVals = make(map[string]string)
 	}
+}
+
+func (d *Dao) GetMasterDB() *DB {
+	return d.masterDB
+}
+
+func (d *Dao) GetReadDB() *DB {
+	return d.readDB
 }
