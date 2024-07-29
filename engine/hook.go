@@ -79,23 +79,3 @@ func (c *Chain) After(ctx context.Context, ec *ExecutorContext, er *ExecutorResu
 		c.hooks[i].After(ctx, ec, er)
 	}
 }
-
-// LogHook 打印日志中间件
-type LogHook struct {
-	Print AfterHandler
-}
-
-// NewLogHook 创建打印日志中间件
-func NewLogHook(p AfterHandler) *LogHook {
-	return &LogHook{Print: p}
-}
-
-// Before 执行前
-func (l LogHook) Before(ctx context.Context, ec *ExecutorContext) error {
-	return nil
-}
-
-// After 执行后
-func (l LogHook) After(ctx context.Context, ec *ExecutorContext, er *ExecutorResult) {
-	l.Print(ctx, ec, er)
-}

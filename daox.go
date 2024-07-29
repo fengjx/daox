@@ -23,7 +23,7 @@ var (
 
 // Dao 数据访问
 type Dao struct {
-	sync.Mutex
+	lock        sync.Mutex
 	options     *Options
 	masterDB    *DB
 	readDB      *DB
@@ -528,8 +528,8 @@ func (d *Dao) GetMasterDB() *DB {
 	if global.defaultMasterDB == nil {
 		return nil
 	}
-	d.Lock()
-	defer d.Unlock()
+	d.lock.Lock()
+	defer d.lock.Unlock()
 	// double check
 	if d.masterDB != nil {
 		return d.masterDB
@@ -547,8 +547,8 @@ func (d *Dao) GetReadDB() *DB {
 	if global.defaultReadDB == nil && d.GetMasterDB() == nil {
 		return nil
 	}
-	d.Lock()
-	defer d.Unlock()
+	d.lock.Lock()
+	defer d.lock.Unlock()
 	// double check
 	if d.readDB != nil {
 		return d.readDB
@@ -584,9 +584,9 @@ func mergeHooks(options *Options) []engine.Hook {
 		hooks = append(hooks, options.hooks...)
 	}
 	if options.printSQL != nil {
-		hooks = append(hooks, engine.NewLogHook(options.printSQL))
+		hooks = append(hooks, NewLogHook(options.printSQL))
 	} else if global.printSQL != nil {
-		hooks = append(hooks, engine.NewLogHook(global.printSQL))
+		hooks = append(hooks, NewLogHook(global.printSQL))
 	}
 	return hooks
 }

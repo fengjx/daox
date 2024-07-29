@@ -60,12 +60,14 @@ func Sub(y, x int) int {
 // 返回 -1 表示非切片类型
 func GetLength(slice any) int {
 	v := reflect.ValueOf(slice)
+	// 如果是指针
+	for v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
 	switch v.Kind() {
-	case reflect.Slice:
-		return v.Len()
-	case reflect.Map:
+	case reflect.Slice, reflect.Array, reflect.Map:
 		return v.Len()
 	default:
+		return -1
 	}
-	return -1
 }
