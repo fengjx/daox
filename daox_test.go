@@ -501,7 +501,7 @@ func TestDao_Hook(t *testing.T) {
 			"utime": "10",
 			"ctime": "10",
 		}),
-		daox.WithHooks(engine.NewLogHook(func(ctx context.Context, ec *engine.ExecutorContext, er *engine.ExecutorResult) {
+		daox.WithHooks(daox.NewLogHook(func(ctx context.Context, ec *engine.ExecutorContext, er *engine.ExecutorResult) {
 			t.Log("sql_type", ec.Type, "sql:", ec.SQL, "args:", ec.Args, "rows:", er.QueryRows, "duration:", er.Duration, "err:", er.Err)
 		})),
 	)
@@ -528,4 +528,7 @@ func TestDao_Hook(t *testing.T) {
 		t.Fatal("GetByID not exist")
 	}
 	assert.Equal(t, u1.UID, u2.UID)
+	var list []DemoInfo
+	err = dao.ListByIDs(&list, 1, 2, 3)
+	assert.NoError(t, err)
 }
