@@ -27,7 +27,7 @@ type globalConfig struct {
 	metaMap map[string]*TableMeta
 	// 保存时默认忽略的字段，全局生效
 	// 一般用户统一的开发规范
-	saveOmitColumns []string
+	omitColumns []string
 	// 全局中间件
 	hooks []engine.Hook
 	// 打印sql
@@ -62,9 +62,9 @@ func UseDefaultReadDB(read *sqlx.DB) {
 	global.setDefaultReadDB(read)
 }
 
-// UseSaveOmits 设置保存时全局默认忽略的字段
-func UseSaveOmits(omits ...string) {
-	global.saveOmitColumns = append(global.saveOmitColumns, omits...)
+// UseOmits 设置保存时全局默认忽略的字段
+func UseOmits(omits ...string) {
+	global.omitColumns = append(global.omitColumns, omits...)
 }
 
 // GetMetaInfo 根据表名获得元信息

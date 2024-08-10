@@ -305,8 +305,8 @@ func (d *Dao) getSaveColumns(opt *InsertOptions) []string {
 	if len(opt.omitColumns) > 0 {
 		omits = append(omits, opt.omitColumns...)
 	}
-	if !opt.disableGlobalOmitColumns && len(global.saveOmitColumns) > 0 {
-		omits = append(omits, global.saveOmitColumns...)
+	if !opt.disableGlobalOmitColumns && len(global.omitColumns) > 0 {
+		omits = append(omits, global.omitColumns...)
 	}
 	return meta.OmitColumns(omits...)
 }
@@ -414,14 +414,23 @@ func (d *Dao) UpdateContext(ctx context.Context, model Model, omitColumns ...str
 	if utils.IsIDEmpty(model.GetID()) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
-
 	tableMeta := d.TableMeta
-	omitColumns = append(omitColumns, tableMeta.PrimaryKey)
+	return d.UpdateByCondContext(ctx, model, ql.SC().And(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey)), tableMeta.PrimaryKey)
+}
+
+// UpdateByCond 按条件更新全部字段
+func (d *Dao) UpdateByCond(model Model, where sqlbuilder.ConditionBuilder, omitColumns ...string) (bool, error) {
+	return d.UpdateByCondContext(context.Background(), model, where, omitColumns...)
+}
+
+// UpdateByCondContext 按条件更新全部字段
+func (d *Dao) UpdateByCondContext(ctx context.Context, model Model, where sqlbuilder.ConditionBuilder, omitColumns ...string) (bool, error) {
+	if len(global.omitColumns) > 0 {
+		omitColumns = append(omitColumns, global.omitColumns...)
+	}
 	updater := d.Updater().Execer(d.getExecer()).
 		Columns(d.DBColumns(omitColumns...)...).
-		Where(
-			ql.SC().And(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey)),
-		)
+		Where(where)
 	affected, err := updater.NamedExecContext(ctx, model)
 	if err != nil {
 		return false, err
