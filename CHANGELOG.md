@@ -39,3 +39,4 @@
 - [dao 移除直接依赖 sqlx.Tx](https://github.com/fengjx/daox/pull/62)
 - [获取db方法优化](https://github.com/fengjx/daox/pull/64)
 - [fix 查询行数统计错误](https://github.com/fengjx/daox/pull/66)
+- [全字段update支持指定where条件](https://github.com/fengjx/daox/pull/68)

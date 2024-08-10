@@ -375,7 +375,7 @@ func TestDao_Update(t *testing.T) {
 }
 
 func TestDisableGlobalOmitColumns(t *testing.T) {
-	daox.UseSaveOmits("ctime", "utime")
+	daox.UseOmits("ctime", "utime")
 	tb := "demo_info_global_disable_omit"
 	before(t, tb)
 	DBMaster := newDb()
