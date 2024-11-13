@@ -220,6 +220,26 @@ func TestSelect(t *testing.T) {
 			wantSQL:  "SELECT * FROM `user` WHERE `id` NOT IN (?, ?);",
 			wantArgs: []any{100, 101},
 		},
+		{
+			name: "select where is null",
+			selector: sqlbuilder.New("user").Select().
+				Columns("id", "username", "age", "sex").
+				Where(ql.C(
+					ql.Col("sex").IsNull(),
+					ql.Col("age").LTEQ(18),
+				)),
+			wantSQL:  "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `sex` IS NULL AND `age` <= ?;",
+			wantArgs: []any{18},
+		},
+		{
+			name: "select where is not null",
+			selector: sqlbuilder.New("user").Select().
+				Columns("id", "username", "age", "sex").
+				Where(
+					ql.C(ql.Col("sex").IsNotNull()),
+				),
+			wantSQL: "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `sex` IS NOT NULL;",
+		},
 	}
 
 	for _, tc := range testCases {

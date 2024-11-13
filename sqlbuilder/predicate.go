@@ -71,7 +71,7 @@ func (e *Condition) And(cols ...Column) *Condition {
 		e.predicates = append(e.predicates, Predicate{
 			Op:       OpAnd,
 			Express:  c.Express(),
-			Args:     []any{c.arg},
+			Args:     c.getArgs(),
 			HasInSQL: c.HasInSQL(),
 		})
 	}
@@ -86,7 +86,7 @@ func (e *Condition) Or(c Column) *Condition {
 	e.predicates = append(e.predicates, Predicate{
 		Op:       OpOr,
 		Express:  c.Express(),
-		Args:     []any{c.arg},
+		Args:     c.getArgs(),
 		HasInSQL: c.HasInSQL(),
 	})
 	return e
