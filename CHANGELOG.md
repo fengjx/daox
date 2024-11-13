@@ -40,3 +40,4 @@
 - [获取db方法优化](https://github.com/fengjx/daox/pull/64)
 - [fix 查询行数统计错误](https://github.com/fengjx/daox/pull/66)
 - [全字段update支持指定where条件](https://github.com/fengjx/daox/pull/68)
+- [where 支持 is null](https://github.com/fengjx/daox/pull/70)
