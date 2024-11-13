@@ -96,6 +96,25 @@ func (c Column) NotIn(vals ...any) Column {
 	return c
 }
 
+// IsNull -> IS NULL
+func (c Column) IsNull() Column {
+	c.op = OpIsNull
+	return c
+}
+
+// IsNotNull -> IS NOT NULL
+func (c Column) IsNotNull() Column {
+	c.op = OpIsNotNull
+	return c
+}
+
+func (c Column) getArgs() []any {
+	if c.arg == nil {
+		return nil
+	}
+	return []any{c.arg}
+}
+
 // Express 输出 sql 表达式
 func (c Column) Express() string {
 	sb := strings.Builder{}
@@ -105,7 +124,7 @@ func (c Column) Express() string {
 	sb.WriteString(c.op.Text)
 	if c.HasInSQL() {
 		sb.WriteString("(?)")
-	} else {
+	} else if c.arg != nil {
 		sb.WriteString("?")
 	}
 	return sb.String()
