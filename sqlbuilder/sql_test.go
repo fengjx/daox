@@ -18,11 +18,12 @@ type tm struct {
 
 func TestSelect(t *testing.T) {
 	testCases := []struct {
-		name     string
-		selector *sqlbuilder.Selector
-		wantSQL  string
-		wantErr  error
-		wantArgs []any
+		name         string
+		selector     *sqlbuilder.Selector
+		wantSQL      string
+		wantCountSQL string
+		wantErr      error
+		wantArgs     []any
 	}{
 		{
 			name:     "select *",
@@ -240,6 +241,27 @@ func TestSelect(t *testing.T) {
 				),
 			wantSQL: "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `sex` IS NOT NULL;",
 		},
+		{
+			name: "select join",
+			selector: sqlbuilder.New("blog").Select().As("u").
+				ColumnAlias("b", "id", "title").
+				ColumnAlias("u", "id", "username").
+				LeftJoin("user", "b", "b.uid = u.id").
+				Where(ql.SC().And("u.id = ?")),
+			wantSQL:      "SELECT b.`id`, b.`title`, u.`id`, u.`username` FROM `blog` AS `u` LEFT JOIN `user` AS `b` ON b.uid = u.id WHERE u.id = ?;",
+			wantCountSQL: "SELECT COUNT(*) FROM `blog` AS `u` LEFT JOIN `user` AS `b` ON b.uid = u.id WHERE u.id = ?;",
+		},
+
+		{
+			name: "select join where alias",
+			selector: sqlbuilder.New("blog").Select().As("u").
+				ColumnAlias("b", "id", "title").
+				ColumnAlias("u", "id", "username").
+				LeftJoin("user", "b", "b.uid = u.id").
+				Where(ql.C(ql.Col("id").Alias("u").EQ(1000))),
+			wantSQL:  "SELECT b.`id`, b.`title`, u.`id`, u.`username` FROM `blog` AS `u` LEFT JOIN `user` AS `b` ON b.uid = u.id WHERE u.`id` = ?;",
+			wantArgs: []interface{}{1000},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -258,6 +280,11 @@ func TestSelect(t *testing.T) {
 				return
 			}
 			assert.Equal(t, tc.wantSQL, sql)
+			if tc.wantCountSQL != "" {
+				countSQL, err := tc.selector.CountSQL()
+				assert.NoError(t, err)
+				assert.Equal(t, tc.wantCountSQL, countSQL)
+			}
 		})
 	}
 }

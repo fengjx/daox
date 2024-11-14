@@ -27,7 +27,7 @@ var (
 	updateRegex = regexp.MustCompile(`(?i)^\s*UPDATE\b`)
 	deleteRegex = regexp.MustCompile(`(?i)^\s*DELETE\b`)
 
-	tableRegex = regexp.MustCompile(`(?i)\b(?:from|join|into|update)\s+(\w+)\b`)
+	tableRegex = regexp.MustCompile(`(?i)\b(?:from|join|into|update)\s+(` + "`?\\w+`?" + `)`)
 )
 
 // ParseSQLType 解析 sql 类型
@@ -55,7 +55,9 @@ func ParseSQLType(query string) SQLType {
 func ParseTableName(sql string) string {
 	matches := tableRegex.FindStringSubmatch(strings.ToLower(sql))
 	if len(matches) > 1 {
-		return matches[1]
+		tableName := matches[1]
+		// 去除首尾的反引号
+		return strings.Trim(tableName, "`")
 	}
 	return ""
 }

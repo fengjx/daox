@@ -9,6 +9,7 @@ type Column struct {
 	name  string
 	op    Op
 	arg   any
+	alias string
 	isUse bool
 }
 
@@ -23,6 +24,12 @@ func Col(c string) Column {
 // Use 是否使用
 func (c Column) Use(use bool) Column {
 	c.isUse = use
+	return c
+}
+
+// Alias 设置字段别名
+func (c Column) Alias(alias string) Column {
+	c.alias = alias
 	return c
 }
 
@@ -118,8 +125,12 @@ func (c Column) getArgs() []any {
 // Express 输出 sql 表达式
 func (c Column) Express() string {
 	sb := strings.Builder{}
+	if c.alias != "" {
+		sb.WriteString(c.alias)
+		sb.WriteByte('.')
+	}
 	sb.WriteByte('`')
-	sb.WriteString(c.name)
+	sb.WriteString(strings.TrimSpace(c.name))
 	sb.WriteByte('`')
 	sb.WriteString(c.op.Text)
 	if c.HasInSQL() {

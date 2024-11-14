@@ -12,14 +12,66 @@ import (
 	"github.com/fengjx/daox/engine"
 )
 
+// joinType 表示 JOIN 类型
+type joinType string
+
+const (
+	innerJoin joinType = "INNER JOIN"
+	leftJoin  joinType = "LEFT JOIN"
+	rightJoin joinType = "RIGHT JOIN"
+	fullJoin  joinType = "FULL JOIN"
+)
+
+// join 表示一个 JOIN 子句
+type join struct {
+	joinType joinType
+	table    string
+	alias    string
+	on       string
+}
+
+// column 查询字段
+type column struct {
+	name  string
+	alias string
+}
+
+type OrderType string
+
+const (
+	ASC  OrderType = "ASC"
+	DESC OrderType = "DESC"
+)
+
+type OrderBy struct {
+	columns   []string
+	orderType string
+}
+
+func Asc(columns ...string) OrderBy {
+	return OrderBy{
+		columns:   columns,
+		orderType: string(ASC),
+	}
+}
+
+func Desc(columns ...string) OrderBy {
+	return OrderBy{
+		columns:   columns,
+		orderType: string(DESC),
+	}
+}
+
 // Selector select 语句构造器
 type Selector struct {
 	sqlBuilder
 	queryer     engine.Queryer
 	tableName   string
+	tableAlias  string
+	joins       []join
 	queryString string
 	distinct    bool
-	columns     []string
+	columns     []column
 	where       ConditionBuilder
 	orderBy     []OrderBy
 	groupBy     []string
@@ -49,6 +101,12 @@ func (s *Selector) QueryString(queryString string) *Selector {
 	return s
 }
 
+// As 设置表的别名
+func (s *Selector) As(alias string) *Selector {
+	s.tableAlias = alias
+	return s
+}
+
 // StructColumns 通过任意model解析出表字段
 // tagName 解析数据库字段的 tag-name
 // omitColumns 排除哪些字段
@@ -59,8 +117,49 @@ func (s *Selector) StructColumns(model any, tagName string, omitColumns ...strin
 
 // Columns select 的数据库字段
 func (s *Selector) Columns(columns ...string) *Selector {
-	s.columns = columns
+	for _, col := range columns {
+		s.columns = append(s.columns, column{name: col})
+	}
 	return s
+}
+
+// ColumnAlias 用于添加列及其别名
+func (s *Selector) ColumnAlias(alias string, columns ...string) *Selector {
+	for _, col := range columns {
+		s.columns = append(s.columns, column{alias: alias, name: col})
+	}
+	return s
+}
+
+// Join 添加一个 JOIN 子句
+func (s *Selector) join(joinType joinType, table, alias string, on string) *Selector {
+	s.joins = append(s.joins, join{
+		joinType: joinType,
+		table:    table,
+		alias:    alias,
+		on:       on,
+	})
+	return s
+}
+
+// InnerJoin 添加一个 INNER JOIN 子句
+func (s *Selector) InnerJoin(table, alias string, on string) *Selector {
+	return s.join(innerJoin, table, alias, on)
+}
+
+// LeftJoin 添加一个 LEFT JOIN 子句
+func (s *Selector) LeftJoin(table, alias string, on string) *Selector {
+	return s.join(leftJoin, table, alias, on)
+}
+
+// RightJoin 添加一个 RIGHT JOIN 子句
+func (s *Selector) RightJoin(table, alias string, on string) *Selector {
+	return s.join(rightJoin, table, alias, on)
+}
+
+// FullJoin 添加一个 FULL JOIN 子句
+func (s *Selector) FullJoin(table, alias string, on string) *Selector {
+	return s.join(fullJoin, table, alias, on)
 }
 
 // IfNullVal 设置字段为空时，返回的值
@@ -145,14 +244,13 @@ func (s *Selector) SQL() (string, error) {
 		if len(s.columns) == 0 {
 			s.writeByte('*')
 		} else {
-			n := len(s.columns)
-			for i, column := range s.columns {
-				if defVal, ok := s.ifNullVals[column]; ok {
-					s.ifNullCol(column, defVal)
+			for i, col := range s.columns {
+				if defVal, ok := s.ifNullVals[col.name]; ok {
+					s.ifNullCol(col, defVal)
 				} else {
-					s.quote(column)
+					s.col(col)
 				}
-				if i != n-1 {
+				if i != len(s.columns)-1 {
 					s.writeString(", ")
 				}
 			}
@@ -160,16 +258,36 @@ func (s *Selector) SQL() (string, error) {
 	}
 	s.writeString(" FROM ")
 	s.quote(s.tableName)
+	if s.tableAlias != "" {
+		s.writeString(" AS ")
+		s.quote(s.tableAlias)
+	}
+
+	// 添加 JOIN 子句
+	for _, j := range s.joins {
+		s.writeByte(' ')
+		s.writeString(string(j.joinType))
+		s.writeByte(' ')
+		s.quote(j.table)
+		if j.alias != "" {
+			s.writeString(" AS ")
+			s.quote(j.alias)
+		}
+		if j.on != "" {
+			s.writeString(" ON ")
+			s.writeString(j.on)
+		}
+	}
 	s.whereSQL(s.where)
 
 	if len(s.groupBy) > 0 {
 		s.writeString(" GROUP BY ")
-		for i, column := range s.groupBy {
+		for i, col := range s.groupBy {
 			if i > 0 {
 				s.comma()
 				s.space()
 			}
-			s.quote(column)
+			s.quote(col)
 		}
 	}
 
@@ -209,6 +327,25 @@ func (s *Selector) CountSQL() (string, error) {
 	s.writeString("SELECT COUNT(*)")
 	s.writeString(" FROM ")
 	s.quote(s.tableName)
+	if s.tableAlias != "" {
+		s.writeString(" AS ")
+		s.quote(s.tableAlias)
+	}
+	// 添加 JOIN 子句
+	for _, j := range s.joins {
+		s.writeByte(' ')
+		s.writeString(string(j.joinType))
+		s.writeByte(' ')
+		s.quote(j.table)
+		if j.alias != "" {
+			s.writeString(" AS ")
+			s.quote(j.alias)
+		}
+		if j.on != "" {
+			s.writeString(" ON ")
+			s.writeString(j.on)
+		}
+	}
 	s.whereSQL(s.where)
 
 	if len(s.groupBy) > 0 {
@@ -307,30 +444,4 @@ func (s *Selector) GetContext(ctx context.Context, dest any) (exist bool, err er
 		return false, err
 	}
 	return true, nil
-}
-
-type OrderType string
-
-const (
-	ASC  OrderType = "ASC"
-	DESC OrderType = "DESC"
-)
-
-type OrderBy struct {
-	columns   []string
-	orderType string
-}
-
-func Asc(columns ...string) OrderBy {
-	return OrderBy{
-		columns:   columns,
-		orderType: string(ASC),
-	}
-}
-
-func Desc(columns ...string) OrderBy {
-	return OrderBy{
-		columns:   columns,
-		orderType: string(DESC),
-	}
 }
