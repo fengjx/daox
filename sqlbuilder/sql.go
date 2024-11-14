@@ -104,13 +104,23 @@ func (b *sqlBuilder) quote(val string) {
 	b.writeByte('`')
 }
 
-func (b *sqlBuilder) ifNullCol(col string, val string) {
+func (b *sqlBuilder) col(col column) {
+	if col.alias != "" {
+		b.writeString(col.alias)
+		b.writeByte('.')
+	}
+	b.writeByte('`')
+	b.writeString(strings.TrimSpace(col.name))
+	b.writeByte('`')
+}
+
+func (b *sqlBuilder) ifNullCol(col column, val string) {
 	b.writeString("IFNULL(")
-	b.quote(col)
+	b.col(col)
 	b.writeString(", '")
 	b.writeString(val)
 	b.writeString("') as ")
-	b.quote(col)
+	b.quote(col.name)
 }
 
 func (b *sqlBuilder) space() {

@@ -39,6 +39,13 @@ func TestParseSQLType(t *testing.T) {
 			},
 			want: DELETE,
 		},
+		{
+			name: "select join",
+			args: args{
+				sql: "SELECT b.`id`, b.`title`, u.`id`, u.`username` FROM `blog` AS `u` LEFT JOIN `user` AS `b` ON b.uid = u.id WHERE a.id = ?;",
+			},
+			want: SELECT,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -85,6 +92,13 @@ func TestParseTableName(t *testing.T) {
 				sql: "DELETE FROM user WHERE id = ?",
 			},
 			want: "user",
+		},
+		{
+			name: "select join",
+			args: args{
+				sql: "SELECT b.`id`, b.`title`, u.`id`, u.`username` FROM `blog` AS `u` LEFT JOIN `user` AS `b` ON b.uid = u.id WHERE a.id = ?;",
+			},
+			want: "blog",
 		},
 	}
 	for _, tt := range tests {
