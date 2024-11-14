@@ -445,3 +445,22 @@ func (s *Selector) GetContext(ctx context.Context, dest any) (exist bool, err er
 	}
 	return true, nil
 }
+
+// GetCount 查询总记录数
+func (s *Selector) GetCount() (int64, error) {
+	return s.GetCountContext(context.Background())
+}
+
+// GetCountContext 查询总记录数
+func (s *Selector) GetCountContext(ctx context.Context) (int64, error) {
+	querySQL, args, err := s.CountSQLArgs()
+	if err != nil {
+		return 0, err
+	}
+	var count int64
+	err = s.queryer.GetContext(ctx, &count, querySQL, args...)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
