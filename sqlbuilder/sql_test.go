@@ -242,6 +242,12 @@ func TestSelect(t *testing.T) {
 			wantSQL: "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `sex` IS NOT NULL;",
 		},
 		{
+			name: "select alias",
+			selector: sqlbuilder.New("user").Select().As("u").
+				Columns("id", "username", "age", "sex"),
+			wantSQL: "SELECT u.`id`, u.`username`, u.`age`, u.`sex` FROM `user` AS `u`;",
+		},
+		{
 			name: "select join",
 			selector: sqlbuilder.New("blog").Select().As("u").
 				ColumnAlias("b", "id", "title").
@@ -251,7 +257,6 @@ func TestSelect(t *testing.T) {
 			wantSQL:      "SELECT b.`id`, b.`title`, u.`id`, u.`username` FROM `blog` AS `u` LEFT JOIN `user` AS `b` ON b.uid = u.id WHERE u.id = ?;",
 			wantCountSQL: "SELECT COUNT(*) FROM `blog` AS `u` LEFT JOIN `user` AS `b` ON b.uid = u.id WHERE u.id = ?;",
 		},
-
 		{
 			name: "select join where alias",
 			selector: sqlbuilder.New("blog").Select().As("u").
