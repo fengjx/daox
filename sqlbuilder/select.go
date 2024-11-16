@@ -44,20 +44,40 @@ const (
 )
 
 type OrderBy struct {
-	columns   []string
+	columns   []column
 	orderType string
 }
 
+func (o OrderBy) Alias(as string) OrderBy {
+	for i, col := range o.columns {
+		col.alias = as
+		o.columns[i] = col
+	}
+	return o
+}
+
 func Asc(columns ...string) OrderBy {
+	cols := make([]column, len(columns))
+	for i, name := range columns {
+		cols[i] = column{
+			name: name,
+		}
+	}
 	return OrderBy{
-		columns:   columns,
+		columns:   cols,
 		orderType: string(ASC),
 	}
 }
 
 func Desc(columns ...string) OrderBy {
+	cols := make([]column, len(columns))
+	for i, name := range columns {
+		cols[i] = column{
+			name: name,
+		}
+	}
 	return OrderBy{
-		columns:   columns,
+		columns:   cols,
 		orderType: string(DESC),
 	}
 }
@@ -299,7 +319,7 @@ func (s *Selector) SQL() (string, error) {
 				s.comma()
 			}
 			for _, c := range ob.columns {
-				s.quote(c)
+				s.col(c)
 			}
 			s.space()
 			s.writeString(ob.orderType)
