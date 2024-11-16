@@ -44,3 +44,4 @@
 - [支持join查询](https://github.com/fengjx/daox/pull/72)
 - [支持count查询](https://github.com/fengjx/daox/pull/74)
 - [alias优化](https://github.com/fengjx/daox/pull/76)
+- [order by 支持 alias](https://github.com/fengjx/daox/pull/78)
