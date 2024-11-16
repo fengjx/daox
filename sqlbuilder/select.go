@@ -232,7 +232,7 @@ func (s *Selector) Offset(offset int64) *Selector {
 
 // SQL 输出sql语句
 func (s *Selector) SQL() (string, error) {
-	s.reset()
+	s.preSQL()
 	s.writeString("SELECT ")
 	if s.queryString != "" {
 		// 使用原始语句，例如 count, max 之类的函数
@@ -323,7 +323,7 @@ func (s *Selector) SQL() (string, error) {
 
 // CountSQL 构造 count 查询 sql
 func (s *Selector) CountSQL() (string, error) {
-	s.reset()
+	s.preSQL()
 	s.writeString("SELECT COUNT(*)")
 	s.writeString(" FROM ")
 	s.quote(s.tableName)
@@ -350,12 +350,12 @@ func (s *Selector) CountSQL() (string, error) {
 
 	if len(s.groupBy) > 0 {
 		s.writeString(" GROUP BY ")
-		for i, column := range s.groupBy {
+		for i, col := range s.groupBy {
 			if i > 0 {
 				s.comma()
 				s.space()
 			}
-			s.quote(column)
+			s.quote(col)
 		}
 	}
 	s.end()
@@ -463,4 +463,17 @@ func (s *Selector) GetCountContext(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+// 生成sql前置工作
+func (s *Selector) preSQL() {
+	s.reset()
+	if s.tableAlias != "" {
+		for i, col := range s.columns {
+			if col.alias == "" {
+				col.alias = s.tableAlias
+				s.columns[i] = col
+			}
+		}
+	}
 }
