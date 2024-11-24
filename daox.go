@@ -162,8 +162,12 @@ func (d *Dao) Deleter() *sqlbuilder.Deleter {
 }
 
 // Inserter 创建当前表的 updater
-func (d *Dao) Inserter() *sqlbuilder.Inserter {
-	return d.SQLBuilder().Insert().Execer(d.getExecer())
+func (d *Dao) Inserter(opts ...InsertOption) *sqlbuilder.Inserter {
+	opt := &InsertOptions{}
+	for _, o := range opts {
+		o(opt)
+	}
+	return d.SQLBuilder().Insert(d.getSaveColumns(opt)...).Execer(d.getExecer())
 }
 
 // GetColumnsByModel 根据 model 结构获取数据库字段
