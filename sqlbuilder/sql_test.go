@@ -18,11 +18,12 @@ type tm struct {
 
 func TestSelect(t *testing.T) {
 	testCases := []struct {
-		name     string
-		selector *sqlbuilder.Selector
-		wantSQL  string
-		wantErr  error
-		wantArgs []any
+		name         string
+		selector     *sqlbuilder.Selector
+		wantSQL      string
+		wantCountSQL string
+		wantErr      error
+		wantArgs     []any
 	}{
 		{
 			name:     "select *",
@@ -34,6 +35,22 @@ func TestSelect(t *testing.T) {
 			selector: sqlbuilder.New("user").Select().
 				Columns("id", "username"),
 			wantSQL: "SELECT `id`, `username` FROM `user`;",
+		},
+		{
+			name: "select columns if null",
+			selector: sqlbuilder.New("user").Select().
+				Columns("id", "username", "email").
+				IfNullVal("email", ""),
+			wantSQL: "SELECT `id`, `username`, IFNULL(`email`, '') as `email` FROM `user`;",
+		},
+		{
+			name: "select columns if null use map",
+			selector: sqlbuilder.New("user").Select().
+				Columns("id", "username", "email").
+				IfNullVals(map[string]string{
+					"email": "",
+				}),
+			wantSQL: "SELECT `id`, `username`, IFNULL(`email`, '') as `email` FROM `user`;",
 		},
 		{
 			name: "select by id",
@@ -108,6 +125,13 @@ func TestSelect(t *testing.T) {
 				).
 				OrderBy(ql.Desc("ctime")),
 			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE `age` > ? AND `sex` = ? ORDER BY `ctime` DESC;",
+		},
+		{
+			name: "select order by alias",
+			selector: sqlbuilder.New("user").Select().As("t").
+				Columns("id", "username", "age", "sex", "ctime").
+				OrderBy(ql.Desc("ctime").Alias("t")),
+			wantSQL: "SELECT t.`id`, t.`username`, t.`age`, t.`sex`, t.`ctime` FROM `user` AS `t` ORDER BY t.`ctime` DESC;",
 		},
 		{
 			name: "select limit",
@@ -204,6 +228,52 @@ func TestSelect(t *testing.T) {
 			wantSQL:  "SELECT * FROM `user` WHERE `id` NOT IN (?, ?);",
 			wantArgs: []any{100, 101},
 		},
+		{
+			name: "select where is null",
+			selector: sqlbuilder.New("user").Select().
+				Columns("id", "username", "age", "sex").
+				Where(ql.C(
+					ql.Col("sex").IsNull(),
+					ql.Col("age").LTEQ(18),
+				)),
+			wantSQL:  "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `sex` IS NULL AND `age` <= ?;",
+			wantArgs: []any{18},
+		},
+		{
+			name: "select where is not null",
+			selector: sqlbuilder.New("user").Select().
+				Columns("id", "username", "age", "sex").
+				Where(
+					ql.C(ql.Col("sex").IsNotNull()),
+				),
+			wantSQL: "SELECT `id`, `username`, `age`, `sex` FROM `user` WHERE `sex` IS NOT NULL;",
+		},
+		{
+			name: "select alias",
+			selector: sqlbuilder.New("user").Select().As("u").
+				Columns("id", "username", "age", "sex"),
+			wantSQL: "SELECT u.`id`, u.`username`, u.`age`, u.`sex` FROM `user` AS `u`;",
+		},
+		{
+			name: "select join",
+			selector: sqlbuilder.New("blog").Select().As("u").
+				ColumnAlias("b", "id", "title").
+				ColumnAlias("u", "id", "username").
+				LeftJoin("user", "b", "b.uid = u.id").
+				Where(ql.SC().And("u.id = ?")),
+			wantSQL:      "SELECT b.`id`, b.`title`, u.`id`, u.`username` FROM `blog` AS `u` LEFT JOIN `user` AS `b` ON b.uid = u.id WHERE u.id = ?;",
+			wantCountSQL: "SELECT COUNT(*) FROM `blog` AS `u` LEFT JOIN `user` AS `b` ON b.uid = u.id WHERE u.id = ?;",
+		},
+		{
+			name: "select join where alias",
+			selector: sqlbuilder.New("blog").Select().As("u").
+				ColumnAlias("b", "id", "title").
+				ColumnAlias("u", "id", "username").
+				LeftJoin("user", "b", "b.uid = u.id").
+				Where(ql.C(ql.Col("id").Alias("u").EQ(1000))),
+			wantSQL:  "SELECT b.`id`, b.`title`, u.`id`, u.`username` FROM `blog` AS `u` LEFT JOIN `user` AS `b` ON b.uid = u.id WHERE u.`id` = ?;",
+			wantArgs: []interface{}{1000},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -222,6 +292,11 @@ func TestSelect(t *testing.T) {
 				return
 			}
 			assert.Equal(t, tc.wantSQL, sql)
+			if tc.wantCountSQL != "" {
+				countSQL, err := tc.selector.CountSQL()
+				assert.NoError(t, err)
+				assert.Equal(t, tc.wantCountSQL, countSQL)
+			}
 		})
 	}
 }
@@ -233,6 +308,7 @@ func TestInsert(t *testing.T) {
 		wantSQL     string
 		wantNameSQL string
 		wantErr     error
+		wantArgs    []any
 	}{
 		{
 			name:        "insert",
@@ -248,9 +324,25 @@ func TestInsert(t *testing.T) {
 		},
 		{
 			name:        "insert on duplicate key update",
-			inserter:    sqlbuilder.New("user").Insert().Columns("username", "age", "sex", "version").OnDuplicateKeyUpdateString("version = version + 1"),
-			wantSQL:     "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE version = version + 1;",
-			wantNameSQL: "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (:username, :age, :sex, :version) ON DUPLICATE KEY UPDATE version = version + 1;",
+			inserter:    sqlbuilder.New("user").Insert().Columns("username", "age", "sex", "version").OnDuplicateKeyUpdateString("`version` = `version` + 1"),
+			wantSQL:     "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE `version` = `version` + 1;",
+			wantNameSQL: "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (:username, :age, :sex, :version) ON DUPLICATE KEY UPDATE `version` = `version` + 1;",
+		},
+		{
+			name:        "insert on duplicate key update nameSql",
+			inserter:    sqlbuilder.New("user").Insert().Columns("username", "age", "sex", "version").OnDuplicateKeyUpdate(ql.F("version").Incr(1), ql.F("sex").Val("male")),
+			wantNameSQL: "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (:username, :age, :sex, :version) ON DUPLICATE KEY UPDATE `version` = `version` + 1, `sex` = :sex;",
+		},
+		{
+			name: "insert on duplicate key update args sql",
+			inserter: sqlbuilder.New("user").Insert().Fields(
+				ql.F("username").Val("fengjx"),
+				ql.F("age").Val(int32(20)),
+				ql.F("sex").Val("male"),
+				ql.F("version").Val(int64(1)),
+			).OnDuplicateKeyUpdate(ql.F("version").Incr(1)),
+			wantSQL:  "INSERT INTO `user`(`username`, `age`, `sex`, `version`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE `version` = `version` + 1;",
+			wantArgs: []any{"fengjx", int32(20), "male", int64(1)},
 		},
 		{
 			name: "replace into",
@@ -264,6 +356,16 @@ func TestInsert(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.wantArgs != nil {
+				sql, args, err := tc.inserter.SQLArgs()
+				assert.Equal(t, tc.wantErr, err)
+				if err != nil {
+					return
+				}
+				EqualArgs(t, tc.wantArgs, args)
+				assert.Equal(t, tc.wantSQL, sql)
+			}
+
 			if tc.wantSQL != "" {
 				sql, err := tc.inserter.SQL()
 				assert.Equal(t, tc.wantErr, err)
@@ -352,6 +454,28 @@ func TestUpdate(t *testing.T) {
 				Where(ql.C().And(ql.Col("id").EQ(1000))),
 			wantSQL:  "UPDATE `user` SET `name` = ?, `age` = ? WHERE `id` = ?;",
 			wantArgs: []any{"fengjx", 20, 1000},
+		},
+		{
+			name: "update use incr",
+			updater: sqlbuilder.New("user").
+				Update().
+				Columns("username", "sex").
+				Incr("age", 1).
+				Where(ql.SC().And("`id` = :id")),
+			wantNameSQL: "UPDATE `user` SET `username` = :username, `sex` = :sex, `age` = `age` + 1 WHERE `id` = :id;",
+		},
+		{
+			name: "update use fields",
+			updater: sqlbuilder.New("user").
+				Update().
+				Fields(
+					ql.F("username").Val("fengjx"),
+					ql.F("sex").Val("male"),
+					ql.F("age").Incr(1),
+				).
+				Where(ql.C(ql.Col("id").EQ(100))),
+			wantSQL:  "UPDATE `user` SET `username` = ?, `sex` = ?, `age` = `age` + 1 WHERE `id` = ?;",
+			wantArgs: []any{"fengjx", "male", 100},
 		},
 	}
 

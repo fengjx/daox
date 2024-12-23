@@ -2,34 +2,66 @@ package daox
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/fengjx/daox/engine"
 )
+
+type Tx struct {
+	*sqlx.Tx
+	hook engine.Hook
+}
+
+// NamedExecContext 使用命名参数执行sql
+func (t *Tx) NamedExecContext(ctx context.Context, execSQL string, arg any) (sql.Result, error) {
+	return doNamedExec(ctx, t.Tx, execSQL, arg, t.hook)
+}
+
+// ExecContext 使用数组参数执行sql
+func (t *Tx) ExecContext(ctx context.Context, execSQL string, args ...any) (sql.Result, error) {
+	return doExec(ctx, t.Tx, execSQL, args, t.hook)
+}
+
+// SelectContext 查询多条数据
+func (t *Tx) SelectContext(ctx context.Context, dest any, query string, args ...any) error {
+	return doSelect(ctx, t.Tx, dest, query, args, t.hook)
+}
+
+// GetContext 查询单条数据
+func (t *Tx) GetContext(ctx context.Context, dest any, query string, args ...any) error {
+	return doGet(ctx, t.Tx, dest, query, args, t.hook)
+}
 
 type txCtxKey struct{}
 
 // TxFun 事务处理函数
-type TxFun func(txCtx context.Context, tx *sqlx.Tx) error
+type TxFun func(txCtx context.Context, executor engine.Executor) error
 
 // TxManager 事务管理器
 type TxManager struct {
-	db *sqlx.DB
+	db *DB
 }
 
 // NewTxManager 创建事务管理器
 func NewTxManager(db *sqlx.DB) *TxManager {
 	m := &TxManager{
-		db: db,
+		db: NewDb(db),
 	}
 	return m
 }
 
-func (m *TxManager) withTx(ctx context.Context, tx *sqlx.Tx) context.Context {
+func (m *TxManager) withTx(ctx context.Context, tx *Tx) context.Context {
 	return context.WithValue(ctx, txCtxKey{}, tx)
 }
 
-func (m *TxManager) getTx(ctx context.Context) *sqlx.Tx {
-	tx, ok := ctx.Value(txCtxKey{}).(*sqlx.Tx)
+func (m *TxManager) getTx(ctx context.Context) *Tx {
+	val := ctx.Value(txCtxKey{})
+	if val == nil {
+		return nil
+	}
+	tx, ok := val.(*Tx)
 	if !ok {
 		return nil
 	}
@@ -54,7 +86,7 @@ func (m *TxManager) ExecTx(ctx context.Context, fn TxFun) (err error) {
 			panic(perr)
 		}
 		if err != nil {
-			// 这里不给 err 复制，因为希望返回回滚前的原始 err
+			// 这里不给 err 赋值，因为希望返回回滚前的原始 err
 			_ = tx.Rollback()
 			return
 		}

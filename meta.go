@@ -1,14 +1,12 @@
 package daox
 
 import (
-	"reflect"
-
 	"github.com/fengjx/daox/utils"
 )
 
+// TableMeta 数据库表元信息
 type TableMeta struct {
 	TableName       string
-	StructType      reflect.Type
 	Columns         []string
 	PrimaryKey      string
 	IsAutoIncrement bool
@@ -16,7 +14,10 @@ type TableMeta struct {
 
 // OmitColumns 数据库表字段
 // omit 包含的字段
-func (meta *TableMeta) OmitColumns(omit ...string) []string {
+func (meta TableMeta) OmitColumns(omit ...string) []string {
+	if len(omit) == 0 {
+		return meta.Columns
+	}
 	columnArr := make([]string, 0, len(meta.Columns))
 	for _, column := range meta.Columns {
 		if !utils.ContainsString(omit, column) {
@@ -26,6 +27,25 @@ func (meta *TableMeta) OmitColumns(omit ...string) []string {
 	return columnArr
 }
 
+// WithTableName 设置表名，一般用在分表的场景，设置实际物理表名
+func (meta TableMeta) WithTableName(tableName string) *TableMeta {
+	return &TableMeta{
+		TableName:       tableName,
+		Columns:         meta.Columns,
+		PrimaryKey:      meta.PrimaryKey,
+		IsAutoIncrement: meta.IsAutoIncrement,
+	}
+}
+
+// Model 数据库 model 定义
 type Model interface {
 	GetID() any
+}
+
+// Meta 数据库表元信息定义接口
+type Meta interface {
+	TableName() string
+	PrimaryKey() string
+	IsAutoIncrement() bool
+	Columns() []string
 }

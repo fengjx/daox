@@ -55,3 +55,19 @@ func Add(y, x int) int {
 func Sub(y, x int) int {
 	return x - y
 }
+
+// GetLength 获取集合类型长度
+// 返回 -1 表示非切片类型
+func GetLength(slice any) int {
+	v := reflect.ValueOf(slice)
+	// 如果是指针
+	for v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	switch v.Kind() {
+	case reflect.Slice, reflect.Array, reflect.Map:
+		return v.Len()
+	default:
+		return -1
+	}
+}

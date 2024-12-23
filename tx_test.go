@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/fengjx/daox"
+	"github.com/fengjx/daox/engine"
 	"github.com/fengjx/daox/sqlbuilder"
 	"github.com/fengjx/daox/sqlbuilder/ql"
 )
@@ -36,23 +37,24 @@ func TestTxManager_ExecTx(t *testing.T) {
 				dbx := sqlx.NewDb(db, "mysql")
 				return dbx
 			},
-			txFun: func(txCtx context.Context, tx *sqlx.Tx) error {
-				execSQL, args, err := sqlbuilder.NewUpdater("blog").
+			txFun: func(txCtx context.Context, executor engine.Executor) error {
+				_, err := sqlbuilder.NewUpdater("blog").Execer(executor).
 					Set("views", 100).
 					Where(ql.C(ql.Col("id").EQ(1))).
-					SQLArgs()
+					ExecContext(txCtx)
 				if err != nil {
-					return err
+					t.Fatal(err)
 				}
-				if _, err = tx.Exec(execSQL, args...); err != nil {
-					return err
-				}
-				execSQL, err = sqlbuilder.NewInserter("blog_viewer").
+				id, affected, err := sqlbuilder.NewInserter("blog_viewer").Execer(executor).
 					Columns("user_id", "blog_id").
-					NameSQL()
-				if _, err = tx.Exec(execSQL, 100, 1); err != nil {
-					return err
+					NamedExecContext(txCtx, map[string]any{
+						"user_id": 100,
+						"blog_id": 1,
+					})
+				if err != nil {
+					t.Fatal(err)
 				}
+				t.Log(id, affected)
 				return nil
 			},
 			wantErr: nil,
@@ -67,7 +69,7 @@ func TestTxManager_ExecTx(t *testing.T) {
 				dbx := sqlx.NewDb(db, "mysql")
 				return dbx
 			},
-			txFun: func(txCtx context.Context, tx *sqlx.Tx) error {
+			txFun: func(txCtx context.Context, executor engine.Executor) error {
 				return errors.New("rollback")
 			},
 			wantErr: errors.New("rollback"),
@@ -85,8 +87,8 @@ func TestTxManager_ExecTx(t *testing.T) {
 
 		ctx := context.Background()
 		manager := daox.NewTxManager(db)
-		err = manager.ExecTx(ctx, func(txCtx context.Context, tx *sqlx.Tx) error {
-			return tc.txFun(txCtx, tx)
+		err = manager.ExecTx(ctx, func(txCtx context.Context, executor engine.Executor) error {
+			return tc.txFun(txCtx, executor)
 		})
 		assert.Equal(t, tc.wantErr, err)
 		if err != nil {

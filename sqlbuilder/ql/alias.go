@@ -16,3 +16,6 @@ var SC = sqlbuilder.SC
 
 // Col alias for sqlbuilder.Col
 var Col = sqlbuilder.Col
+
+// F alias for sqlbuilder.F
+var F = sqlbuilder.F

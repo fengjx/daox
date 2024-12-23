@@ -4,10 +4,12 @@ import (
 	"strings"
 )
 
+// Column 表字段
 type Column struct {
 	name  string
 	op    Op
 	arg   any
+	alias string
 	isUse bool
 }
 
@@ -19,8 +21,15 @@ func Col(c string) Column {
 	}
 }
 
+// Use 是否使用
 func (c Column) Use(use bool) Column {
 	c.isUse = use
+	return c
+}
+
+// Alias 设置字段别名
+func (c Column) Alias(alias string) Column {
+	c.alias = alias
 	return c
 }
 
@@ -94,20 +103,79 @@ func (c Column) NotIn(vals ...any) Column {
 	return c
 }
 
+// IsNull -> IS NULL
+func (c Column) IsNull() Column {
+	c.op = OpIsNull
+	return c
+}
+
+// IsNotNull -> IS NOT NULL
+func (c Column) IsNotNull() Column {
+	c.op = OpIsNotNull
+	return c
+}
+
+func (c Column) getArgs() []any {
+	if c.arg == nil {
+		return nil
+	}
+	return []any{c.arg}
+}
+
+// Express 输出 sql 表达式
 func (c Column) Express() string {
 	sb := strings.Builder{}
+	if c.alias != "" {
+		sb.WriteString(c.alias)
+		sb.WriteByte('.')
+	}
 	sb.WriteByte('`')
-	sb.WriteString(c.name)
+	sb.WriteString(strings.TrimSpace(c.name))
 	sb.WriteByte('`')
 	sb.WriteString(c.op.Text)
 	if c.HasInSQL() {
 		sb.WriteString("(?)")
-	} else {
+	} else if c.arg != nil {
 		sb.WriteString("?")
 	}
 	return sb.String()
 }
 
+// HasInSQL 是否有 in 语句
 func (c Column) HasInSQL() bool {
 	return c.op == OpIn || c.op == OpNotIN
+}
+
+// Field 表更新字段
+type Field struct {
+	isUse   bool   // 是否启用
+	col     string // 字段名
+	val     any    // 字段值
+	incrVal *int64 // 递增值，eg: set a = a + 1
+}
+
+// F 创建更新字段
+func F(col string) Field {
+	return Field{
+		isUse: true,
+		col:   col,
+	}
+}
+
+// Val 设置字段值
+func (f Field) Val(val any) Field {
+	f.val = val
+	return f
+}
+
+// Incr 设置字段增加值
+func (f Field) Incr(n int64) Field {
+	f.incrVal = &n
+	return f
+}
+
+// Use 是否启用
+func (f Field) Use(use bool) Field {
+	f.isUse = use
+	return f
 }

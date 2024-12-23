@@ -2,6 +2,7 @@ package sqlbuilder
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -53,6 +54,7 @@ type Builder struct {
 	tableName string
 }
 
+// New 创建 sql builder
 func New(tableName string) *Builder {
 	builder := &Builder{
 		tableName: tableName,
@@ -60,18 +62,22 @@ func New(tableName string) *Builder {
 	return builder
 }
 
+// Select 创建 select 语句构造器
 func (b *Builder) Select(columns ...string) *Selector {
 	return NewSelector(b.tableName).Columns(columns...)
 }
 
+// Insert 创建 insert 语句构造器
 func (b *Builder) Insert(columns ...string) *Inserter {
 	return NewInserter(b.tableName).Columns(columns...)
 }
 
+// Update 创建 update 语句构造器
 func (b *Builder) Update(columns ...string) *Updater {
 	return NewUpdater(b.tableName).Columns(columns...)
 }
 
+// Delete 创建 delete 语句构造器
 func (b *Builder) Delete() *Deleter {
 	return NewDeleter(b.tableName)
 }
@@ -96,6 +102,25 @@ func (b *sqlBuilder) quote(val string) {
 	b.writeByte('`')
 	b.writeString(strings.TrimSpace(val))
 	b.writeByte('`')
+}
+
+func (b *sqlBuilder) col(col column) {
+	if col.alias != "" {
+		b.writeString(col.alias)
+		b.writeByte('.')
+	}
+	b.writeByte('`')
+	b.writeString(strings.TrimSpace(col.name))
+	b.writeByte('`')
+}
+
+func (b *sqlBuilder) ifNullCol(col column, val string) {
+	b.writeString("IFNULL(")
+	b.col(col)
+	b.writeString(", '")
+	b.writeString(val)
+	b.writeString("') as ")
+	b.quote(col.name)
 }
 
 func (b *sqlBuilder) space() {
@@ -135,4 +160,43 @@ func (b *sqlBuilder) whereArgs(where ConditionBuilder) (args []any, hasInSQL boo
 		}
 	}
 	return
+}
+
+// setFields 字段赋值语句
+func (b *sqlBuilder) setFields(fields []Field) {
+	n := len(fields)
+	for i, f := range fields {
+		b.quote(f.col)
+		b.writeString(" = ")
+		if f.incrVal != nil {
+			b.quote(f.col)
+			b.writeString(" + ")
+			b.writeString(strconv.FormatInt(*f.incrVal, 10))
+		} else {
+			b.writeString("?")
+		}
+		if i != n-1 {
+			b.writeString(", ")
+		}
+	}
+}
+
+// setFields 字段赋值语句
+func (b *sqlBuilder) setNameFields(fields []Field) {
+	n := len(fields)
+	for i, f := range fields {
+		b.quote(f.col)
+		b.writeString(" = ")
+		if f.incrVal != nil {
+			b.quote(f.col)
+			b.writeString(" + ")
+			b.writeString(strconv.FormatInt(*f.incrVal, 10))
+		} else {
+			b.writeString(":")
+			b.writeString(f.col)
+		}
+		if i != n-1 {
+			b.writeString(", ")
+		}
+	}
 }

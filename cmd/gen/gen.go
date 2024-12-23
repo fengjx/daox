@@ -122,8 +122,15 @@ func loadTableMeta(db *sqlx.DB, dbName, tableName string) *Table {
 // *Column PrimaryKey column
 func loadColumnMeta(db *sqlx.DB, dbName, tableName string) ([]Column, Column) {
 	args := []any{dbName, tableName}
-	querySQL := "SELECT column_name, column_type, column_comment, column_key FROM information_schema.columns " +
-		"WHERE table_schema = ? AND table_name = ? ORDER BY ORDINAL_POSITION"
+	querySQL := `SELECT
+			column_name,
+			column_type,
+			column_comment, 
+			column_key,
+			ifnull(column_default, ''),
+			ifnull(extra, '')
+		FROM information_schema.columns
+		WHERE table_schema = ? AND table_name = ? ORDER BY ORDINAL_POSITION`
 	rows, err := db.Query(querySQL, args...)
 	if err != nil {
 		log.Fatal(err)
@@ -136,13 +143,24 @@ func loadColumnMeta(db *sqlx.DB, dbName, tableName string) ([]Column, Column) {
 		var columnType string
 		var columnComment string
 		var columnKey string
-		err = rows.Scan(&columnName, &columnType, &columnComment, &columnKey)
+		var columnDefault string
+		var extra string
+		err = rows.Scan(
+			&columnName,
+			&columnType,
+			&columnComment,
+			&columnKey,
+			&columnDefault,
+			&extra,
+		)
 		if err != nil {
 			log.Fatal(err)
 		}
 		col := Column{}
 		col.Name = strings.Trim(columnName, "` ")
 		col.Comment = columnComment
+		col.DefaultValue = columnDefault
+		col.Extra = extra
 
 		fields := strings.Fields(columnType)
 		columnType = fields[0]
@@ -177,7 +195,7 @@ func gen(config *Config, table *Table) {
 		"Var":      config.Target.Custom.Var,
 		"TagName":  config.Target.Custom.TagName,
 		"Table":    table,
-		"TableVar": config.Target.Tables[table.Name],
+		"TableOpt": config.Target.Tables[table.Name],
 	}
 	out := filepath.Join(config.Target.Custom.OutDir)
 	render(isEmbed, filepath.Join(dir), "", entries, out, attr)
@@ -296,18 +314,24 @@ type DS struct {
 	Dsn  string
 }
 
-type TableVar map[string]string
+type Var map[string]string
+
+type TableConfig struct {
+	Module string `yaml:"module"`
+	IsTime bool   `yaml:"is-time"`
+	Var    Var    `yaml:"var"`
+}
 
 type ReverseTarget struct {
 	Custom *Custom
-	Tables map[string]TableVar
+	Tables map[string]TableConfig
 }
 
 type Custom struct {
-	TemplateDir string            `yaml:"template-dir"`
-	OutDir      string            `yaml:"out-dir"`
-	Var         map[string]string `yaml:"var"`
-	TagName     string            `yaml:"tag-name"`
+	TemplateDir string `yaml:"template-dir"`
+	OutDir      string `yaml:"out-dir"`
+	Var         Var    `yaml:"var"`
+	TagName     string `yaml:"tag-name"`
 }
 
 // Table represents a database table
@@ -328,6 +352,8 @@ type Column struct {
 	SQLType      string
 	Comment      string
 	IsPrimaryKey bool
+	DefaultValue string
+	Extra        string
 }
 
 func GenGoImports(cols []Column) []string {

@@ -1,110 +1,122 @@
 package daox
 
 import (
-	"context"
-
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
+
+	"github.com/fengjx/daox/engine"
 )
 
-type Option func(*Dao)
+type Options struct {
+	tableName     string
+	master        *sqlx.DB
+	read          *sqlx.DB
+	omitColumns   []string
+	autoIncrement bool
+	mapper        *reflectx.Mapper
+	ifNullVals    map[string]string
+	hooks         []engine.Hook
+	printSQL      engine.AfterHandler
+}
+
+type Option func(*Options)
 
 // WithDBMaster 设置主库
 func WithDBMaster(master *sqlx.DB) Option {
-	return func(p *Dao) {
-		p.masterDB = master
+	return func(p *Options) {
+		p.master = master
 	}
 }
 
 // WithDBRead 设置从库
 func WithDBRead(read *sqlx.DB) Option {
-	return func(p *Dao) {
-		p.readDB = read
+	return func(p *Options) {
+		p.read = read
 	}
 }
 
 // IsAutoIncrement 是否自增主键
 func IsAutoIncrement() Option {
-	return func(dao *Dao) {
-		dao.TableMeta.IsAutoIncrement = true
+	return func(dao *Options) {
+		dao.autoIncrement = true
 	}
 }
 
-func WithMapper(Mapper *reflectx.Mapper) Option {
-	return func(d *Dao) {
-		d.Mapper = Mapper
+// WithMapper 设置字段映射
+func WithMapper(mapper *reflectx.Mapper) Option {
+	return func(d *Options) {
+		d.mapper = mapper
 	}
 }
 
+// WithTableName 设置表名
 func WithTableName(tableName string) Option {
-	return func(d *Dao) {
-		d.TableMeta.TableName = tableName
+	return func(d *Options) {
+		d.tableName = tableName
 	}
 }
 
-type DataWrapper[S any, T any] func(context.Context, S) T
+// WithIfNullVal 设置字段为null时的默认值
+func WithIfNullVal(col string, val string) Option {
+	return func(d *Options) {
+		if d.ifNullVals == nil {
+			d.ifNullVals = make(map[string]string)
+		}
+		d.ifNullVals[col] = val
+	}
+}
 
-type FieldsFilter func(context.Context) []string
+// WithIfNullVals 设置字段（多个）为null时的默认值
+func WithIfNullVals(vals map[string]string) Option {
+	return func(d *Options) {
+		if d.ifNullVals == nil {
+			d.ifNullVals = make(map[string]string)
+		}
+		for col, val := range vals {
+			d.ifNullVals[col] = val
+		}
+	}
+}
 
+// WithOmitColumns 设置忽略字段
+func WithOmitColumns(omitColumns ...string) Option {
+	return func(d *Options) {
+		d.omitColumns = omitColumns
+	}
+}
+
+// WithHooks 设置中间件
+func WithHooks(hooks ...engine.Hook) Option {
+	return func(d *Options) {
+		d.hooks = hooks
+	}
+}
+
+// WithPrintSQL 打印 sql 回调
+func WithPrintSQL(printSQL engine.AfterHandler) Option {
+	return func(d *Options) {
+		d.printSQL = printSQL
+	}
+}
+
+// InsertOptions insert 选项
 type InsertOptions struct {
-	DataWrapper  DataWrapper[map[string]any, map[string]any]
-	FieldsFilter FieldsFilter
+	disableGlobalOmitColumns bool     // 禁用全局忽略字段
+	omitColumns              []string // 当前 insert 忽略的字段
 }
 
 type InsertOption func(*InsertOptions)
 
-// WithInsertDataWrapper 数据转换
-func WithInsertDataWrapper(dataWrapper DataWrapper[map[string]any, map[string]any]) InsertOption {
+// DisableGlobalInsertOmits insert 数据时，禁用全局忽略字段
+func DisableGlobalInsertOmits(disable bool) InsertOption {
 	return func(o *InsertOptions) {
-		o.DataWrapper = dataWrapper
+		o.disableGlobalOmitColumns = disable
 	}
 }
 
-// WithInsertFieldsFilter 过滤 insert 字段
-func WithInsertFieldsFilter(fieldsFilter FieldsFilter) InsertOption {
+// WithInsertOmits 当前 insert 时，忽略的字段
+func WithInsertOmits(omits ...string) InsertOption {
 	return func(o *InsertOptions) {
-		o.FieldsFilter = fieldsFilter
-	}
-}
-
-type SelectOptions struct {
-	FieldsFilter  FieldsFilter
-	ResultWrapper DataWrapper[any, any]
-}
-
-type SelectOption func(*SelectOptions)
-
-// WithSelectFieldsFilter 过滤 select 字段
-func WithSelectFieldsFilter(fieldsFilter FieldsFilter) SelectOption {
-	return func(o *SelectOptions) {
-		o.FieldsFilter = fieldsFilter
-	}
-}
-
-// WithSelectDataWrapper 返回结果转换
-func WithSelectDataWrapper(resultWrapper DataWrapper[any, any]) SelectOption {
-	return func(o *SelectOptions) {
-		o.ResultWrapper = resultWrapper
-	}
-}
-
-type UpdateOptions struct {
-	DataWrapper  DataWrapper[map[string]any, map[string]any]
-	FieldsFilter FieldsFilter
-}
-
-type UpdateOption func(*UpdateOptions)
-
-// WithUpdateFieldsFilter 过滤 update 字段
-func WithUpdateFieldsFilter(fieldsFilter FieldsFilter) UpdateOption {
-	return func(o *UpdateOptions) {
-		o.FieldsFilter = fieldsFilter
-	}
-}
-
-// WithUpdateDataWrapper 数据转换
-func WithUpdateDataWrapper(dataWrapper DataWrapper[map[string]any, map[string]any]) UpdateOption {
-	return func(o *UpdateOptions) {
-		o.DataWrapper = dataWrapper
+		o.omitColumns = append(o.omitColumns, omits...)
 	}
 }
