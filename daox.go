@@ -17,34 +17,36 @@ import (
 )
 
 var (
+	// ErrUpdatePrimaryKeyRequire 更新操作必须提供主键值
 	ErrUpdatePrimaryKeyRequire = errors.New("[daox] Primary key require for update")
-	ErrTxNil                   = errors.New("[daox] Tx is nil")
+	// ErrTxNil 事务对象为空
+	ErrTxNil = errors.New("[daox] Tx is nil")
 )
 
-// Dao 数据访问
+// Dao 数据访问对象，封装了数据库操作的基础方法
 type Dao struct {
 	lock        sync.Mutex
-	options     *Options
-	masterDB    *DB
-	readDB      *DB
-	mapper      *reflectx.Mapper
-	TableMeta   *TableMeta
-	ifNullVals  map[string]string
-	omitColumns []string
-	executor    engine.Executor
+	options     *Options          // 配置选项
+	masterDB    *DB               // 主库连接
+	readDB      *DB               // 从库连接
+	mapper      *reflectx.Mapper  // 字段映射器
+	TableMeta   *TableMeta        // 表元数据
+	ifNullVals  map[string]string // NULL值替换配置
+	omitColumns []string          // 忽略的字段列表
+	executor    engine.Executor   // SQL执行器，用于事务等场景
 }
 
 // NewDao 创建一个新的 dao 对象
-// tableName 参数表示表名
-// primaryKey 参数表示主键
-// structType 参数表示数据结构类型
-// opts 参数表示可选的选项
-// 返回值为创建的Dao对象指针
+// tableName: 表名
+// primaryKey: 主键字段名
+// opts: 可选配置项，如自增主键、字段映射等
+// 返回值: 创建的Dao对象指针
 func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 	options := &Options{}
 	for _, opt := range opts {
 		opt(options)
 	}
+	// 设置默认字段映射器
 	if options.mapper == nil {
 		if options.master != nil {
 			options.mapper = options.master.Mapper
@@ -53,6 +55,7 @@ func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 		}
 	}
 	options.tableName = tableName
+	// 获取结构体类型并解析字段
 	structType := reflect.TypeFor[T]()
 	columns := sqlbuilder.GetColumnsByType(options.mapper, structType, options.omitColumns...)
 	meta := &TableMeta{
@@ -61,11 +64,14 @@ func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 		IsAutoIncrement: options.autoIncrement,
 		Columns:         columns,
 	}
+	// 合并 hooks
 	hooks := mergeHooks(options)
+	// 设置主库连接
 	master := options.master
 	if options.master == nil {
 		master = global.defaultMasterDB
 	}
+	// 设置从库连接
 	read := options.read
 	if read == nil {
 		if global.defaultReadDB != nil {
@@ -88,6 +94,9 @@ func NewDao[T Model](tableName string, primaryKey string, opts ...Option) *Dao {
 }
 
 // NewDaoByMeta 根据 meta 接口创建 dao 对象
+// m: 表元数据接口
+// opts: 可选配置项
+// 返回值: 创建的Dao对象指针
 func NewDaoByMeta(m Meta, opts ...Option) *Dao {
 	options := &Options{}
 	for _, opt := range opts {
@@ -132,13 +141,15 @@ func NewDaoByMeta(m Meta, opts ...Option) *Dao {
 	return dao
 }
 
-// SQLBuilder 创建当前表的 sqlbuilder
+// SQLBuilder 创建当前表的 SQL 构建器
+// 返回值: SQL构建器对象
 func (d *Dao) SQLBuilder() *sqlbuilder.Builder {
 	return sqlbuilder.New(d.TableMeta.TableName)
 }
 
-// Selector 创建当前表的 Selector
-// columns 是查询指定字段，为空则是全部字段
+// Selector 创建当前表的查询构建器
+// columns: 查询的字段列表，为空则查询全部字段
+// 返回值: 查询构建器对象
 func (d *Dao) Selector(columns ...string) *sqlbuilder.Selector {
 	if len(columns) == 0 {
 		columns = d.DBColumns()
@@ -151,17 +162,21 @@ func (d *Dao) Selector(columns ...string) *sqlbuilder.Selector {
 	return selector
 }
 
-// Updater 创建当前表的 Updater
+// Updater 创建当前表的更新构建器
+// 返回值: 更新构建器对象
 func (d *Dao) Updater() *sqlbuilder.Updater {
 	return d.SQLBuilder().Update().Execer(d.getExecer())
 }
 
-// Deleter 创建当前表的 Deleter
+// Deleter 创建当前表的删除构建器
+// 返回值: 删除构建器对象
 func (d *Dao) Deleter() *sqlbuilder.Deleter {
 	return d.SQLBuilder().Delete().Execer(d.getExecer())
 }
 
-// Inserter 创建当前表的 updater
+// Inserter 创建当前表的插入构建器
+// opts: 插入选项，如忽略字段等
+// 返回值: 插入构建器对象
 func (d *Dao) Inserter(opts ...InsertOption) *sqlbuilder.Inserter {
 	opt := &InsertOptions{}
 	for _, o := range opts {
@@ -171,18 +186,24 @@ func (d *Dao) Inserter(opts ...InsertOption) *sqlbuilder.Inserter {
 }
 
 // GetColumnsByModel 根据 model 结构获取数据库字段
-// omitColumns 表示需要忽略的字段
+// model: 模型结构体
+// omitColumns: 需要忽略的字段列表
+// 返回值: 字段名列表
 func (d *Dao) GetColumnsByModel(model any, omitColumns ...string) []string {
 	return d.GetColumnsByType(reflect.TypeOf(model), omitColumns...)
 }
 
 // GetColumnsByType 通过字段 tag 解析数据库字段
+// typ: 结构体类型
+// omitColumns: 需要忽略的字段列表
+// 返回值: 字段名列表
 func (d *Dao) GetColumnsByType(typ reflect.Type, omitColumns ...string) []string {
 	return sqlbuilder.GetColumnsByType(d.mapper, typ, omitColumns...)
 }
 
 // DBColumns 获取当前表数据库字段
-// omitColumns 表示需要忽略的字段
+// omitColumns: 需要忽略的字段列表
+// 返回值: 字段名列表
 func (d *Dao) DBColumns(omitColumns ...string) []string {
 	columns := make([]string, 0)
 	for _, column := range d.TableMeta.Columns {
@@ -195,18 +216,24 @@ func (d *Dao) DBColumns(omitColumns ...string) []string {
 }
 
 // TableName 获取当前表名
+// 返回值: 表名
 func (d *Dao) TableName() string {
 	return d.TableMeta.TableName
 }
 
 // Save 插入数据
-// omitColumns 不需要 insert 的字段
+// dest: 要插入的数据对象
+// opts: 插入选项
+// 返回值: 插入ID，错误信息
 func (d *Dao) Save(dest Model, opts ...InsertOption) (int64, error) {
 	return d.SaveContext(context.Background(), dest, opts...)
 }
 
 // SaveContext 插入数据，携带上下文
-// omitColumns 不需要 insert 的字段
+// ctx: 上下文
+// dest: 要插入的数据对象
+// opts: 插入选项
+// 返回值: 插入ID，错误信息
 func (d *Dao) SaveContext(ctx context.Context, dest Model, opts ...InsertOption) (int64, error) {
 	opt := &InsertOptions{}
 	for _, o := range opts {
@@ -533,7 +560,8 @@ func (d *Dao) initIfNullVal() {
 	}
 }
 
-// GetMasterDB 返回主库
+// GetMasterDB 返回主库连接
+// 返回值: 主库连接对象
 func (d *Dao) GetMasterDB() *DB {
 	if d.masterDB != nil {
 		return d.masterDB
@@ -552,7 +580,8 @@ func (d *Dao) GetMasterDB() *DB {
 	return d.masterDB
 }
 
-// GetReadDB 返回从库
+// GetReadDB 返回从库连接
+// 返回值: 从库连接对象
 func (d *Dao) GetReadDB() *DB {
 	if d.readDB != nil {
 		return d.readDB
@@ -577,6 +606,8 @@ func (d *Dao) GetReadDB() *DB {
 	return d.masterDB
 }
 
+// getQueryer 获取查询执行器
+// 返回值: 查询执行器接口
 func (d *Dao) getQueryer() engine.Queryer {
 	if d.executor != nil {
 		return d.executor
@@ -584,6 +615,8 @@ func (d *Dao) getQueryer() engine.Queryer {
 	return d.GetReadDB()
 }
 
+// getExecer 获取更新执行器
+// 返回值: 更新执行器接口
 func (d *Dao) getExecer() engine.Execer {
 	if d.executor != nil {
 		return d.executor
@@ -591,6 +624,9 @@ func (d *Dao) getExecer() engine.Execer {
 	return d.GetMasterDB()
 }
 
+// mergeHooks 合并 hooks
+// options: 配置选项
+// 返回值: 合并后的 hooks 列表
 func mergeHooks(options *Options) []engine.Hook {
 	hooks := global.hooks
 	if len(options.hooks) > 0 {
