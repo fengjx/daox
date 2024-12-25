@@ -343,18 +343,13 @@ func (d *Dao) getSaveColumns(opt *InsertOptions) []string {
 }
 
 // GetByColumn 按指定字段查询单条数据
-// kv: 键值对，包含字段名和字段值
-// dest: 目标对象，用于存储查询结果
-// 返回值: 是否找到数据，错误信息
+// bool 数据是否存在
 func (d *Dao) GetByColumn(kv *KV, dest Model) (bool, error) {
 	return d.GetByColumnContext(context.Background(), kv, dest)
 }
 
 // GetByColumnContext 按指定字段查询单条数据，携带上下文
-// ctx: 上下文
-// kv: 键值对，包含字段名和字段值
-// dest: 目标对象，用于存储查询结果
-// 返回值: 是否找到数据，错误信息
+// bool 数据是否存在
 func (d *Dao) GetByColumnContext(ctx context.Context, kv *KV, dest Model) (bool, error) {
 	if kv == nil {
 		return false, nil
@@ -365,18 +360,13 @@ func (d *Dao) GetByColumnContext(ctx context.Context, kv *KV, dest Model) (bool,
 }
 
 // ListByColumns 指定字段多个值查询多条数据
-// kvs: 多值键值对，包含字段名和字段值列表
-// dest: 目标对象，必须是切片指针
-// 返回值: 错误信息
+// dest: slice pointer
 func (d *Dao) ListByColumns(kvs *MultiKV, dest any) error {
 	return d.ListByColumnsContext(context.Background(), kvs, dest)
 }
 
 // ListByColumnsContext 指定字段多个值查询多条数据，携带上下文
-// ctx: 上下文
-// kvs: 多值键值对，包含字段名和字段值列表
-// dest: 目标对象，必须是切片指针
-// 返回值: 错误信息
+// dest: slice pointer
 func (d *Dao) ListByColumnsContext(ctx context.Context, kvs *MultiKV, dest any) error {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return nil
@@ -388,18 +378,11 @@ func (d *Dao) ListByColumnsContext(ctx context.Context, kvs *MultiKV, dest any) 
 }
 
 // List 指定字段查询多条数据
-// kv: 键值对，包含字段名和字段值
-// dest: 目标对象，必须是切片指针
-// 返回值: 错误信息
 func (d *Dao) List(kv *KV, dest any) error {
 	return d.ListContext(context.Background(), kv, dest)
 }
 
 // ListContext 指定字段查询多条数据，携带上下文
-// ctx: 上下文
-// kv: 键值对，包含字段名和字段值
-// dest: 目标对象，必须是切片指针
-// 返回值: 错误信息
 func (d *Dao) ListContext(ctx context.Context, kv *KV, dest any) error {
 	return d.Selector().Queryer(d.getQueryer()).
 		Columns(d.DBColumns()...).
@@ -490,17 +473,12 @@ func (d *Dao) deleteByCondContext(ctx context.Context, where sqlbuilder.Conditio
 	return d.Deleter().Execer(d.getExecer()).Where(where).ExecContext(ctx)
 }
 
-// DeleteByColumn 按字段名删除数据
-// kv: 键值对，包含字段名和字段值
-// 返回值: 影响的行数，错误信息
+// DeleteByColumn 按字段名删除
 func (d *Dao) DeleteByColumn(kv *KV) (int64, error) {
 	return d.DeleteByColumnContext(context.Background(), kv)
 }
 
-// DeleteByColumnContext 按字段名删除数据，携带上下文
-// ctx: 上下文
-// kv: 键值对，包含字段名和字段值
-// 返回值: 影响的行数，错误信息
+// DeleteByColumnContext 按字段名删除，携带上下文
 func (d *Dao) DeleteByColumnContext(ctx context.Context, kv *KV) (int64, error) {
 	if kv == nil {
 		return 0, nil
@@ -508,17 +486,12 @@ func (d *Dao) DeleteByColumnContext(ctx context.Context, kv *KV) (int64, error) 
 	return d.deleteByCondContext(ctx, ql.C(ql.Col(kv.Key).EQ(kv.Value)))
 }
 
-// DeleteByColumns 指定字段删除多个值对应的数据
-// kvs: 多值键值对，包含字段名和字段值列表
-// 返回值: 影响的行数，错误信息
+// DeleteByColumns 指定字段删除多个值
 func (d *Dao) DeleteByColumns(kvs *MultiKV) (int64, error) {
 	return d.DeleteByColumnsContext(context.Background(), kvs)
 }
 
-// DeleteByColumnsContext 指定字段删除多个值对应的数据，携带上下文
-// ctx: 上下文
-// kvs: 多值键值对，包含字段名和字段值列表
-// 返回值: 影响的行数，错误信息
+// DeleteByColumnsContext 指定字段删除多个值，携带上下文
 func (d *Dao) DeleteByColumnsContext(ctx context.Context, kvs *MultiKV) (int64, error) {
 	if kvs == nil || len(kvs.Values) == 0 {
 		return 0, nil
