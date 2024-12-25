@@ -7,16 +7,26 @@ import (
 	"github.com/fengjx/daox/engine"
 )
 
+// Options Dao的配置选项
 type Options struct {
-	tableName     string
-	master        *sqlx.DB
-	read          *sqlx.DB
-	omitColumns   []string
+	// 表名
+	tableName string
+	// 主库连接
+	master *sqlx.DB
+	// 从库连接
+	read *sqlx.DB
+	// 忽略的字段列表
+	omitColumns []string
+	// 是否自增主键
 	autoIncrement bool
-	mapper        *reflectx.Mapper
-	ifNullVals    map[string]string
-	hooks         []engine.Hook
-	printSQL      engine.AfterHandler
+	// 字段映射器
+	mapper *reflectx.Mapper
+	// IFNULL默认值配置
+	ifNullVals map[string]string
+	// 回调处理函数
+	hooks []engine.Hook
+	// SQL打印处理器
+	printSQL engine.AfterHandler
 }
 
 type Option func(*Options)

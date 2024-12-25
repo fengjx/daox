@@ -11,13 +11,16 @@ import (
 	"github.com/fengjx/daox/utils"
 )
 
-// DB 包装 sqlx.DB
+// DB 包装 sqlx.DB,添加钩子功能
 type DB struct {
 	*sqlx.DB
+	// SQL执行钩子
 	hook engine.Hook
 }
 
-// NewDb 创建 DB
+// NewDb 创建DB实例
+// db: sqlx.DB实例
+// hooks: SQL执行钩子列表
 func NewDb(db *sqlx.DB, hooks ...engine.Hook) *DB {
 	if db == nil {
 		return nil
@@ -30,7 +33,10 @@ func NewDb(db *sqlx.DB, hooks ...engine.Hook) *DB {
 	return ndb
 }
 
-// NamedExecContext 使用命名参数执行sql
+// NamedExecContext 使用命名参数执行SQL
+// ctx: 上下文
+// execSQL: SQL语句
+// arg: 命名参数
 func (d *DB) NamedExecContext(ctx context.Context, execSQL string, arg any) (sql.Result, error) {
 	return doNamedExec(ctx, d.DB, execSQL, arg, d.hook)
 }

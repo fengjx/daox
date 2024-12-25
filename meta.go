@@ -42,10 +42,14 @@ type Model interface {
 	GetID() any
 }
 
-// Meta 数据库表元信息定义接口
+// Meta 定义数据库表的元数据信息接口
 type Meta interface {
+	// TableName 获取表名
 	TableName() string
+	// PrimaryKey 获取主键字段名
 	PrimaryKey() string
+	// IsAutoIncrement 判断主键是否为自增类型
 	IsAutoIncrement() bool
+	// Columns 获取所有数据库字段名
 	Columns() []string
 }

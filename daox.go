@@ -21,17 +21,25 @@ var (
 	ErrTxNil                   = errors.New("[daox] Tx is nil")
 )
 
-// Dao 数据访问
+// Dao 数据访问对象,提供基础的数据库操作能力
 type Dao struct {
-	lock        sync.Mutex
-	options     *Options
-	masterDB    *DB
-	readDB      *DB
-	mapper      *reflectx.Mapper
-	TableMeta   *TableMeta
-	ifNullVals  map[string]string
+	lock sync.Mutex
+	// dao配置选项
+	options *Options
+	// 主库连接
+	masterDB *DB
+	// 从库连接
+	readDB *DB
+	// 字段映射器
+	mapper *reflectx.Mapper
+	// 表元数据信息
+	TableMeta *TableMeta
+	// IFNULL查询的默认值配置
+	ifNullVals map[string]string
+	// 忽略的字段列表
 	omitColumns []string
-	executor    engine.Executor
+	// SQL执行器
+	executor engine.Executor
 }
 
 // NewDao 创建一个新的 dao 对象

@@ -6,9 +6,20 @@
 
 实现了代码生成器，有内置生成文件模板，也可以自定义模板。
 
+## 特性
+
+- 轻量级设计,专注于 SQL 操作的简化
+- 支持读写分离
+- 支持事务操作
+- 支持自动生成代码
+- 支持自定义字段映射
+- 内置 SQL 构建器
+- 支持 Context 传递
+- 支持自定义 Hook
+
 ## 安装
 
-```
+```bash
 go get github.com/fengjx/daox
 ```
 
@@ -36,30 +47,47 @@ create table user_info
 创建 dao 对象
 
 ```go
-// 使用全局默认DB
+// 1. 使用全局默认DB
 db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
 db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
 // 注册全局DB
 daox.UseDefaultMasterDB(db)
 dao := daox.NewDao[*User](tableName, "id", daox.IsAutoIncrement())
-```
 
-```go
-// 使用 NewDao 创建
-db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
-db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
-dao := daox.NewDao[*User](tableName, "id", daox.IsAutoIncrement(), daox.WithDBMaster(db))
-```
+// 2. 使用 NewDao 创建,指定主从库
+masterDB := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
+readDB := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3307)/demo")
+masterDB.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
+readDB.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
+dao := daox.NewDao[*User](tableName, "id", 
+    daox.IsAutoIncrement(),
+    daox.WithDBMaster(masterDB),
+    daox.WithDBRead(readDB),
+)
 
-```go
-// 使用 meta 接口创建
-db := sqlx.MustOpen("mysql", "root:1234@tcp(localhost:3306)/demo")
-db.Mapper = reflectx.NewMapperFunc("json", strings.ToTitle)
+// 3. 使用 meta 接口创建
 dao := daox.NewDaoByMeta(UserMeta)
 ```
 
 新增
 ```go
+ctx := context.Background()
+
+// 单条插入
+user := &User{
+    Uid:      1001,
+    Nickname: "test",
+    Sex:      1,
+    Utime:    time.Now().Unix(),
+    Ctime:    time.Now().Unix(),
+}
+id, err := dao.SaveContext(ctx, user)
+if err != nil {
+    log.Panic(err)
+}
+
+// 批量插入
+users := make([]*User, 0)
 for i := 0; i < 20; i++ {
     sec := time.Now().Unix()
     user := &User{
@@ -69,72 +97,79 @@ for i := 0; i < 20; i++ {
         Utime:    sec,
         Ctime:    sec,
     }
-    id, err := dao.Save(user)
-    if err != nil {
-        log.Panic(err)
-    }
-    log.Println(id)
+    users = append(users, user)
+}
+affected, err := dao.BatchSaveContext(ctx, users)
+if err != nil {
+    log.Panic(err)
 }
 
+// Replace Into 插入
+id, err = dao.ReplaceIntoContext(ctx, user)
 
+// Insert Ignore 插入
+id, err = dao.IgnoreIntoContext(ctx, user)
 ```
 
 查询
 ```go
+ctx := context.Background()
+
 // id 查询
 user := new(User)
-err := dao.GetByID(1, user)
+exists, err := dao.GetByIDContext(ctx, 1, user)
 
 // 批量id查询
-var list []User
-err = dao.ListByIds(&list3, 10, 11)
+var list []*User
+err = dao.ListByIDsContext(ctx, &list, 10, 11)
 
 // 指定字段查询单条记录
 user := new(User)
-err := dao.GetByColumn(daox.OfKv("uid", 10000), user)
+exists, err := dao.GetByColumnContext(ctx, daox.OfKv("uid", 10000), user)
 
 // 指定字段查询多条记录
 var list []*User
-err := dao.List(daox.OfKv("sex", 0), &list)
+err := dao.ListContext(ctx, daox.OfKv("sex", 0), &list)
 
 // 指定字段查询多个值
 var list []*User
-err = dao.ListByColumns(daox.OfMultiKv("uid", 10000, 10001), &list)
+err = dao.ListByColumnsContext(ctx, daox.OfMultiKv("uid", 10000, 10001), &list)
 ```
 
 修改
 ```go
-user := new(User)
-err := dao.GetByID(10, user)
-user.Nickname = "update-name-10"
+ctx := context.Background()
+
 // 全字段更新
-ok, err := dao.Update(user)
-log.Printf("update res - %v", ok)
+user := new(User)
+exists, err := dao.GetByIDContext(ctx, 10, user)
+user.Nickname = "update-name-10"
+ok, err := dao.UpdateContext(ctx, user)
 
 // 部分字段更新
-ok, err = dao.UpdateField(11, map[string]any{
+ok, err = dao.UpdateFieldContext(ctx, 11, map[string]any{
     "nickname": "update-name-11",
 })
-log.Printf("update res - %v", ok)
+
+// 条件更新
+ok, err = dao.UpdateByCondContext(ctx, user, 
+    sqlbuilder.C().Where(true, "age > ?").And(true, "sex = ?"),
+    "create_time", // 忽略更新的字段
+)
 ```
 
 删除
 ```go
-// 按 id 删除
-ok, err := dao.DeleteById(21)
-log.Printf("delete res - %v", ok)
+ctx := context.Background()
 
-user := new(User)
-err = dao.GetByID(21, user)
-log.Printf("delete by id res - %v", user.Id)
+// 按 id 删除
+ok, err := dao.DeleteByIDContext(ctx, 21)
 
 // 按指定字段删除
-affected, err := dao.DeleteByColumn(daox.OfKv("uid", 101))
-log.Printf("delete by column res - %v", affected)
+affected, err := dao.DeleteByColumnContext(ctx, daox.OfKv("uid", 101))
 
 // 按字段删除多条记录
-affected, err = dao.DeleteByColumns(daox.OfMultiKv("uid", 102, 103))
-log.Printf("multiple delete by column res - %v", affected)
+affected, err = dao.DeleteByColumnsContext(ctx, daox.OfMultiKv("uid", 102, 103))
 ```
 
 ### sqlbuilder
@@ -150,6 +185,7 @@ sqlbuilder.New("user_info")
 
 构造sql
 ```go
+// 查询
 querySQL, err := sqlbuilder.New("user_info").Select().
     Columns("id", "username", "age", "sex", "ctime").
     Where(
@@ -161,42 +197,55 @@ querySQL, err := sqlbuilder.New("user_info").Select().
     Offset(10).
     Limit(10).Sql()
 // SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user_info` WHERE age > ? AND sex = ? ORDER BY `ctime` DESC LIMIT 10 OFFSET 10;
-log.Println(querySQL)
 
-
+// 插入
 inserter := sqlbuilder.New("user_info").Insert().
     Columns("username", "age", "sex")
 
 sql, err := inserter.Sql()
 //  INSERT INTO `user_info`(`username`, `age`, `sex`) VALUES (?, ?, ?);
-log.Println(sql)
 
 nameSql, err := inserter.NameSql()
 // INSERT INTO `user_info`(`username`, `age`, `sex`) VALUES (:username, :age, :sex);
-log.Println(nameSql)
 
-
+// 更新
 updateSQL, err := sqlbuilder.New("user_info").
     Update().
     Columns("username", "age").
-        Where(sqlbuilder.C().Where(true, "id = ?")).
+    Where(sqlbuilder.C().Where(true, "id = ?")).
     Sql()
 // UPDATE `user_info` SET `username` = ?, `age` = ? WHERE id = ?;
-log.Println(updateSQL)
 
-
+// 删除
 deleteSQL, err := sqlbuilder.New("user_info").Delete().
     Where(sqlbuilder.C().Where(true, "id = ?")).
     Sql()
 // DELETE FROM `user_info` WHERE id = ?;
-log.Println(deleteSQL)
 ```
 
 更多示例请查看[sqlbuilder/sql_test.go](https://github.com/fengjx/daox/blob/master/sqlbuilder/sql_test.go)
 
-## 代码生成
+### Hook
 
-### 安装代码生成工具
+daox 支持注册 Hook 来实现 SQL 执行前后的自定义处理:
+
+```go
+// 全局 Hook
+daox.RegisterHook(func(ctx context.Context, stmt string, args []any) {
+    log.Printf("sql: %s, args: %v", stmt, args)
+})
+
+// 单个 dao 实例的 Hook
+dao := daox.NewDao[*User](tableName, "id", 
+    daox.WithHook(func(ctx context.Context, stmt string, args []any) {
+        log.Printf("sql: %s, args: %v", stmt, args)
+    }),
+)
+```
+
+### 代码生成
+
+#### 安装代码生成工具
 
 ```bash
 $ go install github.com/fengjx/daox/cmd/gen@latest
@@ -209,7 +258,7 @@ GLOBAL OPTIONS:
 
 生成代码
 
-```
+```bash
 $ gen -f gen.yml
 ```
 
@@ -266,7 +315,7 @@ attr := map[string]any{
 - utils.TitleCase:  转驼峰风格字符串
 - utils.GonicCase:  转go风格驼峰字符串，user_id -> userID
 - utils.LineString: 空字符串使用横线"-"代替
-- SQLType2GoTypeString: sql类型转go类型字符串
+- SQLType2GoTypeString: sql类型转go类型字符���
 
 ```go
 funcMap := template.FuncMap{
@@ -281,3 +330,7 @@ funcMap := template.FuncMap{
 ```
 
 参考`_example/gen`
+
+## License
+
+MIT License
