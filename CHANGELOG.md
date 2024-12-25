@@ -46,3 +46,4 @@
 - [alias优化](https://github.com/fengjx/daox/pull/76)
 - [order by 支持 alias](https://github.com/fengjx/daox/pull/78)
 - [dao.Inserter 方法使用默认insert字段](https://github.com/fengjx/daox/pull/80)
+- [完善文档注释](https://github.com/fengjx/daox/pull/83)
