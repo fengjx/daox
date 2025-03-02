@@ -46,3 +46,8 @@
 - [alias优化](https://github.com/fengjx/daox/pull/76)
 - [order by 支持 alias](https://github.com/fengjx/daox/pull/78)
 - [dao.Inserter 方法使用默认insert字段](https://github.com/fengjx/daox/pull/80)
+
+### 1.1.1
+
+- [fix order by 多个字段时sql拼接错误](https://github.com/fengjx/daox/pull/86)
+
