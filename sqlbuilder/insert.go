@@ -2,6 +2,7 @@ package sqlbuilder
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"time"
 
@@ -207,19 +208,19 @@ func (ins *Inserter) SQLArgs() (string, []any, error) {
 
 // Exec 执行 insert 语句
 // 执行 Exec 方法，需要通过 Fields 方法赋值，否则使用 NamedExec
-func (ins *Inserter) Exec() (lastID int64, affected int64, err error) {
+func (ins *Inserter) Exec() (sql.Result, error) {
 	return ins.ExecContext(context.Background())
 }
 
 // ExecContext 执行更新语句
 // 执行 Exec 方法，需要通过 Fields 方法赋值，否则使用 NamedExec
-func (ins *Inserter) ExecContext(ctx context.Context) (lastID int64, affected int64, err error) {
+func (ins *Inserter) ExecContext(ctx context.Context) (sql.Result, error) {
 	if ins.execer == nil {
-		return 0, 0, ErrExecerNotSet
+		return nil, ErrExecerNotSet
 	}
 	execSQL, args, err := ins.SQLArgs()
 	if err != nil {
-		return 0, 0, err
+		return nil, err
 	}
 	ec := &engine.ExecutorContext{
 		Type:      engine.INSERT,
@@ -229,29 +230,22 @@ func (ins *Inserter) ExecContext(ctx context.Context) (lastID int64, affected in
 		Args:      args,
 	}
 	ctx = engine.SetExecutorContext(ctx, ec)
-	result, err := ins.execer.ExecContext(ctx, execSQL, args...)
-	if err != nil {
-		return 0, 0, err
-	}
-	// 下面不会返回 error 的
-	lastID, _ = result.LastInsertId()
-	affected, _ = result.RowsAffected()
-	return lastID, affected, nil
+	return ins.execer.ExecContext(ctx, execSQL, args...)
 }
 
 // NamedExec 通过 NameSQL 执行更新语句，参数通过 data 填充
-func (ins *Inserter) NamedExec(model any) (lastID int64, affected int64, err error) {
+func (ins *Inserter) NamedExec(model any) (sql.Result, error) {
 	return ins.NamedExecContext(context.Background(), model)
 }
 
 // NamedExecContext 通过 NameSQL 执行更新语句，参数通过 data 填充
-func (ins *Inserter) NamedExecContext(ctx context.Context, model any) (lastID int64, affected int64, err error) {
+func (ins *Inserter) NamedExecContext(ctx context.Context, model any) (sql.Result, error) {
 	if ins.execer == nil {
-		return 0, 0, ErrExecerNotSet
+		return nil, ErrExecerNotSet
 	}
 	execSQL, err := ins.NameSQL()
 	if err != nil {
-		return 0, 0, err
+		return nil, err
 	}
 	ec := &engine.ExecutorContext{
 		Type:      engine.INSERT,
@@ -261,12 +255,5 @@ func (ins *Inserter) NamedExecContext(ctx context.Context, model any) (lastID in
 		NameArgs:  model,
 	}
 	ctx = engine.SetExecutorContext(ctx, ec)
-	result, err := ins.execer.NamedExecContext(ctx, execSQL, model)
-	if err != nil {
-		return 0, 0, err
-	}
-	// 下面不会返回 error 的
-	lastID, _ = result.LastInsertId()
-	affected, _ = result.RowsAffected()
-	return lastID, affected, nil
+	return ins.execer.NamedExecContext(ctx, execSQL, model)
 }
