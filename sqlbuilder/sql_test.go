@@ -134,6 +134,14 @@ func TestSelect(t *testing.T) {
 			wantSQL: "SELECT t.`id`, t.`username`, t.`age`, t.`sex`, t.`ctime` FROM `user` AS `t` ORDER BY t.`ctime` DESC;",
 		},
 		{
+			name: "select order by multiple columns",
+			selector: sqlbuilder.New("user").Select().
+				Columns("id", "username", "age", "sex", "ctime").
+				Where(ql.SC().And("age > ?").And("sex = ?")).
+				OrderBy(ql.Desc("ctime", "age")),
+			wantSQL: "SELECT `id`, `username`, `age`, `sex`, `ctime` FROM `user` WHERE age > ? AND sex = ? ORDER BY `ctime`, `age` DESC;",
+		},
+		{
 			name: "select limit",
 			selector: sqlbuilder.New("user").Select().
 				Columns("id", "username", "age", "sex", "ctime").
