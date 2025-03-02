@@ -50,4 +50,5 @@
 ### 1.1.1
 
 - [fix order by 多个字段时sql拼接错误](https://github.com/fengjx/daox/pull/86)
+- [fix ignore into sql 错误](https://github.com/fengjx/daox/pull/88)
 
