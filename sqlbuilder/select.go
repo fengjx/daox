@@ -317,9 +317,13 @@ func (s *Selector) SQL() (string, error) {
 		for i, ob := range s.orderBy {
 			if i > 0 {
 				s.comma()
+				s.space()
 			}
-			for _, c := range ob.columns {
-				s.col(c)
+			for j, c := range ob.columns {
+				if j > 0 {
+					s.writeString(", ")
+				}
+				s.quote(c.name)
 			}
 			s.space()
 			s.writeString(ob.orderType)
