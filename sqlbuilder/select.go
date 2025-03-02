@@ -323,7 +323,7 @@ func (s *Selector) SQL() (string, error) {
 				if j > 0 {
 					s.writeString(", ")
 				}
-				s.quote(c.name)
+				s.col(c)
 			}
 			s.space()
 			s.writeString(ob.orderType)
