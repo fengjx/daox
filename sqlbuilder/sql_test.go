@@ -464,6 +464,15 @@ func TestUpdate(t *testing.T) {
 			wantArgs: []any{"fengjx", 20, 1000},
 		},
 		{
+			name: "update_with_set_map",
+			updater: sqlbuilder.New("user").Update().SetMap(map[string]any{
+				"username": "fengjx",
+				"age":      20,
+			}).Where(ql.C(ql.Col("id").EQ(100))),
+			wantSQL:  "UPDATE `user` SET `username` = ?, `age` = ? WHERE `id` = ?;",
+			wantArgs: []any{"fengjx", 20, 100},
+		},
+		{
 			name: "update use incr",
 			updater: sqlbuilder.New("user").
 				Update().

@@ -48,6 +48,14 @@ func (u *Updater) Set(column string, val any) *Updater {
 	return u
 }
 
+// SetMap 使用 map 设置字段值
+func (u *Updater) SetMap(m map[string]any) *Updater {
+	for col, val := range m {
+		u.Set(col, val)
+	}
+	return u
+}
+
 // Columns update 的数据库字段
 func (u *Updater) Columns(columns ...string) *Updater {
 	for _, col := range columns {

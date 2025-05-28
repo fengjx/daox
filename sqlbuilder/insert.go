@@ -57,13 +57,27 @@ func (ins *Inserter) Columns(columns ...string) *Inserter {
 	return ins
 }
 
+// Field 设置 insert 字段和值
+func (ins *Inserter) Field(field Field) *Inserter {
+	if !field.isUse {
+		return ins
+	}
+	ins.insertFields = append(ins.insertFields, field)
+	return ins
+}
+
 // Fields 设置 insert 字段和值
 func (ins *Inserter) Fields(fields ...Field) *Inserter {
-	for _, field := range fields {
-		if !field.isUse {
-			continue
-		}
-		ins.insertFields = append(ins.insertFields, field)
+	for _, f := range fields {
+		ins.Field(f)
+	}
+	return ins
+}
+
+// SetMap 使用 map 设置字段值
+func (ins *Inserter) SetMap(m map[string]any) *Inserter {
+	for col, val := range m {
+		ins.Field(F(col).Val(val))
 	}
 	return ins
 }
