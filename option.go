@@ -35,13 +35,6 @@ func WithDBRead(read *sqlx.DB) Option {
 	}
 }
 
-// IsAutoIncrement 是否自增主键
-func IsAutoIncrement() Option {
-	return func(dao *Options) {
-		dao.autoIncrement = true
-	}
-}
-
 // WithMapper 设置字段映射
 func WithMapper(mapper *reflectx.Mapper) Option {
 	return func(d *Options) {
