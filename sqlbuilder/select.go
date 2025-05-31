@@ -212,10 +212,16 @@ func (s *Selector) Distinct() *Selector {
 	return s
 }
 
-// Where 条件
+// Where 查询条件
 // condition 可以通过 sqlbuilder.C() 方法创建
 func (s *Selector) Where(where ConditionBuilder) *Selector {
 	s.where = where
+	return s
+}
+
+// WhereC 查询条件，使用 sqlbuilder.C() 构造器
+func (s *Selector) WhereC(cols ...Column) *Selector {
+	s.where = C(cols...)
 	return s
 }
 
@@ -409,13 +415,13 @@ func (s *Selector) CountSQLArgs() (string, []any, error) {
 	return sqlx.In(querySQL, args...)
 }
 
-// Select 查询多条数据
-func (s *Selector) Select(dest any) error {
-	return s.SelectContext(context.Background(), dest)
+// List 查询多条数据
+func (s *Selector) List(dest any) error {
+	return s.ListContext(context.Background(), dest)
 }
 
-// SelectContext 查询多条数据
-func (s *Selector) SelectContext(ctx context.Context, dest any) error {
+// ListContext 查询多条数据
+func (s *Selector) ListContext(ctx context.Context, dest any) error {
 	if s.queryer == nil {
 		return ErrQueryerNotSet
 	}
@@ -438,13 +444,13 @@ func (s *Selector) SelectContext(ctx context.Context, dest any) error {
 	return nil
 }
 
-// Get 查询单条数据
-func (s *Selector) Get(dest any) (exist bool, err error) {
-	return s.GetContext(context.Background(), dest)
+// One 查询单条数据
+func (s *Selector) One(dest any) (exist bool, err error) {
+	return s.OneContext(context.Background(), dest)
 }
 
-// GetContext 查询单条数据
-func (s *Selector) GetContext(ctx context.Context, dest any) (exist bool, err error) {
+// OneContext 查询单条数据
+func (s *Selector) OneContext(ctx context.Context, dest any) (exist bool, err error) {
 	if s.queryer == nil {
 		return false, ErrQueryerNotSet
 	}

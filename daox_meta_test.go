@@ -69,7 +69,7 @@ func (m DemoInfoM) PrimaryKey() string {
 }
 
 func (m DemoInfoM) IsAutoIncrement() bool {
-	return false
+	return true
 }
 
 func (m DemoInfoM) Columns() []string {

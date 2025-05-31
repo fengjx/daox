@@ -50,6 +50,32 @@ func (d *DB) GetContext(ctx context.Context, dest any, query string, args ...any
 	return doGet(ctx, d.DB, dest, query, args, d.hook)
 }
 
+// QueryContext 查询多条数据，返回 sql.Rows
+func (d *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	ec := engine.GetExecutorContext(ctx)
+	if ec == nil {
+		ec = &engine.ExecutorContext{
+			Type:      engine.ParseSQLType(query),
+			TableName: engine.ParseTableName(query),
+			SQL:       query,
+			Args:      args,
+			Start:     time.Now(),
+		}
+	}
+	err := d.hook.Before(ctx, ec)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := d.DB.QueryContext(ctx, query, args...)
+	er := &engine.ExecutorResult{
+		Err:       err,
+		Duration:  time.Since(ec.Start),
+		QueryRows: -1,
+	}
+	d.hook.After(ctx, ec, er)
+	return rows, err
+}
+
 // Beginx 打开一个事务
 func (d *DB) Beginx() (*Tx, error) {
 	tx, err := d.DB.Beginx()
