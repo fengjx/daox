@@ -19,8 +19,8 @@ import (
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 
-	"github.com/fengjx/daox/types"
-	"github.com/fengjx/daox/utils"
+	"github.com/fengjx/daox/v2/types"
+	"github.com/fengjx/daox/v2/utils"
 )
 
 //go:embed template/*

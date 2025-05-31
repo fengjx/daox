@@ -3,8 +3,8 @@ package daox
 import (
 	"context"
 
-	"github.com/fengjx/daox/engine"
-	"github.com/fengjx/daox/sqlbuilder"
+	"github.com/fengjx/daox/v2/engine"
+	"github.com/fengjx/daox/v2/sqlbuilder"
 )
 
 // InsertRecord 插入记录

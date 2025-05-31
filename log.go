@@ -3,7 +3,7 @@ package daox
 import (
 	"context"
 
-	"github.com/fengjx/daox/engine"
+	"github.com/fengjx/daox/v2/engine"
 )
 
 // LogHook 打印日志中间件

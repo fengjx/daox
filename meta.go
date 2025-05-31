@@ -1,7 +1,7 @@
 package daox
 
 import (
-	"github.com/fengjx/daox/utils"
+	"github.com/fengjx/daox/v2/utils"
 )
 
 // TableMeta 数据库表元信息，包含表的基本信息和字段定义

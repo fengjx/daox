@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/fengjx/daox/sqlbuilder"
-	"github.com/fengjx/daox/sqlbuilder/ql"
+	"github.com/fengjx/daox/v2/sqlbuilder"
+	"github.com/fengjx/daox/v2/sqlbuilder/ql"
 )
 
 type tm struct {

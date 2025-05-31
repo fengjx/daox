@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/fengjx/daox"
+	"github.com/fengjx/daox/v2"
 )
 
 func TestQuery_ToSQLArgs(t *testing.T) {

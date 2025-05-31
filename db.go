@@ -7,8 +7,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/fengjx/daox/engine"
-	"github.com/fengjx/daox/utils"
+	"github.com/fengjx/daox/v2/engine"
+	"github.com/fengjx/daox/v2/utils"
 )
 
 // DB 包装 sqlx.DB

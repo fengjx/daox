@@ -8,7 +8,7 @@ import (
 
 	"github.com/jmoiron/sqlx/reflectx"
 
-	"github.com/fengjx/daox/utils"
+	"github.com/fengjx/daox/v2/utils"
 )
 
 var mapperMap = map[string]*reflectx.Mapper{}

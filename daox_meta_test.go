@@ -1,8 +1,8 @@
 package daox_test
 
 import (
-	"github.com/fengjx/daox/sqlbuilder"
-	"github.com/fengjx/daox/sqlbuilder/ql"
+	"github.com/fengjx/daox/v2/sqlbuilder"
+	"github.com/fengjx/daox/v2/sqlbuilder/ql"
 )
 
 const createMySQLTableSQL = `

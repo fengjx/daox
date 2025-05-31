@@ -1,6 +1,6 @@
 package ql
 
-import "github.com/fengjx/daox/sqlbuilder"
+import "github.com/fengjx/daox/v2/sqlbuilder"
 
 // Asc alias for sqlbuilder.Asc
 var Asc = sqlbuilder.Asc

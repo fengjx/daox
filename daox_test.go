@@ -16,9 +16,9 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/fengjx/daox"
-	"github.com/fengjx/daox/engine"
-	"github.com/fengjx/daox/sqlbuilder/ql"
+	"github.com/fengjx/daox/v2"
+	"github.com/fengjx/daox/v2/engine"
+	"github.com/fengjx/daox/v2/sqlbuilder/ql"
 )
 
 func sqliteDB() (*sql.DB, error) {

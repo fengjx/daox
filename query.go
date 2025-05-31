@@ -6,10 +6,10 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/fengjx/daox/engine"
-	"github.com/fengjx/daox/sqlbuilder"
-	"github.com/fengjx/daox/sqlbuilder/ql"
-	"github.com/fengjx/daox/types"
+	"github.com/fengjx/daox/v2/engine"
+	"github.com/fengjx/daox/v2/sqlbuilder"
+	"github.com/fengjx/daox/v2/sqlbuilder/ql"
+	"github.com/fengjx/daox/v2/types"
 )
 
 const (
