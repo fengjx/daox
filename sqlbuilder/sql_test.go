@@ -280,7 +280,7 @@ func TestSelect(t *testing.T) {
 				LeftJoin("user", "b", "b.uid = u.id").
 				Where(ql.C(ql.Col("id").Alias("u").EQ(1000))),
 			wantSQL:  "SELECT b.`id`, b.`title`, u.`id`, u.`username` FROM `blog` AS `u` LEFT JOIN `user` AS `b` ON b.uid = u.id WHERE u.`id` = ?;",
-			wantArgs: []interface{}{1000},
+			wantArgs: []any{1000},
 		},
 	}
 
