@@ -2,6 +2,7 @@ package daox
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"reflect"
@@ -239,92 +240,71 @@ func (d *Dao) SaveContext(ctx context.Context, dest Model, opts ...InsertOption)
 	for _, o := range opts {
 		o(opt)
 	}
-	id, _, err := d.SQLBuilder().Insert().Execer(d.getExecer()).
+	result, err := d.SQLBuilder().Insert().Execer(d.getExecer()).
 		Columns(d.getSaveColumns(opt)...).
 		NamedExecContext(ctx, dest)
-	return id, err
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 // ReplaceInto replace into table
 // omitColumns 不需要 insert 的字段
-func (d *Dao) ReplaceInto(dest Model, opts ...InsertOption) (int64, error) {
+func (d *Dao) ReplaceInto(dest Model, opts ...InsertOption) (sql.Result, error) {
 	return d.ReplaceIntoContext(context.Background(), dest, opts...)
 }
 
 // ReplaceIntoContext replace into table，携带上下文
 // omitColumns 不需要 insert 的字段
-func (d *Dao) ReplaceIntoContext(ctx context.Context, model Model, opts ...InsertOption) (int64, error) {
-	opt := &InsertOptions{}
-	for _, o := range opts {
-		o(opt)
-	}
-	id, _, err := d.Inserter().
-		Columns(d.getSaveColumns(opt)...).
+func (d *Dao) ReplaceIntoContext(ctx context.Context, model Model, opts ...InsertOption) (sql.Result, error) {
+	return d.Inserter(opts...).
 		IsReplaceInto(true).
 		NamedExecContext(ctx, model)
-	return id, err
 }
 
 // IgnoreInto 使用 INSERT IGNORE INTO 如果记录已存在则忽略
 // omitColumns 不需要 insert 的字段
-func (d *Dao) IgnoreInto(model Model, opts ...InsertOption) (int64, error) {
+func (d *Dao) IgnoreInto(model Model, opts ...InsertOption) (sql.Result, error) {
 	return d.IgnoreIntoContext(context.Background(), model, opts...)
 }
 
 // IgnoreIntoContext 使用 INSERT IGNORE INTO 如果记录已存在则忽略，携带上下文
 // omitColumns 不需要 insert 的字段
-func (d *Dao) IgnoreIntoContext(ctx context.Context, model Model, opts ...InsertOption) (int64, error) {
-	opt := &InsertOptions{}
-	for _, o := range opts {
-		o(opt)
-	}
-	id, _, err := d.Inserter().
-		Columns(d.getSaveColumns(opt)...).
+func (d *Dao) IgnoreIntoContext(ctx context.Context, model Model, opts ...InsertOption) (sql.Result, error) {
+	return d.Inserter(opts...).
 		IsIgnoreInto(true).
 		NamedExecContext(ctx, model)
-	return id, err
 }
 
 // BatchSave 批量新增，携带上下文
 // omitColumns 不需要 insert 的字段
-func (d *Dao) BatchSave(models any, opts ...InsertOption) (int64, error) {
+func (d *Dao) BatchSave(models any, opts ...InsertOption) (sql.Result, error) {
 	return d.BatchSaveContext(context.Background(), models, opts...)
 }
 
 // BatchSaveContext 批量新增
 // omitColumns 不需要 insert 的字段
 // models 是一个批量 insert 的 slice
-func (d *Dao) BatchSaveContext(ctx context.Context, models any, opts ...InsertOption) (int64, error) {
-	opt := &InsertOptions{}
-	for _, o := range opts {
-		o(opt)
-	}
-	_, affected, err := d.Inserter().
-		Columns(d.getSaveColumns(opt)...).
+func (d *Dao) BatchSaveContext(ctx context.Context, models any, opts ...InsertOption) (sql.Result, error) {
+	return d.Inserter(opts...).
 		NamedExecContext(ctx, models)
-	return affected, err
 }
 
 // BatchReplaceInto 批量新增，使用 replace into 方式
 // models 是一个 slice
 // omitColumns 不需要 insert 的字段
-func (d *Dao) BatchReplaceInto(models any, opts ...InsertOption) (int64, error) {
+func (d *Dao) BatchReplaceInto(models any, opts ...InsertOption) (sql.Result, error) {
 	return d.BatchReplaceIntoContext(context.Background(), models, opts...)
 }
 
 // BatchReplaceIntoContext 批量新增，使用 replace into 方式，携带上下文
 // models 是一个 slice
 // omitColumns 不需要 insert 的字段
-func (d *Dao) BatchReplaceIntoContext(ctx context.Context, models any, opts ...InsertOption) (int64, error) {
-	opt := &InsertOptions{}
-	for _, o := range opts {
-		o(opt)
-	}
-	_, affected, err := d.Inserter().
-		Columns(d.getSaveColumns(opt)...).
+func (d *Dao) BatchReplaceIntoContext(ctx context.Context, models any, opts ...InsertOption) (sql.Result, error) {
+	return d.Inserter(opts...).
 		IsReplaceInto(true).
 		NamedExecContext(ctx, models)
-	return affected, err
 }
 
 func (d *Dao) getSaveColumns(opt *InsertOptions) []string {

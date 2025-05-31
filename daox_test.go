@@ -319,10 +319,11 @@ func TestBatchSave(t *testing.T) {
 			Ctime:     nowUnix,
 		},
 	}
-	affected, err := dao.BatchSave(users)
+	result, err := dao.BatchSave(users)
 	if err != nil {
 		t.Fatal(err)
 	}
+	affected, _ := result.RowsAffected()
 	assert.Equal(t, int64(2), affected)
 	u := &DemoInfo{}
 	ok, err := dao.GetByColumn(daox.OfKv("uid", 1000), u)

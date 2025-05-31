@@ -45,7 +45,7 @@ func TestTxManager_ExecTx(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				id, affected, err := sqlbuilder.NewInserter("blog_viewer").Execer(executor).
+				result, err := sqlbuilder.NewInserter("blog_viewer").Execer(executor).
 					Columns("user_id", "blog_id").
 					NamedExecContext(txCtx, map[string]any{
 						"user_id": 100,
@@ -54,6 +54,8 @@ func TestTxManager_ExecTx(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				id, _ := result.LastInsertId()
+				affected, _ := result.RowsAffected()
 				t.Log(id, affected)
 				return nil
 			},
