@@ -1,4 +1,4 @@
-module github.com/fengjx/daox
+module github.com/fengjx/daox/v2
 
 go 1.22
 
