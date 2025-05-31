@@ -51,29 +51,8 @@ func (d *DB) GetContext(ctx context.Context, dest any, query string, args ...any
 }
 
 // QueryContext 查询多条数据，返回 sql.Rows
-func (d *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	ec := engine.GetExecutorContext(ctx)
-	if ec == nil {
-		ec = &engine.ExecutorContext{
-			Type:      engine.ParseSQLType(query),
-			TableName: engine.ParseTableName(query),
-			SQL:       query,
-			Args:      args,
-			Start:     time.Now(),
-		}
-	}
-	err := d.hook.Before(ctx, ec)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := d.DB.QueryContext(ctx, query, args...)
-	er := &engine.ExecutorResult{
-		Err:       err,
-		Duration:  time.Since(ec.Start),
-		QueryRows: -1,
-	}
-	d.hook.After(ctx, ec, er)
-	return rows, err
+func (d *DB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return doQueryContext(ctx, d.DB, query, args, d.hook)
 }
 
 // Beginx 打开一个事务
@@ -214,4 +193,30 @@ func doGet(ctx context.Context, queryer engine.Queryer, dest any, query string, 
 	}
 	hook.After(ctx, ec, er)
 	return err
+}
+
+// doQueryContext 查询多条数据，返回 sql.Rows
+func doQueryContext(ctx context.Context, queryer engine.Queryer, query string, args []any, hook engine.Hook) (*sql.Rows, error) {
+	ec := engine.GetExecutorContext(ctx)
+	if ec == nil {
+		ec = &engine.ExecutorContext{
+			Type:      engine.ParseSQLType(query),
+			TableName: engine.ParseTableName(query),
+			SQL:       query,
+			Args:      args,
+			Start:     time.Now(),
+		}
+	}
+	err := hook.Before(ctx, ec)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := queryer.QueryContext(ctx, query, args...)
+	er := &engine.ExecutorResult{
+		Err:       err,
+		Duration:  time.Since(ec.Start),
+		QueryRows: -1,
+	}
+	hook.After(ctx, ec, er)
+	return rows, err
 }

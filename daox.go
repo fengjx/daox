@@ -18,15 +18,13 @@ import (
 var (
 	// ErrUpdatePrimaryKeyRequire 更新操作必须提供主键值
 	ErrUpdatePrimaryKeyRequire = errors.New("[daox] Primary key require for update")
-	// ErrTxNil 事务对象为空
-	ErrTxNil = errors.New("[daox] Tx is nil")
 )
 
 // Dao 数据访问对象，封装了数据库操作的基础方法
 type Dao[T Model] struct {
 	options     *Options          // 配置选项
 	masterDB    engine.Executor   // 主库连接
-	readDB      engine.Queryer    // 从库连接
+	readDB      engine.Executor   // 从库连接
 	mapper      *reflectx.Mapper  // 字段映射器
 	modelType   reflect.Type      // 模型类型
 	TableMeta   *TableMeta        // 表元数据
@@ -65,7 +63,7 @@ func NewDao[T Model](m Meta, opts ...Option) *Dao[T] {
 	read := options.read
 	if read == nil {
 		if global.defaultReadDB != nil {
-			read = global.defaultMasterDB
+			read = global.defaultReadDB
 		} else if options.master != nil {
 			read = master
 		}
@@ -469,10 +467,27 @@ func (d *Dao[T]) WithTableName(tableName string) *Dao[T] {
 	return newDao
 }
 
+// WithExecutor 使用新的执行器创建 Dao
 func (d *Dao[T]) WithExecutor(executor engine.Executor) *Dao[T] {
 	newDao := new(Dao[T])
 	*newDao = *d
 	newDao.executor = executor
+	return newDao
+}
+
+// WithMaster 使用主库执行器创建 Dao
+func (d *Dao[T]) WithMaster() *Dao[T] {
+	newDao := new(Dao[T])
+	*newDao = *d
+	newDao.executor = d.masterDB
+	return newDao
+}
+
+// WithRead 使用从库执行器创建 Dao
+func (d *Dao[T]) WithRead() *Dao[T] {
+	newDao := new(Dao[T])
+	*newDao = *d
+	newDao.executor = d.readDB
 	return newDao
 }
 
@@ -485,43 +500,13 @@ func (d *Dao[T]) initIfNullVal() {
 // GetMasterDB 返回主库连接
 // 返回值: 主库连接对象
 func (d *Dao[T]) GetMasterDB() engine.Execer {
-	if d.masterDB != nil {
-		return d.masterDB
-	}
-	if global.defaultMasterDB == nil {
-		return nil
-	}
-	// double check
-	if d.masterDB != nil {
-		return d.masterDB
-	}
-	hooks := mergeHooks(d.options)
-	d.masterDB = NewDb(global.defaultMasterDB, hooks...)
 	return d.masterDB
 }
 
 // GetReadDB 返回从库连接
 // 返回值: 从库连接对象
 func (d *Dao[T]) GetReadDB() engine.Queryer {
-	if d.readDB != nil {
-		return d.readDB
-	}
-	if global.defaultReadDB == nil && d.GetMasterDB() == nil {
-		return nil
-	}
-	// double check
-	if d.readDB != nil {
-		return d.readDB
-	}
-	hooks := mergeHooks(d.options)
-	if global.defaultReadDB != nil {
-		d.readDB = NewDb(global.defaultReadDB, hooks...)
-	} else if d.masterDB != nil {
-		d.readDB = d.masterDB
-	} else if global.defaultMasterDB == nil {
-		d.readDB = NewDb(global.defaultMasterDB, hooks...)
-	}
-	return d.masterDB
+	return d.readDB
 }
 
 // getQueryer 获取查询执行器

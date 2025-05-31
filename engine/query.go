@@ -15,5 +15,5 @@ type Queryer interface {
 	GetContext(ctx context.Context, dest any, query string, args ...any) error
 
 	// QueryContext 查询多条数据，返回 sql.Rows
-	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }

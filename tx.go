@@ -34,6 +34,11 @@ func (t *Tx) GetContext(ctx context.Context, dest any, query string, args ...any
 	return doGet(ctx, t.Tx, dest, query, args, t.hook)
 }
 
+// QueryContext 查询多条数据，返回 sql.Rows
+func (t *Tx) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return doQueryContext(ctx, t.Tx, query, args, t.hook)
+}
+
 type txCtxKey struct{}
 
 // TxFun 事务处理函数
