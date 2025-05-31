@@ -6,7 +6,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/fengjx/daox/engine"
+	"github.com/fengjx/daox/v2/engine"
 )
 
 // Updater update 语句构造器

@@ -9,10 +9,10 @@ import (
 
 	"github.com/jmoiron/sqlx/reflectx"
 
-	"github.com/fengjx/daox/engine"
-	"github.com/fengjx/daox/sqlbuilder"
-	"github.com/fengjx/daox/sqlbuilder/ql"
-	"github.com/fengjx/daox/utils"
+	"github.com/fengjx/daox/v2/engine"
+	"github.com/fengjx/daox/v2/sqlbuilder"
+	"github.com/fengjx/daox/v2/sqlbuilder/ql"
+	"github.com/fengjx/daox/v2/utils"
 )
 
 var (

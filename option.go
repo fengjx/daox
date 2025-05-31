@@ -4,7 +4,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 
-	"github.com/fengjx/daox/engine"
+	"github.com/fengjx/daox/v2/engine"
 )
 
 type Options struct {
