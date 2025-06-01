@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+
+## daox gen
+
+daox cmd 是一个 daox 配套的代码生成工具，用户生成 daox 的辅助代码
+
+- 代码路径: [main.go](mdc:cmd/daox/main.go)
+- 生成代码参考: _example/dao
+- 代码生成模板文件: cmd/daox/gen/template
