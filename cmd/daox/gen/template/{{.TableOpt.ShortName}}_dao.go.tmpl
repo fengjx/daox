@@ -1,0 +1,31 @@
+package dao
+{{$ObjName := GonicCase .Table.Name}}
+{{$ShortGonicCase := GonicCase .TableOpt.ShortName}}
+{{$ShortFirstLower := FirstLower $ShortGonicCase}}
+{{$DaoName := print $ShortFirstLower "Dao"}}
+{{$DaoVarName := print $ShortGonicCase "Dao"}}
+import (
+    "github.com/fengjx/daox/v2"
+	"{{.Gomod}}/{{.TargetDir}}/schema"
+	"{{.Gomod}}/{{.TargetDir}}/schema/{{.TableOpt.TableNameLower}}"
+)
+
+var {{$DaoVarName}} *{{$DaoName}}
+
+func init() {
+	{{$DaoVarName}} = new{{FirstUpper $DaoName}}()
+}
+
+type {{$DaoName}} struct {
+    *daox.Dao[*schema.{{$ObjName}}]
+}
+
+func new{{FirstUpper $DaoName}}() *{{$DaoName}} {
+    dao := daox.NewDao[*schema.{{$ObjName}}](
+        {{.TableOpt.TableNameLower}}.Meta,
+    )
+    inst := &{{$DaoName}}{
+        Dao: dao,
+    }
+    return inst
+}
