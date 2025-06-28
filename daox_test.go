@@ -124,9 +124,9 @@ func after(t *testing.T, tableName string) {
 func testCreate(t *testing.T) {
 	DBMaster := newDb()
 	dao := daox.NewDao[*DemoInfo](DemoInfoMeta, daox.WithDBMaster(DBMaster))
-	assert.Equal(t, len(dao.TableMeta.Columns), 7)
-	assert.Equal(t, dao.TableMeta.PrimaryKey, "id")
-	for _, column := range dao.TableMeta.Columns {
+	assert.Equal(t, len(dao.TableMapper.Meta.Columns), 7)
+	assert.Equal(t, dao.TableMapper.Meta.PrimaryKey, "id")
+	for _, column := range dao.TableMapper.Meta.Columns {
 		t.Log(column)
 	}
 }
@@ -246,12 +246,16 @@ func (b blog) GetID() any {
 	return b.Id
 }
 
+func (b blog) New() daox.Model {
+	return &blog{}
+}
+
 func TestIgnoreField(t *testing.T) {
 	tableName := "TestIgnoreField"
 	DBMaster := newDb()
-	dao := daox.NewDao[*blog](BlogMeta, daox.WithDBMaster(DBMaster)).WithTableName(tableName)
-	t.Log(strings.Join(dao.TableMeta.Columns, ","))
-	assert.Equal(t, "id,uid,title,content,create_time", strings.Join(dao.TableMeta.Columns, ","))
+	dao := daox.NewDao[blog](BlogMeta, daox.WithDBMaster(DBMaster)).WithTableName(tableName)
+	t.Log(strings.Join(dao.TableMapper.Meta.Columns, ","))
+	assert.Equal(t, "id,uid,title,content,create_time", strings.Join(dao.TableMapper.Meta.Columns, ","))
 }
 
 func testPage(t *testing.T) {
@@ -475,6 +479,48 @@ func TestUpdater_NamedExec(t *testing.T) {
 
 func TestDao_Hook(t *testing.T) {
 	tb := "demo_info_hook"
+	before(t, tb)
+	DBMaster := newDb()
+	dao := daox.NewDao[*DemoInfo](
+		DemoInfoMeta,
+		daox.WithDBMaster(DBMaster),
+		daox.WithIfNullVals(map[string]string{"utime": "10", "ctime": "10"}),
+		daox.WithHooks(daox.NewLogHook(func(ctx context.Context, ec *engine.ExecutorContext, er *engine.ExecutorResult) {
+			t.Log("sql_type", ec.Type, "sql:", ec.SQL, "args:", ec.Args, "rows:", er.QueryRows, "duration:", er.Duration, "err:", er.Err)
+		})),
+	).WithTableName(tb)
+	nowSec := time.Now().Unix()
+	u1 := &DemoInfo{
+		UID:       10000,
+		Name:      "fengjx",
+		Sex:       "1",
+		LoginTime: nowSec,
+		Utime:     nowSec,
+		Ctime:     nowSec,
+	}
+	id, err := dao.Save(u1)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	t.Logf("id: %d", id)
+	u2, err := dao.GetByID(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u2 == nil {
+		t.Fatal("GetByID not exist")
+	}
+	assert.Equal(t, u1.UID, u2.UID)
+	list, err := dao.ListByIDs(1, 2, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 3, len(list))
+	assert.NoError(t, err)
+}
+
+func TestDao_RelFilter(t *testing.T) {
+	tb := "demo_info_rel"
 	before(t, tb)
 	DBMaster := newDb()
 	dao := daox.NewDao[*DemoInfo](

@@ -1,6 +1,6 @@
 ds:
   type: mysql
-  dsn: root:123456@tcp(192.168.6.121:3306)/lucky
+  dsn: root:123456@tcp(192.168.6.121:3306)/demo
 target:
   custom:
     gomod: github.com/fengjx/daox/v2
@@ -9,8 +9,9 @@ target:
     var:
       foo: bar
   tables:
-    sys_user:
+    app_user:
       short-name: user
-    sys_dict:
-      target-dir: out/tears/dao
-      short-name: dict
+    app_order:
+      short-name: order
+    app_card:
+      short-name: card

@@ -99,6 +99,7 @@ type Selector struct {
 	offset      *int64
 	isForUpdate bool
 	ifNullVals  map[string]string
+	preloader   func(ctx context.Context, dest any) error
 }
 
 // NewSelector 创建一个selector
@@ -191,7 +192,7 @@ func (s *Selector) IfNullVal(col string, val string) *Selector {
 
 // IfNullVals 设置字段为空时，返回的值
 // key 为数据库表字段名
-// value 为默认值表达式，如：空字符串为 "”"
+// value 为默认值表达式，如：空字符串为 ""
 func (s *Selector) IfNullVals(vals map[string]string) *Selector {
 	s.initIfNullVal()
 	for col, val := range vals {
@@ -222,6 +223,12 @@ func (s *Selector) Where(where ConditionBuilder) *Selector {
 // WhereC 查询条件，使用 sqlbuilder.C() 构造器
 func (s *Selector) WhereC(cols ...Column) *Selector {
 	s.where = C(cols...)
+	return s
+}
+
+// Preload 对查询结果进行预加载
+func (s *Selector) Preload(fn func(ctx context.Context, dest any) error) *Selector {
+	s.preloader = fn
 	return s
 }
 
@@ -441,6 +448,9 @@ func (s *Selector) ListContext(ctx context.Context, dest any) error {
 	if err != nil {
 		return err
 	}
+	if s.preloader != nil {
+		return s.preloader(ctx, dest)
+	}
 	return nil
 }
 
@@ -472,6 +482,12 @@ func (s *Selector) OneContext(ctx context.Context, dest any) (exist bool, err er
 			return false, nil
 		}
 		return false, err
+	}
+	if s.preloader != nil {
+		err = s.preloader(ctx, dest)
+		if err != nil {
+			return true, err
+		}
 	}
 	return true, nil
 }

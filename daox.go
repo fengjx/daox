@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/jmoiron/sqlx/reflectx"
-
 	"github.com/fengjx/daox/v2/engine"
 	"github.com/fengjx/daox/v2/sqlbuilder"
 	"github.com/fengjx/daox/v2/sqlbuilder/ql"
@@ -22,15 +20,15 @@ var (
 
 // Dao 数据访问对象，封装了数据库操作的基础方法
 type Dao[T Model] struct {
+	TableMapper *TableMapper      // 表映射器
 	options     *Options          // 配置选项
 	masterDB    engine.Executor   // 主库连接
 	readDB      engine.Executor   // 从库连接
-	mapper      *reflectx.Mapper  // 字段映射器
-	modelType   reflect.Type      // 模型类型
-	TableMeta   *TableMeta        // 表元数据
 	ifNullVals  map[string]string // NULL值替换配置
 	omitColumns []string          // 忽略的字段列表
 	executor    engine.Executor   // SQL执行器，用于事务等场景
+	preloads    *PreloadNode      // 预加载节点
+	RelFiller   RelFiller[T]      // 关联数据填充器，用于填充关联数据
 }
 
 // NewDao 根据 meta 接口创建 dao 对象
@@ -73,24 +71,28 @@ func NewDao[T Model](m Meta, opts ...Option) *Dao[T] {
 	if err != nil {
 		panic(err)
 	}
+	tableMapper := &TableMapper{
+		Meta:          meta,
+		Mapper:        options.mapper,
+		ModelType:     modelType,
+		ModelTypeName: modelType.Name(),
+	}
 	dao := &Dao[T]{
 		masterDB:    NewDb(master, hooks...),
 		readDB:      NewDb(read, hooks...),
-		mapper:      options.mapper,
-		TableMeta:   meta,
+		TableMapper: tableMapper,
 		ifNullVals:  options.ifNullVals,
 		omitColumns: options.omitColumns,
 		options:     options,
-		modelType:   modelType,
 	}
-	global.registerMeta(dao.TableMeta)
+	regDao(dao)
 	return dao
 }
 
 // SQLBuilder 创建当前表的 SQL 构建器
 // 返回值: SQL构建器对象
 func (d *Dao[T]) SQLBuilder() *sqlbuilder.Builder {
-	return sqlbuilder.New(d.TableMeta.TableName)
+	return sqlbuilder.New(d.TableMapper.Meta.TableName)
 }
 
 // Selector 创建当前表的查询构建器
@@ -100,11 +102,11 @@ func (d *Dao[T]) Selector(columns ...string) *sqlbuilder.Selector {
 	if len(columns) == 0 {
 		columns = d.DBColumns()
 	}
-	selector := sqlbuilder.New(d.TableMeta.TableName).Select(columns...)
+	selector := sqlbuilder.New(d.TableMapper.Meta.TableName).Select(columns...)
 	if len(d.ifNullVals) > 0 {
 		selector.IfNullVals(d.ifNullVals)
 	}
-	selector.Queryer(d.getQueryer())
+	selector.Queryer(d.getQueryer()).Preload(d.selectorPreload)
 	return selector
 }
 
@@ -131,28 +133,12 @@ func (d *Dao[T]) Inserter(opts ...InsertOption) *sqlbuilder.Inserter {
 	return d.SQLBuilder().Insert(d.getSaveColumns(opt)...).Execer(d.getExecer())
 }
 
-// GetColumnsByModel 根据 model 结构获取数据库字段
-// model: 模型结构体
-// omitColumns: 需要忽略的字段列表
-// 返回值: 字段名列表
-func (d *Dao[T]) GetColumnsByModel(model any, omitColumns ...string) []string {
-	return d.GetColumnsByType(reflect.TypeOf(model), omitColumns...)
-}
-
-// GetColumnsByType 通过字段 tag 解析数据库字段
-// typ: 结构体类型
-// omitColumns: 需要忽略的字段列表
-// 返回值: 字段名列表
-func (d *Dao[T]) GetColumnsByType(typ reflect.Type, omitColumns ...string) []string {
-	return sqlbuilder.GetColumnsByType(d.mapper, typ, omitColumns...)
-}
-
 // DBColumns 获取当前表数据库字段
 // omitColumns: 需要忽略的字段列表
 // 返回值: 字段名列表
 func (d *Dao[T]) DBColumns(omitColumns ...string) []string {
 	columns := make([]string, 0)
-	for _, column := range d.TableMeta.Columns {
+	for _, column := range d.TableMapper.Meta.Columns {
 		if utils.ContainsString(omitColumns, column) {
 			continue
 		}
@@ -164,7 +150,7 @@ func (d *Dao[T]) DBColumns(omitColumns ...string) []string {
 // TableName 获取当前表名
 // 返回值: 表名
 func (d *Dao[T]) TableName() string {
-	return d.TableMeta.TableName
+	return d.TableMapper.Meta.TableName
 }
 
 // Save 插入数据
@@ -253,7 +239,7 @@ func (d *Dao[T]) BatchReplaceIntoContext(ctx context.Context, models []T, opts .
 }
 
 func (d *Dao[T]) getSaveColumns(opt *InsertOptions) []string {
-	meta := d.TableMeta
+	meta := d.TableMapper.Meta
 	var omits []string
 	if meta.IsAutoIncrement {
 		omits = append(omits, meta.PrimaryKey)
@@ -281,13 +267,17 @@ func (d *Dao[T]) GetByColumnContext(ctx context.Context, kv *KV) (T, error) {
 	}
 	dest := d.newModel()
 	exist, err := d.Selector().Queryer(d.getQueryer()).
-		Where(ql.C(ql.Col(kv.Key).EQ(kv.Value))).
+		WhereC(ql.Col(kv.Key).EQ(kv.Value)).
 		OneContext(ctx, dest)
 	if err != nil {
 		return d.emptyModel(), err
 	}
 	if !exist {
 		return d.emptyModel(), nil
+	}
+	err = d.relFill(ctx, []T{dest})
+	if err != nil {
+		return d.emptyModel(), err
 	}
 	return dest, nil
 }
@@ -307,8 +297,12 @@ func (d *Dao[T]) ListByColumnsContext(ctx context.Context, kvs *MultiKV) ([]T, e
 	var dest []T
 	err := d.Selector().Queryer(d.getQueryer()).
 		Columns(d.DBColumns()...).
-		Where(ql.C(ql.Col(kvs.Key).In(kvs.Values...))).
+		WhereC(ql.Col(kvs.Key).In(kvs.Values...)).
 		ListContext(ctx, &dest)
+	if err != nil {
+		return nil, err
+	}
+	err = d.relFill(ctx, dest)
 	if err != nil {
 		return nil, err
 	}
@@ -330,6 +324,10 @@ func (d *Dao[T]) ListContext(ctx context.Context, kv *KV) ([]T, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = d.relFill(ctx, dest)
+	if err != nil {
+		return nil, err
+	}
 	return dest, nil
 }
 
@@ -340,7 +338,7 @@ func (d *Dao[T]) GetByID(id any) (T, error) {
 
 // GetByIDContext 根据 id 查询单条数据，携带上下文
 func (d *Dao[T]) GetByIDContext(ctx context.Context, id any) (T, error) {
-	tableMeta := d.TableMeta
+	tableMeta := d.TableMapper.Meta
 	return d.GetByColumnContext(ctx, OfKv(tableMeta.PrimaryKey, id))
 }
 
@@ -351,7 +349,7 @@ func (d *Dao[T]) ListByIDs(ids ...any) ([]T, error) {
 
 // ListByIDsContext 根据 id 查询多条数据，携带上下文
 func (d *Dao[T]) ListByIDsContext(ctx context.Context, ids ...any) ([]T, error) {
-	tableMeta := d.TableMeta
+	tableMeta := d.TableMapper.Meta
 	return d.ListByColumnsContext(ctx, OfMultiKv(tableMeta.PrimaryKey, ids...))
 }
 
@@ -370,7 +368,7 @@ func (d *Dao[T]) UpdateFieldContext(ctx context.Context, idValue any, fieldMap m
 	for col, val := range fieldMap {
 		updater.Set(col, val)
 	}
-	updater.Where(ql.C(ql.Col(d.TableMeta.PrimaryKey).EQ(idValue)))
+	updater.Where(ql.C(ql.Col(d.TableMapper.Meta.PrimaryKey).EQ(idValue)))
 	affected, err := updater.ExecContext(ctx)
 	if err != nil {
 		return 0, err
@@ -388,7 +386,7 @@ func (d *Dao[T]) UpdateContext(ctx context.Context, model T, omitColumns ...stri
 	if utils.IsIDEmpty(model.GetID()) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
-	tableMeta := d.TableMeta
+	tableMeta := d.TableMapper.Meta
 	affected, err := d.UpdateByCondContext(ctx, model, ql.SC().And(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey)), tableMeta.PrimaryKey)
 	return affected > 0, err
 }
@@ -400,7 +398,7 @@ func (d *Dao[T]) UpdateByCond(model T, where sqlbuilder.ConditionBuilder, omitCo
 
 // UpdateByCondContext 按条件更新全部字段
 func (d *Dao[T]) UpdateByCondContext(ctx context.Context, model T, where sqlbuilder.ConditionBuilder, omitColumns ...string) (int64, error) {
-	omitColumns = append(omitColumns, d.TableMeta.PrimaryKey)
+	omitColumns = append(omitColumns, d.TableMapper.Meta.PrimaryKey)
 	if len(global.omitColumns) > 0 {
 		omitColumns = append(omitColumns, global.omitColumns...)
 	}
@@ -451,7 +449,7 @@ func (d *Dao[T]) DeleteByID(id any) (bool, error) {
 
 // DeleteByIDContext 根据id删除数据，携带上下文
 func (d *Dao[T]) DeleteByIDContext(ctx context.Context, id any) (bool, error) {
-	tableMeta := d.TableMeta
+	tableMeta := d.TableMapper.Meta
 	affected, err := d.DeleteByColumnContext(ctx, OfKv(tableMeta.PrimaryKey, id))
 	if err != nil {
 		return false, err
@@ -459,11 +457,45 @@ func (d *Dao[T]) DeleteByIDContext(ctx context.Context, id any) (bool, error) {
 	return affected == 1, nil
 }
 
+// relFill 填充关联数据
+func (d *Dao[T]) relFill(ctx context.Context, items []T) error {
+	if d.RelFiller != nil {
+		return d.RelFiller(ctx, items, d.preloads)
+	}
+	return nil
+}
+
+func (d *Dao[T]) selectorPreload(ctx context.Context, dest any) error {
+	var items []T
+	if v, ok := dest.([]T); ok {
+		items = v
+	} else if v, ok := dest.(T); ok {
+		items = []T{v}
+	}
+	return d.relFill(ctx, items)
+}
+
+// Preload 预加载
+func (d *Dao[T]) Preload(paths ...string) *Dao[T] {
+	preloads := parsePreloadPath(paths...)
+	newDao := *d
+	newDao.preloads = preloads
+	return &newDao
+}
+
+// WithPreloadNode 设置关联节点
+// 一般是代码自动生成调用的 api，大多数情况不需要手动调用这个方法
+func (d *Dao[T]) WithPreloadNode(p *PreloadNode) *Dao[T] {
+	newDao := *d
+	newDao.preloads = p
+	return &newDao
+}
+
 // WithTableName 使用新的数据库连接创建 Dao
 func (d *Dao[T]) WithTableName(tableName string) *Dao[T] {
 	newDao := new(Dao[T])
 	*newDao = *d
-	newDao.TableMeta = newDao.TableMeta.WithTableName(tableName)
+	newDao.TableMapper.Meta = newDao.TableMapper.Meta.WithTableName(tableName)
 	return newDao
 }
 
@@ -489,12 +521,6 @@ func (d *Dao[T]) WithRead() *Dao[T] {
 	*newDao = *d
 	newDao.executor = d.readDB
 	return newDao
-}
-
-func (d *Dao[T]) initIfNullVal() {
-	if d.ifNullVals == nil {
-		d.ifNullVals = make(map[string]string)
-	}
 }
 
 // GetMasterDB 返回主库连接
@@ -528,7 +554,8 @@ func (d *Dao[T]) getExecer() engine.Execer {
 }
 
 func (d *Dao[T]) newModel() T {
-	return reflect.New(d.modelType.Elem()).Interface().(T)
+	var dest T
+	return dest.New().(T)
 }
 
 func (d *Dao[T]) emptyModel() T {

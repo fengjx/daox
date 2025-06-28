@@ -2,10 +2,12 @@ package schema
 
 import (
 	"time"
+
+	"github.com/fengjx/daox/v2"
 )
 
-// SysUser 用户信息表
-type SysUser struct {
+// AppUser 用户信息表
+type AppUser struct {
 	ID       int64     `json:"id"`       // -
 	Username string    `json:"username"` // 用户名
 	Pwd      string    `json:"pwd"`      // 密码
@@ -18,8 +20,15 @@ type SysUser struct {
 	Remark   string    `json:"remark"`   // 备注
 	Utime    time.Time `json:"utime"`    // 更新时间
 	Ctime    time.Time `json:"ctime"`    // 创建时间
+	// relations
+	Orders []*AppOrder `json:"orders"`
+	Card   *AppCard    `json:"card"`
 }
 
-func (m *SysUser) GetID() any {
+func (m *AppUser) GetID() any {
 	return m.ID
+}
+
+func (m *AppUser) New() daox.Model {
+	return &AppUser{}
 }

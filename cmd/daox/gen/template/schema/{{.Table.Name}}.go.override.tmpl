@@ -5,6 +5,8 @@ package schema
 {{if gt $ilen 0}}
 import (
 	{{range .Table.GoImports}}"{{.}}"{{end}}
+
+	"github.com/fengjx/daox/v2"
 )
 {{end}}
 {{$TagName := .TagName}}
@@ -15,4 +17,8 @@ type {{$ObjName}} struct {
 
 func (m *{{$ObjName}}) GetID() any {
 	return m.{{GonicCase .Table.PrimaryKey.Name}}
+}
+
+func (m *{{$ObjName}}) New() daox.Model {
+	return &{{$ObjName}}{}
 }

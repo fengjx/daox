@@ -1,6 +1,7 @@
 package daox_test
 
 import (
+	"github.com/fengjx/daox/v2"
 	"github.com/fengjx/daox/v2/sqlbuilder"
 	"github.com/fengjx/daox/v2/sqlbuilder/ql"
 )
@@ -47,6 +48,10 @@ type DemoInfo struct {
 
 func (m *DemoInfo) GetID() any {
 	return m.ID
+}
+
+func (m *DemoInfo) New() daox.Model {
+	return &DemoInfo{}
 }
 
 // DemoInfoM
