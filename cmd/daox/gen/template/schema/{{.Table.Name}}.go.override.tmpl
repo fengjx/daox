@@ -12,7 +12,7 @@ import (
 {{$TagName := .TagName}}
 // {{$ObjName}} {{.Table.Comment}}
 type {{$ObjName}} struct {
-{{range .Table.Columns}}    {{GonicCase .Name}} {{SQLType2GoTypeString .SQLType}} `{{$TagName}}:"{{.Name}}"` // {{LineString .Comment}}
+{{range .Table.Columns}}    {{GonicCase .Name}} {{SQLType2GoTypeString .SQLType}} `json:"{{.Name}}" db:"{{.Name}}"` // {{LineString .Comment}}
 {{end}}
 {{- if .TableOpt.Relations}}
     // relations
