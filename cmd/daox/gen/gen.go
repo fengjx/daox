@@ -217,6 +217,7 @@ func newGen(tmplDir string, eFS *embed.FS, config *Config, table *Table) *gen {
 	if tableOpt.TargetDir != "" {
 		targetDir = tableOpt.TargetDir
 	}
+
 	attr := map[string]any{
 		"Var":       config.Target.Custom.Var,
 		"TagName":   config.Target.Custom.TagName,

@@ -13,7 +13,21 @@ import (
 // {{$ObjName}} {{.Table.Comment}}
 type {{$ObjName}} struct {
 {{range .Table.Columns}}    {{GonicCase .Name}} {{SQLType2GoTypeString .SQLType}} `{{$TagName}}:"{{.Name}}"` // {{LineString .Comment}}
-{{end}}}
+{{end}}
+{{- if .TableOpt.Relations}}
+    // relations
+    {{- range .TableOpt.Relations}}
+    {{- $RelType := .Type}}
+    {{- $RelName := .Name}}
+    {{- $StructName := GonicCase .Table}}
+    {{- if eq $RelType "o2m"}}
+    {{$RelName}} []*{{$StructName}} `json:"{{$RelName | FirstLower}}"`
+    {{- else if or (eq $RelType "o2o") (eq $RelType "m2o")}}
+    {{$RelName}} *{{$StructName}} `json:"{{$RelName | FirstLower}}"`
+    {{- end}}
+    {{- end}}
+{{- end}}
+}
 
 func (m *{{$ObjName}}) GetID() any {
 	return m.{{GonicCase .Table.PrimaryKey.Name}}

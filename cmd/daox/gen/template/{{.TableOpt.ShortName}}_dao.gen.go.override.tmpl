@@ -1,0 +1,89 @@
+package dao
+{{$ObjName := GonicCase .Table.Name}}
+{{$ShortGonicCase := GonicCase .TableOpt.ShortName}}
+{{$ShortFirstLower := FirstLower $ShortGonicCase}}
+{{$DaoName := print $ShortFirstLower "Dao"}}
+import (
+    "context"
+    "github.com/fengjx/daox/v2"
+    "{{.Gomod}}/{{.TargetDir}}/schema"
+)
+
+// RelFiller auto-generated relation loader. DO NOT MODIFY.
+func (d *{{$DaoName}}) RelFiller(ctx context.Context, list []*schema.{{$ObjName}}, p *daox.PreloadNode) error {
+    if len(list) == 0 || p == nil {
+        return nil
+    }
+    {{- range .TableOpt.Relations}}
+    d.fill{{.Name}}(ctx, list, p)
+    {{- end}}
+    return nil
+}
+
+{{range .TableOpt.Relations}}
+// fill{{.Name}} auto-generated relation loader. DO NOT MODIFY.
+func (d *{{$DaoName}}) fill{{.Name}}(ctx context.Context, list []*schema.{{$ObjName}}, p *daox.PreloadNode) error {
+    n, ok := p.Node["{{.Name}}"]
+    if !ok {
+        return nil
+    }
+    {{$StructName := GonicCase .Table}}
+    {{- if eq .Type "o2m"}}
+    ids := make([]any, 0, len(list))
+    for _, m := range list {
+        ids = append(ids, m.{{GonicCase .RefKey}})
+    }
+    var refDao = daox.GetDao[*schema.{{$StructName}}]("{{.Table}}" ).WithPreloadNode(n)
+    refList, err := refDao.ListByColumnsContext(ctx, daox.OfMultiKv("{{.ForeignKey}}", ids...))
+    if err != nil {
+        return err
+    }
+    refMap := make(map[any][]*schema.{{$StructName}})
+    for _, v := range refList {
+        refMap[v.{{GonicCase .ForeignKey}}] = append(refMap[v.{{GonicCase .ForeignKey}}], v)
+    }
+    for _, m := range list {
+        m.{{.Name}} = refMap[m.{{GonicCase .RefKey}}]
+    }
+    {{- else if eq .Type "o2o"}}
+    ids := make([]any, 0, len(list))
+    for _, m := range list {
+        ids = append(ids, m.{{GonicCase .RefKey}})
+    }
+    var refDao = daox.GetDao[*schema.{{$StructName}}]("{{.Table}}" ).WithPreloadNode(n)
+    refList, err := refDao.ListByColumnsContext(ctx, daox.OfMultiKv("{{.ForeignKey}}", ids...))
+    if err != nil {
+        return err
+    }
+    refMap := make(map[any]*schema.{{$StructName}})
+    for _, v := range refList {
+        refMap[v.{{GonicCase .ForeignKey}}] = v
+    }
+    for _, m := range list {
+        m.{{.Name}} = refMap[m.{{GonicCase .RefKey}}]
+    }
+    {{- else if eq .Type "m2o"}}
+    refIDSet := make(map[any]struct{})
+    for _, m := range list {
+        refIDSet[m.{{GonicCase .ForeignKey}}] = struct{}{}
+    }
+    var ids []any
+    for id := range refIDSet {
+        ids = append(ids, id)
+    }
+    var refDao = daox.GetDao[*schema.{{$StructName}}]("{{.Table}}" ).WithPreloadNode(n)
+    refList, err := refDao.ListByColumnsContext(ctx, daox.OfMultiKv("{{.RefKey}}", ids...))
+    if err != nil {
+        return err
+    }
+    refMap := make(map[any]*schema.{{$StructName}})
+    for _, v := range refList {
+        refMap[v.{{GonicCase .ForeignKey}}] = v
+    }
+    for _, m := range list {
+        m.{{.Name}} = refMap[m.{{GonicCase .ForeignKey}}]
+    }
+    {{- end}}
+    return nil
+}
+{{end}}

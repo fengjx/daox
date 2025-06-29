@@ -11,7 +11,30 @@ target:
   tables:
     app_user:
       short-name: user
+      relations:
+        - name: Card
+          type: o2o
+          table: app_card
+          foreign_key: user_id
+          ref_key: id
+        - name: Orders
+          type: o2m
+          table: app_order
+          foreign_key: user_id
+          ref_key: id
     app_order:
       short-name: order
+      relations:
+        - name: User
+          type: m2o
+          table: app_user
+          foreign_key: id
+          ref_key: user_id
     app_card:
       short-name: card
+      relations:
+        - name: User
+          type: o2o
+          table: app_user
+          foreign_key: id
+          ref_key: user_id

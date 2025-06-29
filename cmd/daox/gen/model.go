@@ -13,12 +13,21 @@ type DS struct {
 
 type Var map[string]string
 
+type RelationConfig struct {
+	Name       string `yaml:"name"`
+	Type       string `yaml:"type"` // o2m, o2o, m2o
+	Table      string `yaml:"table"`
+	ForeignKey string `yaml:"foreign_key"`
+	RefKey     string `yaml:"ref_key"`
+}
+
 type TableConfig struct {
-	ShortName      string `yaml:"short-name"`
-	TargetDir      string `yaml:"target-dir"` // 可选，生成文件路径，默认 ./
-	Var            Var    `yaml:"var"`
-	ShortNameLower string `yaml:"-"`
-	TableNameLower string `yaml:"-"`
+	ShortName      string           `yaml:"short-name"`
+	TargetDir      string           `yaml:"target-dir"` // 可选，生成文件路径，默认 ./
+	Var            Var              `yaml:"var"`
+	ShortNameLower string           `yaml:"-"`
+	TableNameLower string           `yaml:"-"`
+	Relations      []RelationConfig `yaml:"relations"`
 }
 
 type ReverseTarget struct {

@@ -8,45 +8,62 @@ import (
 )
 
 // RelFiller 关联查询
-func (d *userDao) RelFiller(ctx context.Context, users []*schema.AppUser, p *daox.PreloadNode) error {
-	if len(users) == 0 || p == nil {
+func (d *userDao) RelFiller(ctx context.Context, list []*schema.AppUser, p *daox.PreloadNode) error {
+	if len(list) == 0 || p == nil {
 		return nil
 	}
-	userIDs := make([]any, 0, len(users))
-	for _, u := range users {
-		userIDs = append(userIDs, u.ID)
-	}
-
 	// Orders
-	if n, ok := p.Node["Orders"]; ok {
-		var _orderDao = daox.GetDao[*schema.AppOrder]("app_order").WithPreloadNode(n)
-		orders, err := _orderDao.ListByColumnsContext(ctx, daox.OfMultiKv("user_id", userIDs...))
-		if err != nil {
-			return err
-		}
-		orderMap := make(map[int64][]*schema.AppOrder)
-		for _, o := range orders {
-			orderMap[o.UserID] = append(orderMap[o.UserID], o)
-		}
-		for _, u := range users {
-			u.Orders = orderMap[u.ID]
-		}
-	}
+	d.fillOrders(ctx, list, p)
 
 	// Cards
-	if n, ok := p.Node["Card"]; ok {
-		var _cardDao = daox.GetDao[*schema.AppCard]("app_card").WithPreloadNode(n)
-		cards, err := _cardDao.ListByColumnsContext(ctx, daox.OfMultiKv("user_id", userIDs...))
-		if err != nil {
-			return err
-		}
-		cardMap := make(map[int64]*schema.AppCard)
-		for _, c := range cards {
-			cardMap[c.UserID] = c
-		}
-		for _, u := range users {
-			u.Card = cardMap[u.ID]
-		}
+	d.fillCard(ctx, list, p)
+	return nil
+}
+
+func (d *userDao) fillOrders(ctx context.Context, list []*schema.AppUser, p *daox.PreloadNode) error {
+	n, ok := p.Node["Orders"]
+	if !ok {
+		return nil
+	}
+	ids := make([]any, 0, len(list))
+	for _, u := range list {
+		ids = append(ids, u.ID)
+	}
+	var refDao = daox.GetDao[*schema.AppOrder]("app_order").WithPreloadNode(n)
+	redList, err := refDao.ListByColumnsContext(ctx, daox.OfMultiKv("user_id", ids...))
+	if err != nil {
+		return err
+	}
+	refMap := make(map[int64][]*schema.AppOrder)
+	for _, o := range redList {
+		refMap[o.UserID] = append(refMap[o.UserID], o)
+	}
+	for _, u := range list {
+		u.Orders = refMap[u.ID]
+	}
+	return nil
+}
+
+func (d *userDao) fillCard(ctx context.Context, list []*schema.AppUser, p *daox.PreloadNode) error {
+	n, ok := p.Node["Card"]
+	if !ok {
+		return nil
+	}
+	ids := make([]any, 0, len(list))
+	for _, u := range list {
+		ids = append(ids, u.ID)
+	}
+	var refDao = daox.GetDao[*schema.AppCard]("app_card").WithPreloadNode(n)
+	refList, err := refDao.ListByColumnsContext(ctx, daox.OfMultiKv("user_id", ids...))
+	if err != nil {
+		return err
+	}
+	refMap := make(map[int64]*schema.AppCard)
+	for _, c := range refList {
+		refMap[c.UserID] = c
+	}
+	for _, u := range list {
+		u.Card = refMap[u.ID]
 	}
 	return nil
 }

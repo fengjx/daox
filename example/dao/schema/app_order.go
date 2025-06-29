@@ -16,6 +16,8 @@ type AppOrder struct {
 	Remark string    `json:"remark"`  // 备注
 	Utime  time.Time `json:"utime"`   // 更新时间
 	Ctime  time.Time `json:"ctime"`   // 创建时间
+	// relations
+	User *AppUser `json:"user"` // 用户
 }
 
 func (m *AppOrder) GetID() any {

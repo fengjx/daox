@@ -14,11 +14,16 @@ var {{$DaoVarName}} *{{$DaoName}}
 
 func init() {
 	{{$DaoVarName}} = new{{FirstUpper $DaoName}}()
+	if {{$DaoVarName}} != nil {
+		{{$DaoVarName}}.Dao.RelFiller = {{$DaoVarName}}.RelFiller
+	}
 }
 
 type {{$DaoName}} struct {
     *daox.Dao[*schema.{{$ObjName}}]
 }
+
+// 用户可在此文件扩展 {{$DaoName}} 的自定义方法
 
 func new{{FirstUpper $DaoName}}() *{{$DaoName}} {
     dao := daox.NewDao[*schema.{{$ObjName}}](
