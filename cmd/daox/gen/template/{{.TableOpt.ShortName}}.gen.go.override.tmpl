@@ -22,7 +22,7 @@ func (d *{{$DaoName}}) RelFiller(ctx context.Context, list []*schema.{{$ObjName}
 }
 
 {{range .TableOpt.Relations}}
-// fill{{.Name}} auto-generated relation loader. DO NOT MODIFY.
+// fill{{.Name}} {{.Type}} auto-generated relation loader. DO NOT MODIFY.
 func (d *{{$DaoName}}) fill{{.Name}}(ctx context.Context, list []*schema.{{$ObjName}}, p *daox.PreloadNode) error {
     n, ok := p.Node["{{.Name}}"]
     if !ok {
@@ -32,7 +32,7 @@ func (d *{{$DaoName}}) fill{{.Name}}(ctx context.Context, list []*schema.{{$ObjN
     {{- if eq .Type "o2m"}}
     ids := make([]any, 0, len(list))
     for _, m := range list {
-        ids = append(ids, m.{{GonicCase .RefKey}})
+        ids = append(ids, m.{{GonicCase .ForeignKey}})
     }
     var refDao = daox.GetDao[*schema.{{$StructName}}]("{{.Table}}" ).WithPreloadNode(n)
     refList, err := refDao.ListByColumnsContext(ctx, daox.OfMultiKv("{{.ForeignKey}}", ids...))
@@ -41,15 +41,15 @@ func (d *{{$DaoName}}) fill{{.Name}}(ctx context.Context, list []*schema.{{$ObjN
     }
     refMap := make(map[any][]*schema.{{$StructName}})
     for _, v := range refList {
-        refMap[v.{{GonicCase .ForeignKey}}] = append(refMap[v.{{GonicCase .ForeignKey}}], v)
+        refMap[v.{{GonicCase .RefKey}}] = append(refMap[v.{{GonicCase .RefKey}}], v)
     }
     for _, m := range list {
-        m.{{.Name}} = refMap[m.{{GonicCase .RefKey}}]
+        m.{{.Name}} = refMap[m.{{GonicCase .ForeignKey}}]
     }
     {{- else if eq .Type "o2o"}}
     ids := make([]any, 0, len(list))
     for _, m := range list {
-        ids = append(ids, m.{{GonicCase .RefKey}})
+        ids = append(ids, m.{{GonicCase .ForeignKey}})
     }
     var refDao = daox.GetDao[*schema.{{$StructName}}]("{{.Table}}" ).WithPreloadNode(n)
     refList, err := refDao.ListByColumnsContext(ctx, daox.OfMultiKv("{{.ForeignKey}}", ids...))
@@ -58,10 +58,10 @@ func (d *{{$DaoName}}) fill{{.Name}}(ctx context.Context, list []*schema.{{$ObjN
     }
     refMap := make(map[any]*schema.{{$StructName}})
     for _, v := range refList {
-        refMap[v.{{GonicCase .ForeignKey}}] = v
+        refMap[v.{{GonicCase .RefKey}}] = v
     }
     for _, m := range list {
-        m.{{.Name}} = refMap[m.{{GonicCase .RefKey}}]
+        m.{{.Name}} = refMap[m.{{GonicCase .ForeignKey}}]
     }
     {{- else if eq .Type "m2o"}}
     refIDSet := make(map[any]struct{})
@@ -79,7 +79,7 @@ func (d *{{$DaoName}}) fill{{.Name}}(ctx context.Context, list []*schema.{{$ObjN
     }
     refMap := make(map[any]*schema.{{$StructName}})
     for _, v := range refList {
-        refMap[v.{{GonicCase .ForeignKey}}] = v
+        refMap[v.{{GonicCase .RefKey}}] = v
     }
     for _, m := range list {
         m.{{.Name}} = refMap[m.{{GonicCase .ForeignKey}}]

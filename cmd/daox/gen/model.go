@@ -16,8 +16,8 @@ type Var map[string]string
 type RelationConfig struct {
 	Name       string `yaml:"name"`
 	Type       string `yaml:"type"` // o2m, o2o, m2o
-	Table      string `yaml:"table"`
 	ForeignKey string `yaml:"foreign_key"`
+	Table      string `yaml:"table"`
 	RefKey     string `yaml:"ref_key"`
 }
 

@@ -1,6 +1,6 @@
 ds:
   type: mysql
-  dsn: root:123456@tcp(192.168.6.121:3306)/demo
+  dsn: root:123456@tcp(192.168.1.121:3306)/demo
 target:
   custom:
     gomod: github.com/fengjx/daox/v2
@@ -14,27 +14,27 @@ target:
       relations:
         - name: Card
           type: o2o
+          foreign_key: id
           table: app_card
-          foreign_key: user_id
-          ref_key: id
+          ref_key: user_id
         - name: Orders
           type: o2m
+          foreign_key: id
           table: app_order
-          foreign_key: user_id
-          ref_key: id
+          ref_key: user_id
     app_order:
       short-name: order
       relations:
         - name: User
           type: m2o
+          foreign_key: user_id
           table: app_user
-          foreign_key: id
-          ref_key: user_id
+          ref_key: id
     app_card:
       short-name: card
       relations:
         - name: User
           type: o2o
+          foreign_key: user_id
           table: app_user
-          foreign_key: id
-          ref_key: user_id
+          ref_key: id
