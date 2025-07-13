@@ -477,49 +477,51 @@ func (d *Dao[T]) selectorPreload(ctx context.Context, dest any) error {
 
 // Preload 预加载
 func (d *Dao[T]) Preload(paths ...string) *Dao[T] {
+	newDao := d.copy()
 	preloads := parsePreloadPath(paths...)
-	newDao := *d
 	newDao.preloads = preloads
-	return &newDao
+	return newDao
 }
 
 // WithPreloadNode 设置关联节点
 // 一般是代码自动生成调用的 api，大多数情况不需要手动调用这个方法
 func (d *Dao[T]) WithPreloadNode(p *PreloadNode) *Dao[T] {
-	newDao := *d
+	newDao := d.copy()
 	newDao.preloads = p
-	return &newDao
+	return newDao
 }
 
 // WithTableName 使用新的数据库连接创建 Dao
 func (d *Dao[T]) WithTableName(tableName string) *Dao[T] {
-	newDao := new(Dao[T])
-	*newDao = *d
+	newDao := d.copy()
 	newDao.TableMapper.Meta = newDao.TableMapper.Meta.WithTableName(tableName)
 	return newDao
 }
 
 // WithExecutor 使用新的执行器创建 Dao
 func (d *Dao[T]) WithExecutor(executor engine.Executor) *Dao[T] {
-	newDao := new(Dao[T])
-	*newDao = *d
+	newDao := d.copy()
 	newDao.executor = executor
 	return newDao
 }
 
 // WithMaster 使用主库执行器创建 Dao
 func (d *Dao[T]) WithMaster() *Dao[T] {
-	newDao := new(Dao[T])
-	*newDao = *d
+	newDao := d.copy()
 	newDao.executor = d.masterDB
 	return newDao
 }
 
 // WithRead 使用从库执行器创建 Dao
 func (d *Dao[T]) WithRead() *Dao[T] {
+	newDao := d.copy()
+	newDao.executor = d.readDB
+	return newDao
+}
+
+func (d *Dao[T]) copy() *Dao[T] {
 	newDao := new(Dao[T])
 	*newDao = *d
-	newDao.executor = d.readDB
 	return newDao
 }
 
