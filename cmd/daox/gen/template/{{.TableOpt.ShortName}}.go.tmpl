@@ -32,5 +32,6 @@ func new{{FirstUpper $DaoName}}() *{{$DaoName}} {
     inst := &{{$DaoName}}{
         Dao: dao,
     }
+    dao.RelFiller = inst.RelFiller
     return inst
 }
