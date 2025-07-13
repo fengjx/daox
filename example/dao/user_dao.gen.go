@@ -7,6 +7,14 @@ import (
 	"github.com/fengjx/daox/v2/example/dao/schema"
 )
 
+// Preload 预加载
+func (d *userDao) Preload(paths ...string) *userDao {
+	newDao := new(userDao)
+	*newDao = *d
+	newDao.Dao = d.Dao.Preload(paths...)
+	return newDao
+}
+
 // RelFiller 关联查询
 func (d *userDao) RelFiller(ctx context.Context, list []*schema.AppUser, p *daox.PreloadNode) error {
 	if len(list) == 0 || p == nil {

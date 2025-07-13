@@ -10,6 +10,14 @@ import (
     "{{.Gomod}}/{{.TargetDir}}/schema"
 )
 
+// Preload 预加载
+func (d *{{$DaoName}}) Preload(paths ...string) *{{$DaoName}} {
+    newDao := new({{$DaoName}})
+    *newDao = *d
+    newDao.Dao = d.Dao.Preload(paths...)
+    return newDao
+}
+
 // RelFiller auto-generated relation loader. DO NOT MODIFY.
 func (d *{{$DaoName}}) RelFiller(ctx context.Context, list []*schema.{{$ObjName}}, p *daox.PreloadNode) error {
     if len(list) == 0 || p == nil {
