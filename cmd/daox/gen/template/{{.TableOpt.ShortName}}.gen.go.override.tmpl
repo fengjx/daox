@@ -43,7 +43,7 @@ func (d *{{$DaoName}}) fill{{.Name}}(ctx context.Context, list []*schema.{{$ObjN
         ids = append(ids, m.{{GonicCase .ForeignKey}})
     }
     var refDao = daox.GetDao[*schema.{{$StructName}}]("{{.Table}}" ).WithPreloadNode(n)
-    refList, err := refDao.ListByColumnsContext(ctx, daox.OfMultiKv("{{.ForeignKey}}", ids...))
+    refList, err := refDao.ListByColumnsContext(ctx, daox.OfMultiKv("{{.RefKey}}", ids...))
     if err != nil {
         return err
     }
@@ -60,7 +60,7 @@ func (d *{{$DaoName}}) fill{{.Name}}(ctx context.Context, list []*schema.{{$ObjN
         ids = append(ids, m.{{GonicCase .ForeignKey}})
     }
     var refDao = daox.GetDao[*schema.{{$StructName}}]("{{.Table}}" ).WithPreloadNode(n)
-    refList, err := refDao.ListByColumnsContext(ctx, daox.OfMultiKv("{{.ForeignKey}}", ids...))
+    refList, err := refDao.ListByColumnsContext(ctx, daox.OfMultiKv("{{.RefKey}}", ids...))
     if err != nil {
         return err
     }
