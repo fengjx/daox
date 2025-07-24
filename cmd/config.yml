@@ -4,10 +4,7 @@ ds:
 target:
   custom:
     gomod: github.com/fengjx/daox/v2
-    tag-name: json
-    target-dir: out/dao
-    var:
-      foo: bar
+    target-dir: out/demo/dao
   tables:
     app_user:
       short-name: user

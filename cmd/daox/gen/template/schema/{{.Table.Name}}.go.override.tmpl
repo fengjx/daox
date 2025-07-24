@@ -9,7 +9,6 @@ import (
 	"github.com/fengjx/daox/v2"
 )
 {{end}}
-{{$TagName := .TagName}}
 // {{$ObjName}} {{.Table.Comment}}
 type {{$ObjName}} struct {
 {{range .Table.Columns}}    {{GonicCase .Name}} {{SQLType2GoTypeString .SQLType}} `json:"{{.Name}}" db:"{{.Name}}"` // {{LineString .Comment}}

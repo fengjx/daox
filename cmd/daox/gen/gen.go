@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"os"
+	"path"
 	"strings"
 	"text/template"
 
@@ -35,7 +36,16 @@ var (
 )
 
 func Action(ctx context.Context, cmd *cli.Command) error {
+
+	pwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
 	configFile := cmd.String("c")
+	if !strings.HasPrefix(configFile, "/") {
+		configFile = path.Join(pwd, configFile)
+	}
 	bs, err := os.ReadFile(configFile)
 	if err != nil {
 		return err
@@ -83,7 +93,7 @@ func Action(ctx context.Context, cmd *cli.Command) error {
 			continue
 		}
 		color.Green("[%s %s]", table.Name, table.Comment)
-		newGen(tmplDir, eFS, config, table).Gen()
+		newGen(pwd, tmplDir, eFS, config, table).Gen()
 	}
 	return nil
 }
@@ -205,7 +215,7 @@ type gen struct {
 	*filegen.FileGen
 }
 
-func newGen(tmplDir string, eFS *embed.FS, config *Config, table *Table) *gen {
+func newGen(pwd string, tmplDir string, eFS *embed.FS, config *Config, table *Table) *gen {
 	tableOpt := config.Target.Tables[table.Name]
 	if tableOpt.ShortName == "" {
 		tableOpt.ShortName = table.Name
@@ -217,10 +227,12 @@ func newGen(tmplDir string, eFS *embed.FS, config *Config, table *Table) *gen {
 	if tableOpt.TargetDir != "" {
 		targetDir = tableOpt.TargetDir
 	}
+	if !strings.HasPrefix(targetDir, "/") {
+		targetDir = path.Join(pwd, targetDir)
+	}
 
 	attr := map[string]any{
 		"Var":       config.Target.Custom.Var,
-		"TagName":   config.Target.Custom.TagName,
 		"Gomod":     config.Target.Custom.Gomod,
 		"Table":     table,
 		"TableOpt":  tableOpt,
