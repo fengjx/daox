@@ -117,7 +117,7 @@ func (g *FileGen) render(parent string, entries []os.DirEntry) {
 			}
 			targetFile = fmt.Sprintf("%s.%d", targetFile, time.Now().Unix())
 		}
-		color.Yellow(targetFile)
+		color.Blue(targetFile)
 		bs, err := g.readFile(path)
 		if err != nil {
 			color.Red("读取文件失败：%s，失败原因：%s", path, err.Error())
