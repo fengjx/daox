@@ -41,6 +41,7 @@ func Action(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+	color.Blue("pwd: %s", pwd)
 
 	configFile := cmd.String("c")
 	if !strings.HasPrefix(configFile, "/") {
