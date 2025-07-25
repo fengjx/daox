@@ -10,6 +10,8 @@ import (
 	"{{.Gomod}}/{{.TargetDir}}/schema/{{.TableOpt.TableNameLower}}"
 )
 
+// {{$DaoName}} 自动生成，但可以修改扩展其他方法
+
 var {{$DaoVarName}} *{{$DaoName}}
 
 func init() {
@@ -22,8 +24,6 @@ func init() {
 type {{$DaoName}} struct {
     *daox.Dao[*schema.{{$ObjName}}]
 }
-
-// 用户可在此文件扩展 {{$DaoName}} 的自定义方法
 
 func new{{FirstUpper $DaoName}}() *{{$DaoName}} {
     dao := daox.NewDao[*schema.{{$ObjName}}](
