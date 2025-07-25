@@ -69,6 +69,12 @@ func (u *Updater) Where(where ConditionBuilder) *Updater {
 	return u
 }
 
+// WhereC where 条件，使用 sqlbuilder.C() 构造器
+func (u *Updater) WhereC(cols ...Column) *Updater {
+	u.where = C(cols...)
+	return u
+}
+
 // SQL 输出sql语句
 func (u *Updater) SQL() (string, error) {
 	if len(u.fields) == 0 {

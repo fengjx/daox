@@ -40,6 +40,12 @@ func (d *Deleter) Where(where ConditionBuilder) *Deleter {
 	return d
 }
 
+// WhereC where 条件，使用 sqlbuilder.C() 构造器
+func (d *Deleter) WhereC(cols ...Column) *Deleter {
+	d.where = C(cols...)
+	return d
+}
+
 // Limit 限制删除数量
 func (d *Deleter) Limit(limit int) *Deleter {
 	d.limit = &limit
