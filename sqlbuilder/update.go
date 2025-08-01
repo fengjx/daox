@@ -2,6 +2,7 @@ package sqlbuilder
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -16,6 +17,7 @@ type Updater struct {
 	tableName string
 	fields    []Field
 	where     ConditionBuilder
+	limit     *int
 }
 
 // NewUpdater 创建一个 update 语句构造器
@@ -62,6 +64,12 @@ func (u *Updater) Incr(column string, n int64) *Updater {
 	return u
 }
 
+// Limit 限制删除数量
+func (u *Updater) Limit(limit int) *Updater {
+	u.limit = &limit
+	return u
+}
+
 // Where 条件
 // condition 可以通过 sqlbuilder.C() 方法创建
 func (u *Updater) Where(where ConditionBuilder) *Updater {
@@ -86,6 +94,10 @@ func (u *Updater) SQL() (string, error) {
 	u.writeString(" SET ")
 	u.setFields(u.fields)
 	u.whereSQL(u.where)
+	if u.limit != nil {
+		u.writeString(" LIMIT ")
+		u.writeString(strconv.Itoa(*u.limit))
+	}
 	u.end()
 	return u.sb.String(), nil
 }

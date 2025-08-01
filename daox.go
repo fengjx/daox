@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"reflect"
 
 	"github.com/fengjx/daox/v2/engine"
@@ -253,22 +252,9 @@ func (d *Dao[T]) getSaveColumns(opt *InsertOptions) []string {
 	return meta.OmitColumns(omits...)
 }
 
-// GetByColumn 按指定字段查询单条数据
-// bool 数据是否存在
-func (d *Dao[T]) GetByColumn(kv *KV) (T, error) {
-	return d.GetByColumnContext(context.Background(), kv)
-}
-
-// GetByColumnContext 按指定字段查询单条数据，携带上下文
-// bool 数据是否存在
-func (d *Dao[T]) GetByColumnContext(ctx context.Context, kv *KV) (T, error) {
-	if kv == nil {
-		return d.emptyModel(), nil
-	}
+func (d *Dao[T]) getByCond(ctx context.Context, cond sqlbuilder.ConditionBuilder) (T, error) {
 	dest := d.newModel()
-	exist, err := d.Selector().Queryer(d.getQueryer()).
-		WhereC(ql.Col(kv.Key).EQ(kv.Value)).
-		OneContext(ctx, dest)
+	exist, err := d.Selector().Where(cond).OneContext(ctx, dest)
 	if err != nil {
 		return d.emptyModel(), err
 	}
@@ -282,26 +268,15 @@ func (d *Dao[T]) GetByColumnContext(ctx context.Context, kv *KV) (T, error) {
 	return dest, nil
 }
 
-// ListByColumns 指定字段多个值查询多条数据
-// dest: slice pointer
-func (d *Dao[T]) ListByColumns(kvs *MultiKV) ([]T, error) {
-	return d.ListByColumnsContext(context.Background(), kvs)
-}
-
-// ListByColumnsContext 指定字段多个值查询多条数据，携带上下文
-// dest: slice pointer
-func (d *Dao[T]) ListByColumnsContext(ctx context.Context, kvs *MultiKV) ([]T, error) {
-	if kvs == nil || len(kvs.Values) == 0 {
+func (d *Dao[T]) listByCond(ctx context.Context, cond sqlbuilder.ConditionBuilder) ([]T, error) {
+	dest := make([]T, 0)
+	exist, err := d.Selector().Where(cond).OneContext(ctx, dest)
+	if err != nil {
+		return nil, err
+	}
+	if !exist {
 		return nil, nil
 	}
-	var dest []T
-	err := d.Selector().Queryer(d.getQueryer()).
-		Columns(d.DBColumns()...).
-		WhereC(ql.Col(kvs.Key).In(kvs.Values...)).
-		ListContext(ctx, &dest)
-	if err != nil {
-		return nil, err
-	}
 	err = d.relFill(ctx, dest)
 	if err != nil {
 		return nil, err
@@ -309,26 +284,14 @@ func (d *Dao[T]) ListByColumnsContext(ctx context.Context, kvs *MultiKV) ([]T, e
 	return dest, nil
 }
 
-// List 指定字段查询多条数据
-func (d *Dao[T]) List(kv *KV) ([]T, error) {
-	return d.ListContext(context.Background(), kv)
+// GetByCond 根据条件查询单条数据
+func (d *Dao[T]) GetByCond(ctx context.Context, whereCol ...sqlbuilder.Column) (T, error) {
+	return d.getByCond(ctx, sqlbuilder.C(whereCol...))
 }
 
-// ListContext 指定字段查询多条数据，携带上下文
-func (d *Dao[T]) ListContext(ctx context.Context, kv *KV) ([]T, error) {
-	var dest []T
-	err := d.Selector().Queryer(d.getQueryer()).
-		Columns(d.DBColumns()...).
-		Where(ql.C(ql.Col(kv.Key).EQ(kv.Value))).
-		ListContext(ctx, dest)
-	if err != nil {
-		return nil, err
-	}
-	err = d.relFill(ctx, dest)
-	if err != nil {
-		return nil, err
-	}
-	return dest, nil
+// ListByCond 根据条件查询多条数据
+func (d *Dao[T]) ListByCond(ctx context.Context, whereCol ...sqlbuilder.Column) ([]T, error) {
+	return d.listByCond(ctx, sqlbuilder.C(whereCol...))
 }
 
 // GetByID 根据 id 查询单条数据
@@ -339,18 +302,20 @@ func (d *Dao[T]) GetByID(id any) (T, error) {
 // GetByIDContext 根据 id 查询单条数据，携带上下文
 func (d *Dao[T]) GetByIDContext(ctx context.Context, id any) (T, error) {
 	tableMeta := d.TableMapper.Meta
-	return d.GetByColumnContext(ctx, OfKv(tableMeta.PrimaryKey, id))
+	return d.getByCond(ctx, ql.C(ql.Col(tableMeta.PrimaryKey).EQ(id)))
 }
 
 // ListByIDs 根据 id 查询多条数据
-func (d *Dao[T]) ListByIDs(ids ...any) ([]T, error) {
-	return d.ListByIDsContext(context.Background(), ids...)
+// ids 需要传一个 slice
+func (d *Dao[T]) ListByIDs(ids any) ([]T, error) {
+	return d.ListByIDsContext(context.Background(), ids)
 }
 
 // ListByIDsContext 根据 id 查询多条数据，携带上下文
-func (d *Dao[T]) ListByIDsContext(ctx context.Context, ids ...any) ([]T, error) {
+// ids 需要传一个 slice
+func (d *Dao[T]) ListByIDsContext(ctx context.Context, ids any) ([]T, error) {
 	tableMeta := d.TableMapper.Meta
-	return d.ListByColumnsContext(ctx, OfMultiKv(tableMeta.PrimaryKey, ids...))
+	return d.listByCond(ctx, ql.C(ql.Col(tableMeta.PrimaryKey).InSlice(ids)))
 }
 
 // UpdateField 部分字段更新
@@ -387,17 +352,25 @@ func (d *Dao[T]) UpdateContext(ctx context.Context, model T, omitColumns ...stri
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := d.TableMapper.Meta
-	affected, err := d.UpdateByCondContext(ctx, model, ql.SC().And(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey)), tableMeta.PrimaryKey)
+	omitColumns = append(omitColumns, tableMeta.PrimaryKey)
+	affected, err := d.updateByCondContext(ctx, model, ql.C(ql.Col(tableMeta.PrimaryKey).EQ(model.GetID())), omitColumns, 0)
+	if err != nil {
+		return false, err
+	}
 	return affected > 0, err
 }
 
 // UpdateByCond 按条件更新全部字段
-func (d *Dao[T]) UpdateByCond(model T, where sqlbuilder.ConditionBuilder, omitColumns ...string) (int64, error) {
-	return d.UpdateByCondContext(context.Background(), model, where, omitColumns...)
+func (d *Dao[T]) UpdateByCond(model T, whereCol ...sqlbuilder.Column) (int64, error) {
+	return d.UpdateByCondContext(context.Background(), model, whereCol...)
 }
 
 // UpdateByCondContext 按条件更新全部字段
-func (d *Dao[T]) UpdateByCondContext(ctx context.Context, model T, where sqlbuilder.ConditionBuilder, omitColumns ...string) (int64, error) {
+func (d *Dao[T]) UpdateByCondContext(ctx context.Context, model T, whereCol ...sqlbuilder.Column) (int64, error) {
+	return d.updateByCondContext(ctx, model, sqlbuilder.C(whereCol...), nil, 0)
+}
+
+func (d *Dao[T]) updateByCondContext(ctx context.Context, model T, where sqlbuilder.ConditionBuilder, omitColumns []string, limit int) (int64, error) {
 	omitColumns = append(omitColumns, d.TableMapper.Meta.PrimaryKey)
 	if len(global.omitColumns) > 0 {
 		omitColumns = append(omitColumns, global.omitColumns...)
@@ -405,6 +378,9 @@ func (d *Dao[T]) UpdateByCondContext(ctx context.Context, model T, where sqlbuil
 	updater := d.Updater().Execer(d.getExecer()).
 		Columns(d.DBColumns(omitColumns...)...).
 		Where(where)
+	if limit > 0 {
+		updater.Limit(limit)
+	}
 	affected, err := updater.NamedExecContext(ctx, model)
 	if err != nil {
 		return 0, err
@@ -412,34 +388,12 @@ func (d *Dao[T]) UpdateByCondContext(ctx context.Context, model T, where sqlbuil
 	return affected, nil
 }
 
-func (d *Dao[T]) deleteByCondContext(ctx context.Context, where sqlbuilder.ConditionBuilder) (int64, error) {
-	return d.Deleter().Execer(d.getExecer()).Where(where).ExecContext(ctx)
-}
-
-// DeleteByColumn 按字段名删除
-func (d *Dao[T]) DeleteByColumn(kv *KV) (int64, error) {
-	return d.DeleteByColumnContext(context.Background(), kv)
-}
-
-// DeleteByColumnContext 按字段名删除，携带上下文
-func (d *Dao[T]) DeleteByColumnContext(ctx context.Context, kv *KV) (int64, error) {
-	if kv == nil {
-		return 0, nil
+func (d *Dao[T]) deleteByCondContext(ctx context.Context, where sqlbuilder.ConditionBuilder, limit int) (int64, error) {
+	deleter := d.Deleter().Execer(d.getExecer()).Where(where)
+	if limit > 0 {
+		deleter.Limit(limit)
 	}
-	return d.deleteByCondContext(ctx, ql.C(ql.Col(kv.Key).EQ(kv.Value)))
-}
-
-// DeleteByColumns 指定字段删除多个值
-func (d *Dao[T]) DeleteByColumns(kvs *MultiKV) (int64, error) {
-	return d.DeleteByColumnsContext(context.Background(), kvs)
-}
-
-// DeleteByColumnsContext 指定字段删除多个值，携带上下文
-func (d *Dao[T]) DeleteByColumnsContext(ctx context.Context, kvs *MultiKV) (int64, error) {
-	if kvs == nil || len(kvs.Values) == 0 {
-		return 0, nil
-	}
-	return d.deleteByCondContext(ctx, ql.C(ql.Col(kvs.Key).In(kvs.Values...)))
+	return deleter.ExecContext(ctx)
 }
 
 // DeleteByID 根据id删除数据
@@ -450,7 +404,19 @@ func (d *Dao[T]) DeleteByID(id any) (bool, error) {
 // DeleteByIDContext 根据id删除数据，携带上下文
 func (d *Dao[T]) DeleteByIDContext(ctx context.Context, id any) (bool, error) {
 	tableMeta := d.TableMapper.Meta
-	affected, err := d.DeleteByColumnContext(ctx, OfKv(tableMeta.PrimaryKey, id))
+	affected, err := d.deleteByCondContext(ctx, sqlbuilder.C(
+		sqlbuilder.Col(tableMeta.PrimaryKey).EQ(id),
+	), 1)
+	if err != nil {
+		return false, err
+	}
+	return affected == 1, nil
+}
+
+func (d *Dao[T]) DeleteByCondContext(ctx context.Context, whereCol ...sqlbuilder.Column) (bool, error) {
+	affected, err := d.deleteByCondContext(ctx, sqlbuilder.C(
+		whereCol...,
+	), 0)
 	if err != nil {
 		return false, err
 	}

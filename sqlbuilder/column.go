@@ -96,8 +96,24 @@ func (c Column) In(vals ...any) Column {
 	return c
 }
 
+// InSlice -> in ()
+// vals must a slice
+func (c Column) InSlice(vals any) Column {
+	c.op = OpIn
+	c.arg = vals
+	return c
+}
+
 // NotIn -> not in ()
 func (c Column) NotIn(vals ...any) Column {
+	c.op = OpNotIN
+	c.arg = vals
+	return c
+}
+
+// NotInSlice -> not in ()
+// vals must a slice
+func (c Column) NotInSlice(vals any) Column {
 	c.op = OpNotIN
 	c.arg = vals
 	return c
