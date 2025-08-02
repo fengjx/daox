@@ -9,15 +9,16 @@ import (
 
 // AppOrder 订单信息表
 type AppOrder struct {
-	ID     int64     `json:"id"`      // -
-	UserID int64     `json:"user_id"` // 用户ID
-	Amount string    `json:"amount"`  // 订单金额
-	Status string    `json:"status"`  // 订单状态
-	Remark string    `json:"remark"`  // 备注
-	Utime  time.Time `json:"utime"`   // 更新时间
-	Ctime  time.Time `json:"ctime"`   // 创建时间
+	ID     int64     `json:"id" db:"id"`           // -
+	UserID int64     `json:"user_id" db:"user_id"` // 用户ID
+	Amount string    `json:"amount" db:"amount"`   // 订单金额
+	Status string    `json:"status" db:"status"`   // 订单状态
+	Remark string    `json:"remark" db:"remark"`   // 备注
+	Utime  time.Time `json:"utime" db:"utime"`     // 更新时间
+	Ctime  time.Time `json:"ctime" db:"ctime"`     // 创建时间
+
 	// relations
-	User *AppUser `json:"user"` // 用户
+	User *AppUser `json:"user"`
 }
 
 func (m *AppOrder) GetID() any {

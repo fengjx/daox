@@ -9,12 +9,15 @@ import (
 
 // AppCard 身份证信息表
 type AppCard struct {
-	ID     int64     `json:"id"`      // -
-	UserID int64     `json:"user_id"` // 用户ID
-	Number string    `json:"number"`  // 卡号
-	Status string    `json:"status"`  // 卡状态
-	Utime  time.Time `json:"utime"`   // 更新时间
-	Ctime  time.Time `json:"ctime"`   // 创建时间
+	ID     int64     `json:"id" db:"id"`           // -
+	UserID int64     `json:"user_id" db:"user_id"` // 用户ID
+	Number string    `json:"number" db:"number"`   // 卡号
+	Status string    `json:"status" db:"status"`   // 卡状态
+	Utime  time.Time `json:"utime" db:"utime"`     // 更新时间
+	Ctime  time.Time `json:"ctime" db:"ctime"`     // 创建时间
+
+	// relations
+	User *AppUser `json:"user"`
 }
 
 func (m *AppCard) GetID() any {

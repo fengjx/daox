@@ -50,6 +50,14 @@ func (u *Updater) Set(column string, val any) *Updater {
 	return u
 }
 
+// SetMap 设置字段值
+func (u *Updater) SetMap(attr map[string]any) *Updater {
+	for k, v := range attr {
+		u.fields = append(u.fields, F(k).Val(v))
+	}
+	return u
+}
+
 // Columns update 的数据库字段
 func (u *Updater) Columns(columns ...string) *Updater {
 	for _, col := range columns {
@@ -88,6 +96,9 @@ func (u *Updater) SQL() (string, error) {
 	if len(u.fields) == 0 {
 		return "", ErrColumnsRequire
 	}
+	if u.where != nil && len(u.where.getPredicates()) == 0 {
+		return "", ErrUpdateMissWhere
+	}
 	u.reset()
 	u.writeString("UPDATE ")
 	u.quote(u.tableName)
@@ -104,13 +115,10 @@ func (u *Updater) SQL() (string, error) {
 
 // SQLArgs 构造 sql 并返回对应参数
 func (u *Updater) SQLArgs() (string, []any, error) {
-	if len(u.fields) == 0 {
-		return "", nil, ErrColumnsRequire
-	}
-	if u.where != nil && len(u.where.getPredicates()) == 0 {
-		return "", nil, ErrUpdateMissWhere
-	}
 	execSQL, err := u.SQL()
+	if err != nil {
+		return "", nil, err
+	}
 	var args []any
 	for _, f := range u.fields {
 		if f.val != nil {

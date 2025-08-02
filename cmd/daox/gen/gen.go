@@ -15,8 +15,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/fengjx/daox/v2/cmd/daox/internal/filegen"
-	"github.com/fengjx/daox/v2/cmd/daox/internal/kit"
 	"github.com/fengjx/daox/v2/types"
+	"github.com/fengjx/daox/v2/utils"
 )
 
 var (
@@ -111,7 +111,7 @@ func loadTableMeta(db *sqlx.DB, dbName, tableName string) *Table {
 			panic(err)
 		}
 		table.Name = name
-		table.StructName = kit.GonicCase(name)
+		table.StructName = utils.GonicCase(name)
 		if comment != nil {
 			table.Comment = *comment
 		}
@@ -210,9 +210,9 @@ func newGen(tmplDir string, eFS *embed.FS, config *Config, table *Table) *gen {
 	if tableOpt.ShortName == "" {
 		tableOpt.ShortName = table.Name
 	}
-	tableOpt.ShortName = kit.SnakeCase(tableOpt.ShortName)
-	tableOpt.ShortNameLower = kit.ToLowerAndTrim(tableOpt.ShortName)
-	tableOpt.TableNameLower = kit.ToLowerAndTrim(table.Name)
+	tableOpt.ShortName = utils.SnakeCase(tableOpt.ShortName)
+	tableOpt.ShortNameLower = utils.ToLowerAndTrim(tableOpt.ShortName)
+	tableOpt.TableNameLower = utils.ToLowerAndTrim(table.Name)
 	targetDir := config.Target.Custom.TargetDir
 	if tableOpt.TargetDir != "" {
 		targetDir = tableOpt.TargetDir
@@ -227,17 +227,17 @@ func newGen(tmplDir string, eFS *embed.FS, config *Config, table *Table) *gen {
 	}
 
 	funcMap := template.FuncMap{
-		"FirstUpper":           kit.FirstUpper,
-		"FirstLower":           kit.FirstLower,
-		"SnakeCase":            kit.SnakeCase,
-		"TitleCase":            kit.TitleCase,
-		"GonicCase":            kit.GonicCase,
-		"LineString":           kit.LineString,
-		"IsLastIndex":          kit.IsLastIndex,
+		"FirstUpper":           utils.FirstUpper,
+		"FirstLower":           utils.FirstLower,
+		"SnakeCase":            utils.SnakeCase,
+		"TitleCase":            utils.TitleCase,
+		"GonicCase":            utils.GonicCase,
+		"LineString":           utils.LineString,
+		"IsLastIndex":          utils.IsLastIndex,
 		"SQLType2GoTypeString": types.SQLType2GoTypeString,
-		"Add":                  kit.Add,
-		"Sub":                  kit.Sub,
-		"ContainsString":       kit.ContainsString,
+		"Add":                  utils.Add,
+		"Sub":                  utils.Sub,
+		"ContainsString":       utils.ContainsString,
 	}
 	fg := &filegen.FileGen{
 		EmbedFS:     eFS,
@@ -269,5 +269,5 @@ func goImports(cols []Column) []string {
 // IsDebug 是否是调试模式
 func isDebug() bool {
 	debug := os.Getenv("DEBUG")
-	return kit.Contains([]string{"true", "1"}, strings.ToLower(debug))
+	return utils.Contains([]string{"true", "1"}, strings.ToLower(debug))
 }

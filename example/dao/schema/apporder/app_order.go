@@ -30,7 +30,7 @@ func (m ApporderMeta) TableName() string {
 }
 
 func (m ApporderMeta) IsAutoIncrement() bool {
-	return false
+	return true
 }
 
 func (m ApporderMeta) PrimaryKey() string {

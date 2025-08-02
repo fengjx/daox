@@ -35,7 +35,7 @@ func (m AppuserMeta) TableName() string {
 }
 
 func (m AppuserMeta) IsAutoIncrement() bool {
-	return false
+	return true
 }
 
 func (m AppuserMeta) PrimaryKey() string {

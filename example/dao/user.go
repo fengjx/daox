@@ -4,13 +4,17 @@ import (
 	"github.com/fengjx/daox/v2"
 	"github.com/fengjx/daox/v2/example/dao/schema"
 	"github.com/fengjx/daox/v2/example/dao/schema/appuser"
-	"github.com/fengjx/daox/v2/example/db"
 )
+
+// userDao 自动生成，但可以修改扩展其他方法
 
 var UserDao *userDao
 
 func init() {
 	UserDao = newUserDao()
+	if UserDao != nil {
+		UserDao.Dao.RelFiller = UserDao.RelFiller
+	}
 }
 
 type userDao struct {
@@ -18,12 +22,12 @@ type userDao struct {
 }
 
 func newUserDao() *userDao {
-	inst := &userDao{}
 	dao := daox.NewDao[*schema.AppUser](
 		appuser.Meta,
-		daox.WithDBMaster(db.DB),
 	)
+	inst := &userDao{
+		Dao: dao,
+	}
 	dao.RelFiller = inst.RelFiller
-	inst.Dao = dao
 	return inst
 }

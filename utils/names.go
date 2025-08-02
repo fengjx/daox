@@ -2,6 +2,7 @@ package utils
 
 import (
 	"strings"
+	"unicode"
 	"unsafe"
 )
 
@@ -114,6 +115,67 @@ func GonicCase(str string) string {
 	return string(newstr)
 }
 
+// KebabCase kebab case 转换函数
+func KebabCase(s string) string {
+	if s == "" {
+		return ""
+	}
+	var result strings.Builder
+	runes := []rune(s)
+	i := 0
+	for i < len(runes) {
+		matched := false
+		// 最多尝试 5 个大写字母的缩写
+		maxLen := 5
+		if len(runes)-i < maxLen {
+			maxLen = len(runes) - i
+		}
+		for l := maxLen; l >= 2; l-- {
+			seg := string(runes[i : i+l])
+			if LintGonicMapper[seg] {
+				if result.Len() > 0 && result.String()[result.Len()-1] != '-' {
+					result.WriteRune('-')
+				}
+				result.WriteString(strings.ToLower(seg))
+				i += l
+				// 缩写后如果下一个是小写字母，加 -
+				if i < len(runes) && runes[i] >= 'a' && runes[i] <= 'z' {
+					result.WriteRune('-')
+				}
+				matched = true
+				break
+			}
+		}
+		if matched {
+			continue
+		}
+		// 单个大写字母
+		if runes[i] >= 'A' && runes[i] <= 'Z' {
+			if i > 0 {
+				result.WriteRune('-')
+			}
+			result.WriteRune(unicode.ToLower(runes[i]))
+			i++
+			continue
+		}
+		// 普通字符
+		result.WriteRune(unicode.ToLower(runes[i]))
+		i++
+	}
+	return result.String()
+}
+
+// ToLowerAndTrim 将字符串转换为小写，并移除特殊字符（如 - 和 _）
+func ToLowerAndTrim(s string) string {
+	var result strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
+}
+
 var LintGonicMapper = map[string]bool{
 	"API":   true,
 	"ASCII": true,
@@ -148,4 +210,5 @@ var LintGonicMapper = map[string]bool{
 	"XML":   true,
 	"XSRF":  true,
 	"XSS":   true,
+	"HELLO": true,
 }

@@ -29,7 +29,7 @@ func (m AppcardMeta) TableName() string {
 }
 
 func (m AppcardMeta) IsAutoIncrement() bool {
-	return false
+	return true
 }
 
 func (m AppcardMeta) PrimaryKey() string {

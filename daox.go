@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/fengjx/daox/v2/engine"
@@ -15,19 +16,21 @@ import (
 var (
 	// ErrUpdatePrimaryKeyRequire 更新操作必须提供主键值
 	ErrUpdatePrimaryKeyRequire = errors.New("[daox] Primary key require for update")
+	ErrInsertPrimaryKeyRequire = errors.New("[daox] Primary key require for delete")
 )
 
 // Dao 数据访问对象，封装了数据库操作的基础方法
 type Dao[T Model] struct {
-	TableMapper *TableMapper      // 表映射器
-	options     *Options          // 配置选项
-	masterDB    engine.Executor   // 主库连接
-	readDB      engine.Executor   // 从库连接
-	ifNullVals  map[string]string // NULL值替换配置
-	omitColumns []string          // 忽略的字段列表
-	executor    engine.Executor   // SQL执行器，用于事务等场景
-	preloads    *PreloadNode      // 预加载节点
-	RelFiller   RelFiller[T]      // 关联数据填充器，用于填充关联数据
+	TableMapper      *TableMapper      // 表映射器
+	currentTableName string            // 当前使用的表名，优先于 TableMapper.Meta.TableName
+	options          *Options          // 配置选项
+	masterDB         engine.Executor   // 主库连接
+	readDB           engine.Executor   // 从库连接
+	ifNullVals       map[string]string // NULL值替换配置
+	omitColumns      []string          // 忽略的字段列表
+	executor         engine.Executor   // SQL执行器，用于事务等场景
+	preloads         *PreloadNode      // 预加载节点
+	RelFiller        RelFiller[T]      // 关联数据填充器，用于填充关联数据
 }
 
 // NewDao 根据 meta 接口创建 dao 对象
@@ -91,7 +94,7 @@ func NewDao[T Model](m Meta, opts ...Option) *Dao[T] {
 // SQLBuilder 创建当前表的 SQL 构建器
 // 返回值: SQL构建器对象
 func (d *Dao[T]) SQLBuilder() *sqlbuilder.Builder {
-	return sqlbuilder.New(d.TableMapper.Meta.TableName)
+	return sqlbuilder.New(d.TableName())
 }
 
 // Selector 创建当前表的查询构建器
@@ -101,7 +104,7 @@ func (d *Dao[T]) Selector(columns ...string) *sqlbuilder.Selector {
 	if len(columns) == 0 {
 		columns = d.DBColumns()
 	}
-	selector := sqlbuilder.New(d.TableMapper.Meta.TableName).Select(columns...)
+	selector := d.SQLBuilder().Select(columns...)
 	if len(d.ifNullVals) > 0 {
 		selector.IfNullVals(d.ifNullVals)
 	}
@@ -149,6 +152,9 @@ func (d *Dao[T]) DBColumns(omitColumns ...string) []string {
 // TableName 获取当前表名
 // 返回值: 表名
 func (d *Dao[T]) TableName() string {
+	if d.currentTableName != "" {
+		return d.currentTableName
+	}
 	return d.TableMapper.Meta.TableName
 }
 
@@ -160,7 +166,7 @@ func (d *Dao[T]) Save(dest T, opts ...InsertOption) (int64, error) {
 	return d.SaveContext(context.Background(), dest, opts...)
 }
 
-// SaveContext 插入数据，携带上下文
+// SaveContext 插入数据，传递 context
 // ctx: 上下文
 // dest: 要插入的数据对象
 // opts: 插入选项
@@ -185,7 +191,7 @@ func (d *Dao[T]) ReplaceInto(dest T, opts ...InsertOption) (sql.Result, error) {
 	return d.ReplaceIntoContext(context.Background(), dest, opts...)
 }
 
-// ReplaceIntoContext replace into table，携带上下文
+// ReplaceIntoContext replace into table，传递 context
 // omitColumns 不需要 insert 的字段
 func (d *Dao[T]) ReplaceIntoContext(ctx context.Context, model T, opts ...InsertOption) (sql.Result, error) {
 	return d.Inserter(opts...).
@@ -199,7 +205,7 @@ func (d *Dao[T]) IgnoreInto(model T, opts ...InsertOption) (sql.Result, error) {
 	return d.IgnoreIntoContext(context.Background(), model, opts...)
 }
 
-// IgnoreIntoContext 使用 INSERT IGNORE INTO 如果记录已存在则忽略，携带上下文
+// IgnoreIntoContext 使用 INSERT IGNORE INTO 如果记录已存在则忽略，传递 context
 // omitColumns 不需要 insert 的字段
 func (d *Dao[T]) IgnoreIntoContext(ctx context.Context, model T, opts ...InsertOption) (sql.Result, error) {
 	return d.Inserter(opts...).
@@ -207,7 +213,7 @@ func (d *Dao[T]) IgnoreIntoContext(ctx context.Context, model T, opts ...InsertO
 		NamedExecContext(ctx, model)
 }
 
-// BatchSave 批量新增，携带上下文
+// BatchSave 批量新增，传递 context
 // omitColumns 不需要 insert 的字段
 func (d *Dao[T]) BatchSave(models []T, opts ...InsertOption) (sql.Result, error) {
 	return d.BatchSaveContext(context.Background(), models, opts...)
@@ -228,7 +234,7 @@ func (d *Dao[T]) BatchReplaceInto(models []T, opts ...InsertOption) (sql.Result,
 	return d.BatchReplaceIntoContext(context.Background(), models, opts...)
 }
 
-// BatchReplaceIntoContext 批量新增，使用 replace into 方式，携带上下文
+// BatchReplaceIntoContext 批量新增，使用 replace into 方式，传递 context
 // models 是一个 slice
 // omitColumns 不需要 insert 的字段
 func (d *Dao[T]) BatchReplaceIntoContext(ctx context.Context, models []T, opts ...InsertOption) (sql.Result, error) {
@@ -269,13 +275,10 @@ func (d *Dao[T]) getByCond(ctx context.Context, cond sqlbuilder.ConditionBuilder
 }
 
 func (d *Dao[T]) listByCond(ctx context.Context, cond sqlbuilder.ConditionBuilder) ([]T, error) {
-	dest := make([]T, 0)
-	exist, err := d.Selector().Where(cond).OneContext(ctx, dest)
+	var dest []T
+	err := d.Selector().Where(cond).ListContext(ctx, &dest)
 	if err != nil {
 		return nil, err
-	}
-	if !exist {
-		return nil, nil
 	}
 	err = d.relFill(ctx, dest)
 	if err != nil {
@@ -284,14 +287,14 @@ func (d *Dao[T]) listByCond(ctx context.Context, cond sqlbuilder.ConditionBuilde
 	return dest, nil
 }
 
-// GetByCond 根据条件查询单条数据
-func (d *Dao[T]) GetByCond(ctx context.Context, whereCol ...sqlbuilder.Column) (T, error) {
-	return d.getByCond(ctx, sqlbuilder.C(whereCol...))
+// GetByCondContext 根据条件查询单条数据
+func (d *Dao[T]) GetByCondContext(ctx context.Context, whereCol ...sqlbuilder.Column) (T, error) {
+	return d.getByCond(ctx, ql.C(whereCol...))
 }
 
-// ListByCond 根据条件查询多条数据
-func (d *Dao[T]) ListByCond(ctx context.Context, whereCol ...sqlbuilder.Column) ([]T, error) {
-	return d.listByCond(ctx, sqlbuilder.C(whereCol...))
+// ListByCondContext 根据条件查询多条数据
+func (d *Dao[T]) ListByCondContext(ctx context.Context, whereCol ...sqlbuilder.Column) ([]T, error) {
+	return d.listByCond(ctx, ql.C(whereCol...))
 }
 
 // GetByID 根据 id 查询单条数据
@@ -299,7 +302,7 @@ func (d *Dao[T]) GetByID(id any) (T, error) {
 	return d.GetByIDContext(context.Background(), id)
 }
 
-// GetByIDContext 根据 id 查询单条数据，携带上下文
+// GetByIDContext 根据 id 查询单条数据，传递 context
 func (d *Dao[T]) GetByIDContext(ctx context.Context, id any) (T, error) {
 	tableMeta := d.TableMapper.Meta
 	return d.getByCond(ctx, ql.C(ql.Col(tableMeta.PrimaryKey).EQ(id)))
@@ -311,7 +314,7 @@ func (d *Dao[T]) ListByIDs(ids any) ([]T, error) {
 	return d.ListByIDsContext(context.Background(), ids)
 }
 
-// ListByIDsContext 根据 id 查询多条数据，携带上下文
+// ListByIDsContext 根据 id 查询多条数据，传递 context
 // ids 需要传一个 slice
 func (d *Dao[T]) ListByIDsContext(ctx context.Context, ids any) ([]T, error) {
 	tableMeta := d.TableMapper.Meta
@@ -323,18 +326,13 @@ func (d *Dao[T]) UpdateField(idValue any, fieldMap map[string]any) (int64, error
 	return d.UpdateFieldContext(context.Background(), idValue, fieldMap)
 }
 
-// UpdateFieldContext 部分字段更新，携带上下文
-func (d *Dao[T]) UpdateFieldContext(ctx context.Context, idValue any, fieldMap map[string]any) (int64, error) {
+// UpdateFieldContext 部分字段更新，传递 context
+func (d *Dao[T]) UpdateFieldContext(ctx context.Context, idValue any, attr map[string]any) (int64, error) {
 	if utils.IsIDEmpty(idValue) {
 		return 0, ErrUpdatePrimaryKeyRequire
 	}
-
-	updater := d.Updater().Execer(d.getExecer())
-	for col, val := range fieldMap {
-		updater.Set(col, val)
-	}
-	updater.Where(ql.C(ql.Col(d.TableMapper.Meta.PrimaryKey).EQ(idValue)))
-	affected, err := updater.ExecContext(ctx)
+	cond := ql.C(ql.Col(d.TableMapper.Meta.PrimaryKey).EQ(idValue))
+	affected, err := d.updateByCondContext(ctx, attr, cond, 0)
 	if err != nil {
 		return 0, err
 	}
@@ -346,14 +344,18 @@ func (d *Dao[T]) Update(model T, omitColumns ...string) (bool, error) {
 	return d.UpdateContext(context.Background(), model, omitColumns...)
 }
 
-// UpdateContext 根据 ID 全字段更新，携带上下文
+// UpdateContext 根据 ID 全字段更新，传递 context
 func (d *Dao[T]) UpdateContext(ctx context.Context, model T, omitColumns ...string) (bool, error) {
 	if utils.IsIDEmpty(model.GetID()) {
 		return false, ErrUpdatePrimaryKeyRequire
 	}
 	tableMeta := d.TableMapper.Meta
 	omitColumns = append(omitColumns, tableMeta.PrimaryKey)
-	affected, err := d.updateByCondContext(ctx, model, ql.C(ql.Col(tableMeta.PrimaryKey).EQ(model.GetID())), omitColumns, 0)
+	cond := ql.SC().And(fmt.Sprintf("%[1]s = :%[1]s", tableMeta.PrimaryKey))
+	updater := d.Updater().Execer(d.getExecer()).
+		Columns(d.DBColumns(omitColumns...)...).
+		Where(cond)
+	affected, err := updater.NamedExecContext(ctx, model)
 	if err != nil {
 		return false, err
 	}
@@ -361,27 +363,23 @@ func (d *Dao[T]) UpdateContext(ctx context.Context, model T, omitColumns ...stri
 }
 
 // UpdateByCond 按条件更新全部字段
-func (d *Dao[T]) UpdateByCond(model T, whereCol ...sqlbuilder.Column) (int64, error) {
-	return d.UpdateByCondContext(context.Background(), model, whereCol...)
+func (d *Dao[T]) UpdateByCond(attr map[string]any, whereCol ...sqlbuilder.Column) (int64, error) {
+	return d.UpdateByCondContext(context.Background(), attr, whereCol...)
 }
 
 // UpdateByCondContext 按条件更新全部字段
-func (d *Dao[T]) UpdateByCondContext(ctx context.Context, model T, whereCol ...sqlbuilder.Column) (int64, error) {
-	return d.updateByCondContext(ctx, model, sqlbuilder.C(whereCol...), nil, 0)
+func (d *Dao[T]) UpdateByCondContext(ctx context.Context, attr map[string]any, whereCol ...sqlbuilder.Column) (int64, error) {
+	return d.updateByCondContext(ctx, attr, ql.C(whereCol...), 0)
 }
 
-func (d *Dao[T]) updateByCondContext(ctx context.Context, model T, where sqlbuilder.ConditionBuilder, omitColumns []string, limit int) (int64, error) {
-	omitColumns = append(omitColumns, d.TableMapper.Meta.PrimaryKey)
-	if len(global.omitColumns) > 0 {
-		omitColumns = append(omitColumns, global.omitColumns...)
-	}
+func (d *Dao[T]) updateByCondContext(ctx context.Context, attr map[string]any, where sqlbuilder.ConditionBuilder, limit int) (int64, error) {
 	updater := d.Updater().Execer(d.getExecer()).
-		Columns(d.DBColumns(omitColumns...)...).
+		SetMap(attr).
 		Where(where)
 	if limit > 0 {
 		updater.Limit(limit)
 	}
-	affected, err := updater.NamedExecContext(ctx, model)
+	affected, err := updater.ExecContext(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -401,26 +399,25 @@ func (d *Dao[T]) DeleteByID(id any) (bool, error) {
 	return d.DeleteByIDContext(context.Background(), id)
 }
 
-// DeleteByIDContext 根据id删除数据，携带上下文
+// DeleteByIDContext 根据id删除数据，传递 context
 func (d *Dao[T]) DeleteByIDContext(ctx context.Context, id any) (bool, error) {
+	if utils.IsIDEmpty(id) {
+		return false, ErrInsertPrimaryKeyRequire
+	}
 	tableMeta := d.TableMapper.Meta
-	affected, err := d.deleteByCondContext(ctx, sqlbuilder.C(
-		sqlbuilder.Col(tableMeta.PrimaryKey).EQ(id),
-	), 1)
+	affected, err := d.deleteByCondContext(ctx, ql.C(
+		ql.Col(tableMeta.PrimaryKey).EQ(id),
+	), 0)
 	if err != nil {
 		return false, err
 	}
 	return affected == 1, nil
 }
 
-func (d *Dao[T]) DeleteByCondContext(ctx context.Context, whereCol ...sqlbuilder.Column) (bool, error) {
-	affected, err := d.deleteByCondContext(ctx, sqlbuilder.C(
+func (d *Dao[T]) DeleteByCondContext(ctx context.Context, whereCol ...sqlbuilder.Column) (int64, error) {
+	return d.deleteByCondContext(ctx, ql.C(
 		whereCol...,
 	), 0)
-	if err != nil {
-		return false, err
-	}
-	return affected == 1, nil
 }
 
 // relFill 填充关联数据
@@ -457,10 +454,10 @@ func (d *Dao[T]) WithPreloadNode(p *PreloadNode) *Dao[T] {
 	return newDao
 }
 
-// WithTableName 使用新的数据库连接创建 Dao
+// WithTableName 使用新的表名创建 Dao
 func (d *Dao[T]) WithTableName(tableName string) *Dao[T] {
 	newDao := d.copy()
-	newDao.TableMapper.Meta = newDao.TableMapper.Meta.WithTableName(tableName)
+	newDao.currentTableName = tableName
 	return newDao
 }
 

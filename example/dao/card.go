@@ -4,13 +4,17 @@ import (
 	"github.com/fengjx/daox/v2"
 	"github.com/fengjx/daox/v2/example/dao/schema"
 	"github.com/fengjx/daox/v2/example/dao/schema/appcard"
-	"github.com/fengjx/daox/v2/example/db"
 )
+
+// cardDao 自动生成，但可以修改扩展其他方法
 
 var CardDao *cardDao
 
 func init() {
 	CardDao = newCardDao()
+	if CardDao != nil {
+		CardDao.Dao.RelFiller = CardDao.RelFiller
+	}
 }
 
 type cardDao struct {
@@ -20,10 +24,10 @@ type cardDao struct {
 func newCardDao() *cardDao {
 	dao := daox.NewDao[*schema.AppCard](
 		appcard.Meta,
-		daox.WithDBMaster(db.DB),
 	)
 	inst := &cardDao{
 		Dao: dao,
 	}
+	dao.RelFiller = inst.RelFiller
 	return inst
 }

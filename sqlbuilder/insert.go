@@ -68,6 +68,20 @@ func (ins *Inserter) Fields(fields ...Field) *Inserter {
 	return ins
 }
 
+// Set 设置字段值
+func (ins *Inserter) Set(col string, val any) *Inserter {
+	ins.Fields(F(col).Val(val))
+	return ins
+}
+
+// SetMap 设置字段值
+func (ins *Inserter) SetMap(attr map[string]any) *Inserter {
+	for k, v := range attr {
+		ins.Fields(F(k).Val(v))
+	}
+	return ins
+}
+
 // IsReplaceInto 是否使用  replace into
 func (ins *Inserter) IsReplaceInto(replaceInto bool) *Inserter {
 	if replaceInto {

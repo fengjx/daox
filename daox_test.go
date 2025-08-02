@@ -21,6 +21,12 @@ import (
 	"github.com/fengjx/daox/v2/sqlbuilder/ql"
 )
 
+func init() {
+	daox.PrintSQL(func(ctx context.Context, ec *engine.ExecutorContext, er *engine.ExecutorResult) {
+		//fmt.Println(ec.SQL)
+	})
+}
+
 func sqliteDB() (*sql.DB, error) {
 	err := os.MkdirAll(".db", 0755)
 	if err != nil {
@@ -223,9 +229,10 @@ func testGet(t *testing.T) {
 }
 
 func testDeleteByColumns(t *testing.T) {
+	ctx := context.Background()
 	DBMaster := newDb()
 	dao := daox.NewDao[*DemoInfo](DemoInfoMeta, daox.WithDBMaster(DBMaster))
-	num, err := dao.DeleteByColumns(daox.OfMultiKv(DemoInfoMeta.UID, 100, 101))
+	num, err := dao.DeleteByCondContext(ctx, ql.Col(DemoInfoMeta.UID).In(100, 101))
 	if err != nil {
 		t.Error(err)
 	}
@@ -253,7 +260,7 @@ func (b blog) New() daox.Model {
 func TestIgnoreField(t *testing.T) {
 	tableName := "TestIgnoreField"
 	DBMaster := newDb()
-	dao := daox.NewDao[blog](BlogMeta, daox.WithDBMaster(DBMaster)).WithTableName(tableName)
+	dao := daox.NewDao[*blog](BlogMeta, daox.WithDBMaster(DBMaster)).WithTableName(tableName)
 	t.Log(strings.Join(dao.TableMapper.Meta.Columns, ","))
 	assert.Equal(t, "id,uid,title,content,create_time", strings.Join(dao.TableMapper.Meta.Columns, ","))
 }
@@ -309,6 +316,7 @@ func TestDaox(t *testing.T) {
 }
 
 func TestBatchSave(t *testing.T) {
+	ctx := context.Background()
 	tb := "demo_info_batch"
 	before(t, tb)
 	DBMaster := newDb()
@@ -338,7 +346,7 @@ func TestBatchSave(t *testing.T) {
 	}
 	affected, _ := result.RowsAffected()
 	assert.Equal(t, int64(2), affected)
-	u, err := dao.GetByColumn(daox.OfKv("uid", 1000))
+	u, err := dao.GetByCondContext(ctx, ql.Col("uid").EQ(1000))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,6 +438,7 @@ func TestWithTableName(t *testing.T) {
 }
 
 func TestUpdater_Exec(t *testing.T) {
+	ctx := context.Background()
 	tb := "demo_info_updater"
 	before(t, tb)
 	DBMaster := newDb()
@@ -445,7 +454,7 @@ func TestUpdater_Exec(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, int64(1), affected)
-	m1, err := dao.GetByColumn(daox.OfKv("uid", 100))
+	m1, err := dao.GetByCondContext(ctx, ql.Col("uid").EQ(100))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -453,6 +462,7 @@ func TestUpdater_Exec(t *testing.T) {
 }
 
 func TestUpdater_NamedExec(t *testing.T) {
+	ctx := context.Background()
 	tb := "demo_info_updater"
 	before(t, tb)
 	DBMaster := newDb()
@@ -470,7 +480,7 @@ func TestUpdater_NamedExec(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, int64(1), affected)
-	m1, err := dao.GetByColumn(daox.OfKv("uid", 100))
+	m1, err := dao.GetByCondContext(ctx, ql.Col("uid").EQ(100))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,7 +521,7 @@ func TestDao_Hook(t *testing.T) {
 		t.Fatal("GetByID not exist")
 	}
 	assert.Equal(t, u1.UID, u2.UID)
-	list, err := dao.ListByIDs(1, 2, 3)
+	list, err := dao.ListByIDs([]int64{1, 2, 3})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +563,7 @@ func TestDao_RelFilter(t *testing.T) {
 		t.Fatal("GetByID not exist")
 	}
 	assert.Equal(t, u1.UID, u2.UID)
-	list, err := dao.ListByIDs(1, 2, 3)
+	list, err := dao.ListByIDs([]int64{1, 2, 3})
 	if err != nil {
 		t.Fatal(err)
 	}
