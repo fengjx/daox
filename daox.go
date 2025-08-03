@@ -267,7 +267,6 @@ func (d *Dao[T]) getByCond(ctx context.Context, cond sqlbuilder.ConditionBuilder
 	if !exist {
 		return d.emptyModel(), nil
 	}
-	err = d.relFill(ctx, []T{dest})
 	if err != nil {
 		return d.emptyModel(), err
 	}
@@ -277,10 +276,6 @@ func (d *Dao[T]) getByCond(ctx context.Context, cond sqlbuilder.ConditionBuilder
 func (d *Dao[T]) listByCond(ctx context.Context, cond sqlbuilder.ConditionBuilder) ([]T, error) {
 	var dest []T
 	err := d.Selector().Where(cond).ListContext(ctx, &dest)
-	if err != nil {
-		return nil, err
-	}
-	err = d.relFill(ctx, dest)
 	if err != nil {
 		return nil, err
 	}
@@ -430,10 +425,12 @@ func (d *Dao[T]) relFill(ctx context.Context, items []T) error {
 
 func (d *Dao[T]) selectorPreload(ctx context.Context, dest any) error {
 	var items []T
-	if v, ok := dest.([]T); ok {
-		items = v
-	} else if v, ok := dest.(T); ok {
+	if v, ok := dest.(T); ok {
 		items = []T{v}
+	} else if v, ok := dest.(*[]T); ok {
+		items = *v
+	} else if v, ok := dest.([]T); ok {
+		items = v
 	}
 	return d.relFill(ctx, items)
 }

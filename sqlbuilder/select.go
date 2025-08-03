@@ -486,7 +486,7 @@ func (s *Selector) OneContext(ctx context.Context, dest any) (exist bool, err er
 	if s.preloader != nil {
 		err = s.preloader(ctx, dest)
 		if err != nil {
-			return true, err
+			return false, err
 		}
 	}
 	return true, nil
