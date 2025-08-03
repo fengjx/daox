@@ -424,6 +424,9 @@ func (d *Dao[T]) relFill(ctx context.Context, items []T) error {
 }
 
 func (d *Dao[T]) selectorPreload(ctx context.Context, dest any) error {
+	if d.RelFiller == nil {
+		return nil
+	}
 	var items []T
 	if v, ok := dest.(T); ok {
 		items = []T{v}
