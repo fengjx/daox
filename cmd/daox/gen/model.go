@@ -45,14 +45,15 @@ type Custom struct {
 
 // Table represents a database table
 type Table struct {
-	Name          string
-	StructName    string
-	Columns       []Column
-	PrimaryKey    Column
-	AutoIncrement bool
-	Comment       string
-	StoreEngine   string
-	GoImports     []string
+	Name           string
+	StructName     string
+	Columns        []Column
+	PrimaryKey     Column
+	AutoIncrement  bool
+	Comment        string
+	StoreEngine    string
+	GoImports      []string
+	CreateTableSQL string // SHOW CREATE TABLE 的结果
 }
 
 type Column struct {

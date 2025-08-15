@@ -128,6 +128,11 @@ func loadTableMeta(db *sqlx.DB, dbName, tableName string) *Table {
 	table.Columns = columns
 	table.PrimaryKey = primaryKey
 	table.GoImports = goImports(table.Columns)
+
+	// 获取 SHOW CREATE TABLE 的结果
+	createTableSQL := loadCreateTableSQL(db, tableName)
+	table.CreateTableSQL = createTableSQL
+
 	return table
 }
 
@@ -199,6 +204,28 @@ func loadColumnMeta(db *sqlx.DB, dbName, tableName string) ([]Column, Column) {
 		columns = append(columns, col)
 	}
 	return columns, primaryKey
+}
+
+// loadCreateTableSQL 获取表的 CREATE TABLE SQL 语句
+func loadCreateTableSQL(db *sqlx.DB, tableName string) string {
+	querySQL := "SHOW CREATE TABLE `" + tableName + "`"
+	rows, err := db.Query(querySQL)
+	if err != nil {
+		color.Red("读取表[%s] CREATE TABLE SQL 失败: %s", tableName, err.Error())
+		return ""
+	}
+	defer rows.Close()
+
+	var tableNameResult, createTableSQL string
+	if rows.Next() {
+		err = rows.Scan(&tableNameResult, &createTableSQL)
+		if err != nil {
+			color.Red("读取表[%s] CREATE TABLE SQL 失败: %s", tableName, err.Error())
+			return ""
+		}
+	}
+
+	return createTableSQL
 }
 
 type gen struct {

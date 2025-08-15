@@ -1,9 +1,7 @@
 ---
-description: 
-globs: 
+globs: cmd/daox/**
 alwaysApply: false
 ---
-
 ## daox gen
 
 daox cmd 是一个 daox 配套的代码生成工具，用户生成 daox 的辅助代码

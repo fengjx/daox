@@ -10,6 +10,12 @@ import (
 {{end}}
 )
 
+{{- if .Table.CreateTableSQL}}
+/*
+{{.Table.CreateTableSQL}}
+*/
+{{- end}}
+
 const (
 	TableName     = "{{.Table.Name}}"
 	{{- range .Table.Columns}}
