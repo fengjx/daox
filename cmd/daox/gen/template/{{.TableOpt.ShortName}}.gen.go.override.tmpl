@@ -7,6 +7,7 @@ package dao
 import (
     "context"
     "github.com/fengjx/daox/v2"
+    "github.com/fengjx/daox/v2/engine"
     "{{.Gomod}}/{{.TargetDir}}/schema"
 )
 
@@ -27,7 +28,7 @@ func (d *{{$DaoName}}) WithTableName(tableName string) *{{$DaoName}} {
 }
 
 // WithExecutor 使用新的执行器创建 Dao
-func (d *{{$DaoName}}) WithExecutor(executor daox.Executor) *{{$DaoName}} {
+func (d *{{$DaoName}}) WithExecutor(executor engine.Executor) *{{$DaoName}} {
     newDao := new({{$DaoName}})
     *newDao = *d
     newDao.Dao = d.Dao.WithExecutor(executor)
