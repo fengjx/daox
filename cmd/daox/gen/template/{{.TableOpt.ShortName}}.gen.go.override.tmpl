@@ -18,6 +18,38 @@ func (d *{{$DaoName}}) Preload(paths ...string) *{{$DaoName}} {
     return newDao
 }
 
+// WithTableName 使用新的表名创建 Dao
+func (d *{{$DaoName}}) WithTableName(tableName string) *{{$DaoName}} {
+    newDao := new({{$DaoName}})
+    *newDao = *d
+    newDao.Dao = d.Dao.WithTableName(tableName)
+    return newDao
+}
+
+// WithExecutor 使用新的执行器创建 Dao
+func (d *{{$DaoName}}) WithExecutor(executor daox.Executor) *{{$DaoName}} {
+    newDao := new({{$DaoName}})
+    *newDao = *d
+    newDao.Dao = d.Dao.WithExecutor(executor)
+    return newDao
+}
+
+// WithMaster 使用主库执行器创建 Dao
+func (d *{{$DaoName}}) WithMaster() *{{$DaoName}} {
+    newDao := new({{$DaoName}})
+    *newDao = *d
+    newDao.Dao = d.Dao.WithMaster()
+    return newDao
+}
+
+// WithRead 使用从库执行器创建 Dao
+func (d *{{$DaoName}}) WithRead() *{{$DaoName}} {
+    newDao := new({{$DaoName}})
+    *newDao = *d
+    newDao.Dao = d.Dao.WithRead()
+    return newDao
+}
+
 // RelFiller auto-generated relation loader. DO NOT MODIFY.
 func (d *{{$DaoName}}) RelFiller(ctx context.Context, list []*schema.{{$ObjName}}, p *daox.PreloadNode) error {
     if len(list) == 0 || p == nil {
