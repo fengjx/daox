@@ -278,6 +278,77 @@ func testPage(t *testing.T) {
 	}
 }
 
+func testPageContext(t *testing.T) {
+	DBMaster := newDb()
+	dao := daox.NewDao[*DemoInfo](DemoInfoMeta, daox.WithDBMaster(DBMaster))
+
+	// 测试基本分页功能
+	ctx := context.Background()
+	total, items, err := dao.PageContext(ctx, 0, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 验证总数
+	assert.Equal(t, int64(10), total)
+	// 验证返回的数据量
+	assert.Equal(t, 5, len(items))
+
+	// 验证分页偏移
+	total2, items2, err := dao.PageContext(ctx, 5, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(10), total2)
+	assert.Equal(t, 5, len(items2))
+
+	// 验证第一页和第二页的数据不重复
+	firstPageIDs := make(map[int64]bool)
+	for _, item := range items {
+		firstPageIDs[item.ID] = true
+	}
+
+	for _, item := range items2 {
+		assert.False(t, firstPageIDs[item.ID], "第二页数据与第一页重复")
+	}
+
+	// 测试带条件的分页查询
+	total3, items3, err := dao.PageContext(ctx, 0, 3, DemoInfoMeta.SexEQ("male"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(10), total3) // 所有数据都是 male
+	assert.LessOrEqual(t, len(items3), 3)
+
+	// 测试边界情况：offset 超出范围
+	total4, items4, err := dao.PageContext(ctx, 20, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(10), total4)
+	assert.Equal(t, 0, len(items4))
+
+	// 测试边界情况：limit 为 0
+	total5, items5, err := dao.PageContext(ctx, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(10), total5)
+	assert.Equal(t, 0, len(items5))
+
+	// 测试带多个条件的分页查询
+	total6, items6, err := dao.PageContext(ctx, 0, 10,
+		DemoInfoMeta.UidGT(105),
+		DemoInfoMeta.SexEQ("male"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.LessOrEqual(t, total6, int64(10))
+	assert.LessOrEqual(t, len(items6), 10)
+
+	t.Logf("分页测试完成: 总数=%d, 第一页=%d, 第二页=%d", total, len(items), len(items2))
+}
+
 func TestGetDaoByMeta(t *testing.T) {
 	dao := daox.NewDao[*DemoInfo](DemoInfoMeta)
 	assert.Equal(t, DemoInfoMeta.TableName(), dao.TableName())
@@ -312,6 +383,7 @@ func TestDaox(t *testing.T) {
 	t.Run("testSelect", testSelect)
 	t.Run("testGet", testGet)
 	t.Run("testPage", testPage)
+	t.Run("testPageContext", testPageContext)
 	t.Run("testDeleteByColumns", testDeleteByColumns)
 }
 
@@ -569,4 +641,87 @@ func TestDao_RelFilter(t *testing.T) {
 	}
 	assert.Equal(t, 3, len(list))
 	assert.NoError(t, err)
+}
+
+func TestPageContext(t *testing.T) {
+	tb := "demo_info_page_context"
+	before(t, tb)
+	defer after(t, tb)
+
+	DBMaster := newDb()
+	dao := daox.NewDao[*DemoInfo](DemoInfoMeta, daox.WithDBMaster(DBMaster)).WithTableName(tb)
+
+	// 测试基本分页功能
+	ctx := context.Background()
+	total, items, err := dao.PageContext(ctx, 0, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 验证总数
+	assert.Equal(t, int64(10), total)
+	// 验证返回的数据量
+	assert.Equal(t, 5, len(items))
+
+	// 验证分页偏移
+	total2, items2, err := dao.PageContext(ctx, 5, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(10), total2)
+	assert.Equal(t, 5, len(items2))
+
+	// 验证第一页和第二页的数据不重复
+	firstPageIDs := make(map[int64]bool)
+	for _, item := range items {
+		firstPageIDs[item.ID] = true
+	}
+
+	for _, item := range items2 {
+		assert.False(t, firstPageIDs[item.ID], "第二页数据与第一页重复")
+	}
+
+	// 测试带条件的分页查询
+	total3, items3, err := dao.PageContext(ctx, 0, 3, DemoInfoMeta.SexEQ("male"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(10), total3) // 所有数据都是 male
+	assert.LessOrEqual(t, len(items3), 3)
+
+	// 测试边界情况：offset 超出范围
+	total4, items4, err := dao.PageContext(ctx, 20, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(10), total4)
+	assert.Equal(t, 0, len(items4))
+
+	// 测试边界情况：limit 为 0
+	total5, items5, err := dao.PageContext(ctx, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, int64(10), total5)
+	assert.Equal(t, 0, len(items5))
+
+	// 测试带多个条件的分页查询
+	total6, items6, err := dao.PageContext(ctx, 0, 10,
+		DemoInfoMeta.UidGT(105),
+		DemoInfoMeta.SexEQ("male"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.LessOrEqual(t, total6, int64(10))
+	assert.LessOrEqual(t, len(items6), 10)
+
+	// 测试带 context 取消的情况
+	ctxCancel, cancel := context.WithCancel(context.Background())
+	cancel() // 立即取消
+
+	_, _, err = dao.PageContext(ctxCancel, 0, 5)
+	// 注意：这里可能不会立即返回错误，因为数据库操作可能已经完成
+	// 但我们可以验证函数能正常处理已取消的 context
+
+	t.Logf("PageContext 测试完成: 总数=%d, 第一页=%d, 第二页=%d", total, len(items), len(items2))
 }

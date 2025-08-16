@@ -267,9 +267,6 @@ func (d *Dao[T]) getByCond(ctx context.Context, cond sqlbuilder.ConditionBuilder
 	if !exist {
 		return d.emptyModel(), nil
 	}
-	if err != nil {
-		return d.emptyModel(), err
-	}
 	return dest, nil
 }
 
@@ -301,6 +298,37 @@ func (d *Dao[T]) GetByID(id any) (T, error) {
 func (d *Dao[T]) GetByIDContext(ctx context.Context, id any) (T, error) {
 	tableMeta := d.TableMapper.Meta
 	return d.getByCond(ctx, ql.C(ql.Col(tableMeta.PrimaryKey).EQ(id)))
+}
+
+// Page 分页查询
+// offset: 偏移量
+// limit: 限制数量
+// whereCol: 条件
+// 返回值: 总数量, 数据列表, 错误
+func (d *Dao[T]) Page(offset, limit int64, whereCol ...sqlbuilder.Column) (total int64, items []T, err error) {
+	return d.PageContext(context.Background(), offset, limit, whereCol...)
+}
+
+// PageContext 分页查询，传递 context
+// ctx: 上下文
+// offset: 偏移量
+// limit: 限制数量
+// whereCol: 条件
+// 返回值: 总数量, 数据列表, 错误
+func (d *Dao[T]) PageContext(ctx context.Context, offset, limit int64, whereCol ...sqlbuilder.Column) (total int64, items []T, err error) {
+	selector := d.Selector().Offset(offset).Limit(limit)
+	if len(whereCol) > 0 {
+		selector.Where(ql.C(whereCol...))
+	}
+	total, err = selector.GetCountContext(ctx)
+	if err != nil {
+		return 0, nil, err
+	}
+	err = selector.ListContext(ctx, &items)
+	if err != nil {
+		return 0, nil, err
+	}
+	return total, items, nil
 }
 
 // ListByIDs 根据 id 查询多条数据
