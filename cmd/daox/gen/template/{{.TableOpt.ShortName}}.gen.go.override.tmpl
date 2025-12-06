@@ -79,7 +79,7 @@ func (d *{{$DaoName}}) fill{{.Name}}(ctx context.Context, list []*schema.{{$ObjN
         ids = append(ids, m.{{GonicCase .ForeignKey}})
     }
     var refDao = daox.GetDao[*schema.{{$StructName}}]("{{.Table}}" ).WithPreloadNode(n)
-    refList, err := refDao.ListByCondContext(ctx, ql.Col("{{RefKey}}").In(ids...))
+    refList, err := refDao.ListByCondContext(ctx, ql.Col("{{.RefKey}}").In(ids...))
     if err != nil {
         return err
     }
