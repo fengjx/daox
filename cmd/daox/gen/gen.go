@@ -240,6 +240,7 @@ func newGen(tmplDir string, eFS *embed.FS, config *Config, table *Table) *gen {
 	tableOpt.ShortName = utils.SnakeCase(tableOpt.ShortName)
 	tableOpt.ShortNameLower = utils.ToLowerAndTrim(tableOpt.ShortName)
 	tableOpt.TableNameLower = utils.ToLowerAndTrim(table.Name)
+	tableOpt.DaoGenGoImports = daoGoImports(tableOpt)
 	targetDir := config.Target.Custom.TargetDir
 	if tableOpt.TargetDir != "" {
 		targetDir = tableOpt.TargetDir
@@ -277,6 +278,22 @@ func newGen(tmplDir string, eFS *embed.FS, config *Config, table *Table) *gen {
 		FileGen: fg,
 	}
 	return g
+}
+
+func daoGoImports(c TableConfig) []string {
+	hasO2m := func() bool {
+		for _, r := range c.Relations {
+			if r.Type == "o2m" {
+				return true
+			}
+		}
+		return false
+	}
+	var imports []string
+	if hasO2m() {
+		imports = append(imports, "github.com/fengjx/daox/v2/sqlbuilder/ql")
+	}
+	return imports
 }
 
 func goImports(cols []Column) []string {

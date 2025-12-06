@@ -22,12 +22,13 @@ type RelationConfig struct {
 }
 
 type TableConfig struct {
-	ShortName      string           `yaml:"short-name"`
-	TargetDir      string           `yaml:"target-dir"` // 可选，生成文件路径，默认 ./
-	Var            Var              `yaml:"var"`
-	Relations      []RelationConfig `yaml:"relations"`
-	ShortNameLower string           `yaml:"-"`
-	TableNameLower string           `yaml:"-"`
+	ShortName       string           `yaml:"short-name"`
+	TargetDir       string           `yaml:"target-dir"` // 可选，生成文件路径，默认 ./
+	Var             Var              `yaml:"var"`
+	Relations       []RelationConfig `yaml:"relations"`
+	ShortNameLower  string           `yaml:"-"`
+	TableNameLower  string           `yaml:"-"`
+	DaoGenGoImports []string         `yaml:"-"`
 }
 
 type ReverseTarget struct {
