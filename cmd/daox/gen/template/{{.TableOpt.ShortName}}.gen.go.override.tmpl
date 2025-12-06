@@ -9,9 +9,7 @@ import (
     "github.com/fengjx/daox/v2"
     "github.com/fengjx/daox/v2/engine"
     "{{.Gomod}}/{{.TargetDir}}/schema"
-    {{- if eq .Type "o2m"}}
     "github.com/fengjx/daox/v2/sqlbuilder/ql"
-    {{- end}}
 )
 
 // Preload 预加载
