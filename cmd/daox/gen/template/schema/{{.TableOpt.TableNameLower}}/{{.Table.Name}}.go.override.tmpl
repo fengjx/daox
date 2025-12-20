@@ -23,6 +23,18 @@ const (
 	{{- end}}
 )
 
+
+{{- range .Table.Columns}}
+
+func {{GonicCase .Name}}FieldVal() sqlbuilder.Field {
+	return ql.F({{GonicCase .Name}})
+}
+
+{{- end}}
+
+
+
+
 var Meta = {{GonicCase .Table.StructName}}Meta{}
 
 // {{.Table.StructName}}M {{.Table.Comment}}
