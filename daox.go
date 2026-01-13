@@ -344,13 +344,13 @@ func (d *Dao[T]) ListByIDsContext(ctx context.Context, ids any) ([]T, error) {
 	return d.listByCond(ctx, ql.C(ql.Col(tableMeta.PrimaryKey).InSlice(ids)))
 }
 
-// UpdateField 部分字段更新
-func (d *Dao[T]) UpdateField(idValue any, fieldMap map[string]any) (int64, error) {
-	return d.UpdateFieldContext(context.Background(), idValue, fieldMap)
+// UpdateMapFields 部分字段更新
+func (d *Dao[T]) UpdateMapFields(idValue any, fieldMap map[string]any) (int64, error) {
+	return d.UpdateMapFieldsContext(context.Background(), idValue, fieldMap)
 }
 
-// UpdateFieldContext 部分字段更新，传递 context
-func (d *Dao[T]) UpdateFieldContext(ctx context.Context, idValue any, attr map[string]any) (int64, error) {
+// UpdateMapFieldsContext 部分字段更新，传递 context
+func (d *Dao[T]) UpdateMapFieldsContext(ctx context.Context, idValue any, attr map[string]any) (int64, error) {
 	if utils.IsIDEmpty(idValue) {
 		return 0, ErrUpdatePrimaryKeyRequire
 	}
@@ -360,6 +360,21 @@ func (d *Dao[T]) UpdateFieldContext(ctx context.Context, idValue any, attr map[s
 		return 0, err
 	}
 	return affected, nil
+}
+
+// UpdateFieldsByID 部分字段更新，传递 context
+func (d *Dao[T]) UpdateFieldsByID(id any, fields ...sqlbuilder.Field) (int64, error) {
+	return d.UpdateFieldsByIDContext(context.Background(), id, fields...)
+}
+
+// UpdateFieldsByIDContext 部分字段更新，传递 context
+func (d *Dao[T]) UpdateFieldsByIDContext(ctx context.Context, id any, fields ...sqlbuilder.Field) (int64, error) {
+	if len(fields) == 0 {
+		return 0, nil
+	}
+	return d.Updater().Fields(
+		fields...,
+	).WhereC(ql.Col(d.TableMapper.Meta.PrimaryKey).EQ(id)).ExecContext(ctx)
 }
 
 // Update 根据 ID 全字段更新
